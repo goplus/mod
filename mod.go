@@ -59,4 +59,9 @@ func GOPMOD(dir string, mode Mode) (file string, err error) {
 	return "", syscall.ENOENT
 }
 
+// GOMOD checks the modfile (go.mod) in this dir or its ancestors.
+func GOMOD(dir string) (file string, err error) {
+	return GOPMOD(dir, GoModOnly)
+}
+
 // -----------------------------------------------------------------------------
