@@ -118,9 +118,15 @@ func fixVersion(fixed *bool) modfile.VersionFixer {
 	}
 }
 
+type Mode = mod.Mode
+
+const (
+	GoModOnly = mod.GoModOnly
+)
+
 // Load loads a module from `dir`.
-func Load(dir string) (p Module, err error) {
-	gopmod, err := mod.GOPMOD(dir)
+func Load(dir string, mode Mode) (p Module, err error) {
+	gopmod, err := mod.GOPMOD(dir, mode)
 	if err != nil {
 		return
 	}

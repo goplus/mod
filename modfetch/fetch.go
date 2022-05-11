@@ -93,7 +93,11 @@ func tryConvGoMod(data string, next *string, env *modload.GopEnv) (mod module.Ve
 }
 
 func convGoMod(dir string, env *modload.GopEnv) (isClass bool, err error) {
-	mod, err := modload.Load(dir)
+	var mode modload.Mode
+	if env == nil {
+		mode = modload.GoModOnly
+	}
+	mod, err := modload.Load(dir, mode)
 	if err != nil {
 		return
 	}
