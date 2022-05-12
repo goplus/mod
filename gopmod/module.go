@@ -17,7 +17,9 @@
 package gopmod
 
 import (
+	"log"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"syscall"
@@ -82,6 +84,40 @@ func isPkgInMod(pkgPath, modPath string) bool {
 		return suffix == "" || suffix[0] == '/'
 	}
 	return false
+}
+
+type Package struct {
+	Type    PkgType
+	Dir     string
+	ModDir  string
+	ModPath string
+}
+
+func (p *Module) Lookup(pkgPath string) (pkg *Package, err error) {
+	switch pt := p.PkgType(pkgPath); pt {
+	case PkgtStandard:
+		modDir := runtime.GOROOT()
+		pkg = &Package{Type: PkgtStandard, ModDir: modDir, Dir: filepath.Join(modDir, pkgPath)}
+	case PkgtModule:
+		modPath := p.Path()
+		modDir := p.Root()
+		dir := modDir + pkgPath[:len(modPath)]
+		pkg = &Package{Type: PkgtModule, ModPath: modPath, ModDir: modDir, Dir: dir}
+	case PkgtExtern:
+		if modPath, modVer, ok := p.LookupExternPkg(pkgPath); ok {
+			if modDir, e := modcache.Path(modVer); e == nil {
+				dir := modDir + pkgPath[:len(modPath)]
+				pkg = &Package{Type: PkgtExtern, ModPath: modPath, ModDir: modDir, Dir: dir}
+			} else {
+				return nil, e
+			}
+		} else {
+			err = syscall.ENOENT
+		}
+	default:
+		log.Panicln("Module.Lookup:", pkgPath, "unsupported pkgType:", pt)
+	}
+	return
 }
 
 // LookupExternPkg lookups a external package from depended modules.
