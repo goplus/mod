@@ -101,12 +101,12 @@ func (p *Module) Lookup(pkgPath string) (pkg *Package, err error) {
 	case PkgtModule:
 		modPath := p.Path()
 		modDir := p.Root()
-		dir := modDir + pkgPath[:len(modPath)]
+		dir := modDir + pkgPath[len(modPath):]
 		pkg = &Package{Type: PkgtModule, ModPath: modPath, ModDir: modDir, Dir: dir}
 	case PkgtExtern:
 		if modPath, modVer, ok := p.LookupExternPkg(pkgPath); ok {
 			if modDir, e := modcache.Path(modVer); e == nil {
-				dir := modDir + pkgPath[:len(modPath)]
+				dir := modDir + pkgPath[len(modPath):]
 				pkg = &Package{Type: PkgtExtern, ModPath: modPath, ModDir: modDir, Dir: dir}
 			} else {
 				return nil, e
