@@ -25,17 +25,20 @@ import (
 	"path/filepath"
 	"strings"
 
-	gomodfile "golang.org/x/mod/modfile"
+	"github.com/goplus/mod"
+	"github.com/goplus/mod/env"
+	"github.com/goplus/mod/modfile"
 	"golang.org/x/mod/module"
 
-	"github.com/goplus/mod"
-	"github.com/goplus/mod/modfile"
+	gomodfile "golang.org/x/mod/modfile"
 )
 
 var (
 	ErrNoModDecl = errors.New("no module declaration in gop.mod (or go.mod)")
 	ErrNoModRoot = errors.New("gop.mod or go.mod file not found in current directory or any parent directory")
 )
+
+type GopEnv = env.Gop
 
 type Module struct {
 	*modfile.File
@@ -254,11 +257,6 @@ func (p Module) saveGoMod(gomod string, env *GopEnv) error {
 		err = os.WriteFile(gomod, data, 0644)
 	}
 	return err
-}
-
-type GopEnv struct {
-	Version string
-	Root    string // GOPROOT
 }
 
 func (p Module) convToGoMod(env *GopEnv) *gomodfile.File {

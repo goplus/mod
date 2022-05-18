@@ -24,13 +24,14 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/goplus/mod/env"
 	"github.com/goplus/mod/modcache"
 	"github.com/goplus/mod/modfetch"
 	"github.com/goplus/mod/modload"
 	"golang.org/x/mod/module"
 )
 
-type GopEnv = modload.GopEnv
+type GopEnv = env.Gop
 
 // -----------------------------------------------------------------------------
 

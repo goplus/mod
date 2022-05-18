@@ -26,6 +26,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/goplus/mod/env"
 	"github.com/goplus/mod/modcache"
 	"github.com/goplus/mod/modload"
 	"golang.org/x/mod/module"
@@ -38,7 +39,7 @@ type (
 	ExecCmdError = modload.ExecCmdError
 )
 
-func Get(env *modload.GopEnv, modPath string, noCache ...bool) (mod module.Version, isClass bool, err error) {
+func Get(env *env.Gop, modPath string, noCache ...bool) (mod module.Version, isClass bool, err error) {
 	if noCache == nil || !noCache[0] {
 		mod, isClass, err = getFromCache(modPath, env)
 		if err != syscall.ENOENT {
@@ -60,7 +61,7 @@ func Get(env *modload.GopEnv, modPath string, noCache ...bool) (mod module.Versi
 	return getFromCache(modPath, env)
 }
 
-func getResult(data string, env *modload.GopEnv) (mod module.Version, isClass bool, err error) {
+func getResult(data string, env *env.Gop) (mod module.Version, isClass bool, err error) {
 	// go: downloading github.com/xushiwei/foogop v0.1.0
 	const downloading = "go: downloading "
 	if strings.HasPrefix(data, downloading) {
@@ -77,7 +78,7 @@ func getResult(data string, env *modload.GopEnv) (mod module.Version, isClass bo
 	return
 }
 
-func tryConvGoMod(data string, next *string, env *modload.GopEnv) (mod module.Version, isClass bool, err error) {
+func tryConvGoMod(data string, next *string, env *env.Gop) (mod module.Version, isClass bool, err error) {
 	err = syscall.ENOENT
 	if pos := strings.IndexByte(data, '\n'); pos > 0 {
 		line := data[:pos]
@@ -92,7 +93,7 @@ func tryConvGoMod(data string, next *string, env *modload.GopEnv) (mod module.Ve
 	return
 }
 
-func convGoMod(dir string, env *modload.GopEnv) (isClass bool, err error) {
+func convGoMod(dir string, env *env.Gop) (isClass bool, err error) {
 	var mode modload.Mode
 	if env == nil {
 		mode = modload.GoModOnly
@@ -108,7 +109,7 @@ func convGoMod(dir string, env *modload.GopEnv) (isClass bool, err error) {
 
 // -----------------------------------------------------------------------------
 
-func getFromCache(modPath string, env *modload.GopEnv) (modVer module.Version, isClass bool, err error) {
+func getFromCache(modPath string, env *env.Gop) (modVer module.Version, isClass bool, err error) {
 	modRoot, modVer, err := lookupFromCache(modPath)
 	if err != nil {
 		return
