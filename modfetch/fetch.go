@@ -35,10 +35,8 @@ import (
 
 // -----------------------------------------------------------------------------
 
-type (
-	ExecCmdError = modload.ExecCmdError
-)
-
+// Get downloads a modPath to GOMODCACHE.
+//
 func Get(env *env.Gop, modPath string, noCache ...bool) (mod module.Version, isClass bool, err error) {
 	if noCache == nil || !noCache[0] {
 		mod, isClass, err = getFromCache(modPath, env)
@@ -47,16 +45,15 @@ func Get(env *env.Gop, modPath string, noCache ...bool) (mod module.Version, isC
 		}
 	}
 	var stdout, stderr bytes.Buffer
-	cmd := exec.Command("go", "get", modPath)
+	cmd := exec.Command("go", "install", modPath)
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
-	err = cmd.Run()
-	if err != nil {
-		err = &ExecCmdError{Err: err, Stderr: stderr.Bytes()}
-		return
-	}
+	cmd.Run()
 	if stderr.Len() > 0 {
-		return getResult(stderr.String(), env)
+		mod, isClass, err = getResult(stderr.String(), env)
+		if err != syscall.ENOENT {
+			return
+		}
 	}
 	return getFromCache(modPath, env)
 }
@@ -70,11 +67,7 @@ func getResult(data string, env *env.Gop) (mod module.Version, isClass bool, err
 		}
 		return tryConvGoMod(data[len(downloading):], &data, env)
 	}
-	// go get: added github.com/xushiwei/foogop v0.1.0
-	const added = "go get: added "
-	if strings.HasPrefix(data, added) {
-		return tryConvGoMod(data[len(added):], &data, env)
-	}
+	err = syscall.ENOENT
 	return
 }
 
@@ -94,11 +87,10 @@ func tryConvGoMod(data string, next *string, env *env.Gop) (mod module.Version, 
 }
 
 func convGoMod(dir string, env *env.Gop) (isClass bool, err error) {
-	var mode modload.Mode
 	if env == nil {
-		mode = modload.GoModOnly
+		return
 	}
-	mod, err := modload.Load(dir, mode)
+	mod, err := modload.Load(dir, 0)
 	if err != nil {
 		return
 	}
