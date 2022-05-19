@@ -45,7 +45,11 @@ func Get(env *env.Gop, modPath string, noCache ...bool) (mod module.Version, isC
 		}
 	}
 	var stdout, stderr bytes.Buffer
-	cmd := exec.Command("go", "install", modPath)
+	var modPathVer = modPath
+	if strings.IndexByte(modPath, '@') < 0 {
+		modPathVer += "@latest"
+	}
+	cmd := exec.Command("go", "install", modPathVer)
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	cmd.Run()
