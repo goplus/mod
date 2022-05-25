@@ -24,14 +24,11 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/goplus/mod/env"
 	"github.com/goplus/mod/modcache"
 	"github.com/goplus/mod/modfetch"
 	"github.com/goplus/mod/modload"
 	"golang.org/x/mod/module"
 )
-
-type GopEnv = env.Gop
 
 // -----------------------------------------------------------------------------
 
@@ -44,7 +41,6 @@ type Module struct {
 	modload.Module
 	classes map[string]*Class
 	depmods []depmodInfo
-	env     *GopEnv
 }
 
 // PkgType specifies a package type.
@@ -171,46 +167,42 @@ func getDepMods(mod modload.Module) []depmodInfo {
 }
 
 // New creates a module from a modload.Module instance.
-func New(mod modload.Module, env *GopEnv) *Module {
+func New(mod modload.Module) *Module {
 	classes := make(map[string]*Class)
 	depmods := getDepMods(mod)
-	return &Module{classes: classes, depmods: depmods, Module: mod, env: env}
+	return &Module{classes: classes, depmods: depmods, Module: mod}
 }
 
 // Load loads a module from a local dir.
 // If we only want to load a Go modfile, pass env parameter as nil.
-func Load(dir string, env *GopEnv) (*Module, error) {
-	var mode modload.Mode
-	if env == nil {
-		mode = modload.GoModOnly
-	}
-	mod, err := modload.Load(dir, mode)
+func Load(dir string) (*Module, error) {
+	mod, err := modload.Load(dir, 0)
 	if err != nil {
 		return nil, err
 	}
-	return New(mod, env), nil
+	return New(mod), nil
 }
 
 // LoadMod loads a module from a versioned module path.
 // If we only want to load a Go modfile, pass env parameter as nil.
-func LoadMod(mod module.Version, env *GopEnv) (p *Module, err error) {
-	p, err = loadModFrom(mod, env)
+func LoadMod(mod module.Version) (p *Module, err error) {
+	p, err = loadModFrom(mod)
 	if err != syscall.ENOENT {
 		return
 	}
-	mod, _, err = modfetch.Get(env, mod.String())
+	mod, err = modfetch.Get(mod.String())
 	if err != nil {
 		return
 	}
-	return loadModFrom(mod, env)
+	return loadModFrom(mod)
 }
 
-func loadModFrom(mod module.Version, env *GopEnv) (p *Module, err error) {
+func loadModFrom(mod module.Version) (p *Module, err error) {
 	dir, err := modcache.Path(mod)
 	if err != nil {
 		return
 	}
-	return Load(dir, env)
+	return Load(dir)
 }
 
 // -----------------------------------------------------------------------------

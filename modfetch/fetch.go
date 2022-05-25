@@ -26,9 +26,7 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/goplus/mod/env"
 	"github.com/goplus/mod/modcache"
-	"github.com/goplus/mod/modload"
 	"golang.org/x/mod/module"
 	"golang.org/x/mod/semver"
 )
@@ -37,9 +35,9 @@ import (
 
 // Get downloads a modPath to GOMODCACHE.
 //
-func Get(env *env.Gop, modPath string, noCache ...bool) (mod module.Version, isClass bool, err error) {
+func Get(modPath string, noCache ...bool) (mod module.Version, err error) {
 	if noCache == nil || !noCache[0] {
-		mod, isClass, err = getFromCache(modPath, env)
+		mod, err = getFromCache(modPath)
 		if err != syscall.ENOENT {
 			return
 		}
@@ -54,63 +52,46 @@ func Get(env *env.Gop, modPath string, noCache ...bool) (mod module.Version, isC
 	cmd.Stderr = &stderr
 	cmd.Run()
 	if stderr.Len() > 0 {
-		mod, isClass, err = getResult(stderr.String(), env)
+		mod, err = getResult(stderr.String())
 		if err != syscall.ENOENT {
 			return
 		}
 	}
-	return getFromCache(modPath, env)
+	return getFromCache(modPath)
 }
 
-func getResult(data string, env *env.Gop) (mod module.Version, isClass bool, err error) {
+func getResult(data string) (mod module.Version, err error) {
 	// go: downloading github.com/xushiwei/foogop v0.1.0
 	const downloading = "go: downloading "
 	if strings.HasPrefix(data, downloading) {
 		if pos := strings.IndexByte(data, '\n'); pos > 0 {
 			fmt.Fprintln(os.Stderr, "gop:", data[4:pos])
 		}
-		return tryConvGoMod(data[len(downloading):], &data, env)
+		return getMod(data[len(downloading):], nil)
 	}
 	err = syscall.ENOENT
 	return
 }
 
-func tryConvGoMod(data string, next *string, env *env.Gop) (mod module.Version, isClass bool, err error) {
-	err = syscall.ENOENT
+func getMod(data string, next *string) (mod module.Version, err error) {
 	if pos := strings.IndexByte(data, '\n'); pos > 0 {
 		line := data[:pos]
-		*next = data[pos+1:]
+		if next != nil {
+			*next = data[pos+1:]
+		}
 		if pos = strings.IndexByte(line, ' '); pos > 0 {
 			mod.Path, mod.Version = line[:pos], line[pos+1:]
-			if dir, e := modcache.Path(mod); e == nil {
-				isClass, err = convGoMod(dir, env)
-			}
+			return
 		}
 	}
+	err = syscall.ENOENT
 	return
-}
-
-func convGoMod(dir string, env *env.Gop) (isClass bool, err error) {
-	if env == nil {
-		return
-	}
-	mod, err := modload.Load(dir, 0)
-	if err != nil {
-		return
-	}
-	os.Chmod(dir, 0755)
-	defer os.Chmod(dir, 0555)
-	return mod.Classfile != nil, mod.UpdateGoMod(env, true)
 }
 
 // -----------------------------------------------------------------------------
 
-func getFromCache(modPath string, env *env.Gop) (modVer module.Version, isClass bool, err error) {
-	modRoot, modVer, err := lookupFromCache(modPath)
-	if err != nil {
-		return
-	}
-	isClass, err = convGoMod(modRoot, env)
+func getFromCache(modPath string) (modVer module.Version, err error) {
+	_, modVer, err = lookupFromCache(modPath)
 	return
 }
 

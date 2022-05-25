@@ -82,7 +82,7 @@ func (p *Module) registerMod(modPath string, regcls func(c *Class)) (err error) 
 	if err != syscall.ENOENT {
 		return
 	}
-	mod, _, err = modfetch.Get(p.env, mod.String())
+	mod, err = modfetch.Get(mod.String())
 	if err != nil {
 		return
 	}
