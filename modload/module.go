@@ -17,11 +17,9 @@
 package modload
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -152,15 +150,6 @@ func Load(dir string, mode Mode) (p Module, err error) {
 	return Module{File: f}, nil
 }
 
-func loadGoMod(gomod string) (f *gomodfile.File, err error) {
-	data, err := os.ReadFile(gomod)
-	if err != nil {
-		return
-	}
-	var fixed bool
-	return gomodfile.Parse(gomod, data, fixVersion(&fixed))
-}
-
 // -----------------------------------------------------------------------------
 
 // Save saves all changes of this module.
@@ -176,65 +165,6 @@ func (p Module) Save() error {
 const (
 	gopMod = "github.com/goplus/gop"
 )
-
-// Tidy adds missing and removes unused modules.
-// Note: please call GenGo before Tidy.
-func (p Module) Tidy(env *GopEnv) (err error) {
-	gopmod := p.Modfile()
-	dir, file := filepath.Split(gopmod)
-	gomod := dir + "go.mod"
-	isGopMod := file != "go.mod"
-	if isGopMod {
-		if err = p.saveGoMod(gomod, env); err != nil {
-			return
-		}
-	}
-	if err = tidy(dir); err != nil {
-		return
-	}
-	if isGopMod {
-		gof, loadErr := loadGoMod(gomod)
-		if loadErr != nil {
-			return loadErr
-		}
-		p.DropAllRequire()
-		p.DropAllReplace()
-		for _, r := range gof.Require {
-			switch r.Mod.Path {
-			case gopMod, "":
-				continue
-			}
-			p.AddRequire(r.Mod.Path, r.Mod.Version)
-		}
-		for _, r := range gof.Replace {
-			switch r.Old.Path {
-			case gopMod, "":
-				continue
-			}
-			p.AddReplace(r.Old.Path, r.Old.Version, r.New.Path, r.New.Version)
-		}
-		err = p.Save()
-		if err == nil {
-			err = p.UpdateGoMod(env, false)
-		}
-	}
-	return
-}
-
-func tidy(modRoot string) (err error) {
-	var stdout, stderr bytes.Buffer
-	cmd := exec.Command("go", "mod", "tidy")
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	cmd.Dir = modRoot
-	err = cmd.Run()
-	if err != nil {
-		err = &ExecCmdError{Err: err, Stderr: stderr.Bytes()}
-	}
-	msg := strings.ReplaceAll(stderr.String(), "go: ", "gop: ")
-	os.Stdout.WriteString(msg)
-	return
-}
 
 // UpdateGoMod updates the go.mod file.
 func (p Module) UpdateGoMod(env *GopEnv, checkChanged bool) error {
@@ -335,20 +265,6 @@ func getVerb(e modfile.Expr) string {
 		return line.Token[0]
 	}
 	return e.(*modfile.LineBlock).Token[0]
-}
-
-// -----------------------------------------------------------------------------
-
-type ExecCmdError struct {
-	Err    error
-	Stderr []byte
-}
-
-func (p *ExecCmdError) Error() string {
-	if e := p.Stderr; e != nil {
-		return string(e)
-	}
-	return p.Err.Error()
 }
 
 // -----------------------------------------------------------------------------
