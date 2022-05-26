@@ -66,10 +66,12 @@ func Split(pkgPath, modBase string) (modPath, relPath string) {
 				relPath = relPath[:pos]
 			}
 			modPath = strings.Join(parts[:3], "/")
-			return
+		} else {
+			modPath = pkgPath
 		}
+		return
 	}
-	panic("TODO: modfetch.Split - unexpected pkgPath")
+	panic("TODO: modfetch.Split - unexpected pkgPath: " + pkgPath)
 }
 
 // -----------------------------------------------------------------------------
