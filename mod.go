@@ -28,12 +28,14 @@ import (
 type Mode int
 
 const (
-	GoModOnly Mode = 1
+	GoModOnly  Mode = 1
+	GopModOnly Mode = 2
 )
 
 // GOPMOD checks the modfile in this dir or its ancestors.
 // If mode == 0, it checks both gop.mod and go.mod
 // If mode == GoModOnly, it checks go.mod
+// If mode == GopModOnly, it checks gop.mod
 func GOPMOD(dir string, mode Mode) (file string, err error) {
 	if dir == "" {
 		dir = "."
@@ -48,9 +50,11 @@ func GOPMOD(dir string, mode Mode) (file string, err error) {
 				return
 			}
 		}
-		file = filepath.Join(dir, "go.mod")
-		if fi, e := os.Lstat(file); e == nil && !fi.IsDir() {
-			return
+		if mode != GopModOnly {
+			file = filepath.Join(dir, "go.mod")
+			if fi, e := os.Lstat(file); e == nil && !fi.IsDir() {
+				return
+			}
 		}
 		if dir, file = filepath.Split(strings.TrimRight(dir, "/\\")); file == "" {
 			break

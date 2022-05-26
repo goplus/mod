@@ -24,6 +24,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/goplus/mod"
 	"github.com/goplus/mod/modcache"
 	"github.com/goplus/mod/modfetch"
 	"github.com/goplus/mod/modload"
@@ -101,7 +102,7 @@ func (p *Module) Lookup(pkgPath string) (pkg *Package, err error) {
 		dir := modDir + pkgPath[len(modPath):]
 		pkg = &Package{Type: PkgtModule, ModPath: modPath, ModDir: modDir, Dir: dir}
 	case PkgtExtern:
-		if modPath, modVer, ok := p.LookupExternPkg(pkgPath); ok {
+		if modPath, modVer, ok := p.lookupExternPkg(pkgPath); ok {
 			if modDir, e := modcache.Path(modVer); e == nil {
 				dir := modDir + pkgPath[len(modPath):]
 				pkg = &Package{Type: PkgtExtern, ModPath: modPath, ModDir: modDir, Dir: dir}
@@ -117,9 +118,9 @@ func (p *Module) Lookup(pkgPath string) (pkg *Package, err error) {
 	return
 }
 
-// LookupExternPkg lookups a external package from depended modules.
+// lookupExternPkg lookups a external package from depended modules.
 // If modVer.Path is replace to be a local path, it will be canonical to an absolute path.
-func (p *Module) LookupExternPkg(pkgPath string) (modPath string, modVer module.Version, ok bool) {
+func (p *Module) lookupExternPkg(pkgPath string) (modPath string, modVer module.Version, ok bool) {
 	for _, m := range p.depmods {
 		if isPkgInMod(pkgPath, m.path) {
 			modPath, modVer, ok = m.path, m.real, true
@@ -175,8 +176,8 @@ func New(mod modload.Module) *Module {
 
 // Load loads a module from a local dir.
 // If we only want to load a Go modfile, pass env parameter as nil.
-func Load(dir string) (*Module, error) {
-	mod, err := modload.Load(dir, 0)
+func Load(dir string, mode mod.Mode) (*Module, error) {
+	mod, err := modload.Load(dir, mode)
 	if err != nil {
 		return nil, err
 	}
@@ -185,8 +186,8 @@ func Load(dir string) (*Module, error) {
 
 // LoadMod loads a module from a versioned module path.
 // If we only want to load a Go modfile, pass env parameter as nil.
-func LoadMod(mod module.Version) (p *Module, err error) {
-	p, err = loadModFrom(mod)
+func LoadMod(mod module.Version, mode mod.Mode) (p *Module, err error) {
+	p, err = loadModFrom(mod, mode)
 	if err != syscall.ENOENT {
 		return
 	}
@@ -194,15 +195,15 @@ func LoadMod(mod module.Version) (p *Module, err error) {
 	if err != nil {
 		return
 	}
-	return loadModFrom(mod)
+	return loadModFrom(mod, mode)
 }
 
-func loadModFrom(mod module.Version) (p *Module, err error) {
+func loadModFrom(mod module.Version, mode mod.Mode) (p *Module, err error) {
 	dir, err := modcache.Path(mod)
 	if err != nil {
 		return
 	}
-	return Load(dir)
+	return Load(dir, mode)
 }
 
 // -----------------------------------------------------------------------------

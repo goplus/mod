@@ -33,9 +33,57 @@ import (
 
 // -----------------------------------------------------------------------------
 
+// GetPkg downloads the module that contains pkgPath to GOMODCACHE.
+func GetPkg(pkgPath, modBase string) (modVer module.Version, relPath string, err error) {
+	modPath, relPath := Split(pkgPath, modBase)
+	modVer, err = Get(modPath)
+	return
+}
+
+// Split splits a pkgPath into modPath and its relPath to module root.
+func Split(pkgPath, modBase string) (modPath, relPath string) {
+	if modBase != "" && strings.HasPrefix(pkgPath, modBase) {
+		n := len(modBase)
+		if len(pkgPath) == n {
+			return modBase, ""
+		}
+		if pkgPath[n] == '/' {
+			return modBase, pkgPath[n+1:]
+		}
+	}
+	parts := strings.SplitN(pkgPath, "/", 4)
+	if strings.Index(parts[0], ".") < 0 { // standard package
+		return "", pkgPath
+	}
+	switch parts[0] {
+	case ".", "..": // local package
+		return modBase, pkgPath
+	case "github.com":
+		if len(parts) > 3 {
+			relPath = parts[3]
+			if pos := strings.IndexByte(relPath, '@'); pos > 0 {
+				parts[2] += relPath[pos:]
+				relPath = relPath[:pos]
+			}
+			modPath = strings.Join(parts[:3], "/")
+			return
+		}
+	}
+	panic("TODO: modfetch.Split - unexpected pkgPath")
+}
+
+// -----------------------------------------------------------------------------
+
+var (
+	errEmptyModPath = errors.New("empty module path")
+)
+
 // Get downloads a modPath to GOMODCACHE.
-//
 func Get(modPath string, noCache ...bool) (mod module.Version, err error) {
+	if modPath == "" {
+		err = errEmptyModPath
+		return
+	}
 	if noCache == nil || !noCache[0] {
 		mod, err = getFromCache(modPath)
 		if err != syscall.ENOENT {
