@@ -44,6 +44,11 @@ type Module struct {
 	depmods []depmodInfo
 }
 
+// IsValid returns if this module exists or not.
+func (p *Module) IsValid() bool {
+	return p != nil && p.File != nil
+}
+
 // PkgType specifies a package type.
 type PkgType int
 
@@ -102,31 +107,30 @@ func (p *Module) Lookup(pkgPath string) (pkg *Package, err error) {
 		dir := modDir + pkgPath[len(modPath):]
 		pkg = &Package{Type: PkgtModule, ModPath: modPath, ModDir: modDir, Dir: dir}
 	case PkgtExtern:
-		if modPath, modVer, ok := p.lookupExternPkg(pkgPath); ok {
-			if modDir, e := modcache.Path(modVer); e == nil {
-				dir := modDir + pkgPath[len(modPath):]
-				pkg = &Package{Type: PkgtExtern, ModPath: modPath, ModDir: modDir, Dir: dir}
-			} else {
-				return nil, e
-			}
-		} else {
-			err = syscall.ENOENT
-		}
+		pkg, _, err = p.LookupExternPkg(pkgPath)
 	default:
 		log.Panicln("Module.Lookup:", pkgPath, "unsupported pkgType:", pt)
 	}
 	return
 }
 
-// lookupExternPkg lookups a external package from depended modules.
+// LookupExternPkg lookups a external package from depended modules.
 // If modVer.Path is replace to be a local path, it will be canonical to an absolute path.
-func (p *Module) lookupExternPkg(pkgPath string) (modPath string, modVer module.Version, ok bool) {
+func (p *Module) LookupExternPkg(pkgPath string) (pkg *Package, modVer module.Version, err error) {
 	for _, m := range p.depmods {
 		if isPkgInMod(pkgPath, m.path) {
-			modPath, modVer, ok = m.path, m.real, true
-			break
+			modVer = m.real
+			if modDir, e := modcache.Path(modVer); e == nil {
+				modPath := m.path
+				dir := modDir + pkgPath[len(modPath):]
+				pkg = &Package{Type: PkgtExtern, ModPath: modPath, ModDir: modDir, Dir: dir}
+			} else {
+				err = e
+			}
+			return
 		}
 	}
+	err = syscall.ENOENT
 	return
 }
 
