@@ -226,7 +226,7 @@ func notChanged(target, src string) bool {
 func cloneGoFileSyntax(syn *modfile.FileSyntax) *modfile.FileSyntax {
 	stmt := make([]modfile.Expr, 0, len(syn.Stmt))
 	for _, e := range syn.Stmt {
-		if isGopExpr(e) {
+		if isGopOrDeletedExpr(e) {
 			continue
 		}
 		stmt = append(stmt, cloneExpr(e))
@@ -246,9 +246,9 @@ func cloneExpr(e modfile.Expr) modfile.Expr {
 	return e
 }
 
-func isGopExpr(e modfile.Expr) bool {
+func isGopOrDeletedExpr(e modfile.Expr) bool {
 	switch verb := getVerb(e); verb {
-	case "gop", "register", "classfile":
+	case "", "gop", "register", "classfile":
 		return true
 	}
 	return false
@@ -256,7 +256,10 @@ func isGopExpr(e modfile.Expr) bool {
 
 func getVerb(e modfile.Expr) string {
 	if line, ok := e.(*modfile.Line); ok {
-		return line.Token[0]
+		if token := line.Token; len(token) > 0 {
+			return token[0]
+		}
+		return "" // deleted line
 	}
 	return e.(*modfile.LineBlock).Token[0]
 }
