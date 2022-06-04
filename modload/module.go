@@ -36,8 +36,6 @@ var (
 	ErrNoModRoot = errors.New("gop.mod or go.mod file not found in current directory or any parent directory")
 )
 
-type GopEnv = env.Gop
-
 type Module struct {
 	*modfile.File
 }
@@ -161,7 +159,7 @@ const (
 )
 
 // UpdateGoMod updates the go.mod file.
-func (p Module) UpdateGoMod(env *GopEnv, checkChanged bool) error {
+func (p Module) UpdateGoMod(env *env.Gop, checkChanged bool) error {
 	gopmod := p.Modfile()
 	dir, file := filepath.Split(gopmod)
 	if file == "go.mod" {
@@ -174,7 +172,7 @@ func (p Module) UpdateGoMod(env *GopEnv, checkChanged bool) error {
 	return p.saveGoMod(gomod, env)
 }
 
-func (p Module) saveGoMod(gomod string, env *GopEnv) error {
+func (p Module) saveGoMod(gomod string, env *env.Gop) error {
 	gof := p.convToGoMod(env)
 	data, err := gof.Format()
 	if err == nil {
@@ -183,7 +181,7 @@ func (p Module) saveGoMod(gomod string, env *GopEnv) error {
 	return err
 }
 
-func (p Module) convToGoMod(env *GopEnv) *gomodfile.File {
+func (p Module) convToGoMod(env *env.Gop) *gomodfile.File {
 	copy := p.File.File
 	copy.Syntax = cloneGoFileSyntax(copy.Syntax)
 	addRequireIfNotExist(&copy, gopMod, env.Version)
