@@ -17,6 +17,7 @@
 package gopmod
 
 import (
+	"fmt"
 	"log"
 	"path/filepath"
 	"runtime"
@@ -130,7 +131,8 @@ func (p *Module) lookupExternPkg(pkgPath string) (pkg *Package, err error) {
 			return
 		}
 	}
-	err = syscall.ENOENT
+	err = fmt.Errorf(`no required module provides package %v; to add it:
+	go get %v`, pkgPath, pkgPath)
 	return
 }
 
