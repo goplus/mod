@@ -17,6 +17,7 @@
 package gopmod
 
 import (
+	"fmt"
 	"log"
 	"path/filepath"
 	"runtime"
@@ -130,7 +131,7 @@ func (p *Module) lookupExternPkg(pkgPath string) (pkg *Package, err error) {
 			return
 		}
 	}
-	err = &mod.MissingPkgError{Path: pkgPath}
+	err = &MissingError{Path: pkgPath}
 	return
 }
 
@@ -208,6 +209,15 @@ func loadModFrom(mod module.Version, mode mod.Mode) (p *Module, err error) {
 		return
 	}
 	return Load(dir, mode)
+}
+
+type MissingError struct {
+	Path string
+}
+
+func (e *MissingError) Error() string {
+	return fmt.Sprintf(`no required module provides package %v; to add it:
+	gop get %v`, e.Path, e.Path)
 }
 
 // -----------------------------------------------------------------------------

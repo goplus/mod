@@ -17,7 +17,6 @@
 package mod
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -67,15 +66,6 @@ func GOPMOD(dir string, mode Mode) (file string, err error) {
 // GOMOD checks the modfile (go.mod) in this dir or its ancestors.
 func GOMOD(dir string) (file string, err error) {
 	return GOPMOD(dir, GoModOnly)
-}
-
-type MissingPkgError struct {
-	Path string
-}
-
-func (e *MissingPkgError) Error() string {
-	return fmt.Sprintf(`no required module provides package %v; to add it:
-	go get %v`, e.Path, e.Path)
 }
 
 // -----------------------------------------------------------------------------
