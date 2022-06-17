@@ -132,7 +132,7 @@ func parseToFile(file string, data []byte, fix VersionFixer, strict bool) (parse
 
 func (f *File) parseVerb(errs *ErrorList, verb string, line *Line, args []string, strict bool) {
 	wrapModPathError := func(modPath string, err error) {
-		*errs = append(*errs, Error{
+		errs.Add(&Error{
 			Filename: f.Syntax.Name,
 			Pos:      line.Start,
 			ModPath:  modPath,
@@ -141,7 +141,7 @@ func (f *File) parseVerb(errs *ErrorList, verb string, line *Line, args []string
 		})
 	}
 	wrapError1 := func(err error) {
-		*errs = append(*errs, Error{
+		errs.Add(&Error{
 			Filename: f.Syntax.Name,
 			Pos:      line.Start,
 			Err:      err,
@@ -403,8 +403,22 @@ func (e *InvalidExtError) Error() string {
 
 func (e *InvalidExtError) Unwrap() error { return e.Err }
 
-type ErrorList = modfile.ErrorList
-type Error = modfile.Error
+type ErrorList = errors.List
+type Error modfile.Error
+
+func (p *Error) Error() string {
+	return (*modfile.Error)(p).Error()
+}
+
+func (p *Error) Unwrap() error {
+	return p.Err
+}
+
+func (p *Error) Summary() string {
+	cpy := *(*modfile.Error)(p)
+	cpy.Err = errors.New(errors.Summary(p.Unwrap()))
+	return cpy.Error()
+}
 
 // -----------------------------------------------------------------------------
 

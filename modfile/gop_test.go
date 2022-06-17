@@ -20,6 +20,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/qiniu/x/errors"
 	"golang.org/x/mod/modfile"
 )
 
@@ -224,7 +225,7 @@ register -
 classfile .gmx .spx github.com/goplus/spx math
 classfile .gmx .spx github.com/goplus/spx math
 `)
-	doTestParseErr(t, `gop.mod:2: usage: classfile projExt workExt [classFilePkgPath ...]`, `
+	doTestParseErr(t, `gop.mod:2: usage: classfile projExt workExt classFilePkgPath ...`, `
 classfile .gmx .spx
 `)
 	doTestParseErr(t, `gop.mod:2: ext . invalid: invalid ext format`, `
@@ -247,12 +248,12 @@ go 1.x
 func doTestParseErr(t *testing.T, errMsg string, gopmod string) {
 	t.Run(errMsg, func(t *testing.T) {
 		_, err := Parse("gop.mod", []byte(gopmod), nil)
-		if err == nil {
+		if err == nil || err.Error() == "" {
 			t.Fatal("Parse: no error?")
 			return
 		}
-		if err.Error() != errMsg {
-			t.Error("Parse got:", err, "\nExpected:", errMsg)
+		if errRet := errors.Summary(err); errRet != errMsg {
+			t.Error("Parse got:", errRet, "\nExpected:", errMsg)
 		}
 	})
 }
