@@ -17,12 +17,13 @@
 package modfile
 
 import (
-	"errors"
 	"fmt"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 
+	"github.com/qiniu/x/errors"
 	"golang.org/x/mod/modfile"
 	"golang.org/x/mod/module"
 )
@@ -105,6 +106,7 @@ func ParseLax(file string, data []byte, fix VersionFixer) (*File, error) {
 func parseToFile(file string, data []byte, fix VersionFixer, strict bool) (parsed *File, err error) {
 	f, err := modfile.ParseLax(file, data, fix)
 	if err != nil {
+		err = errors.NewWith(err, `modfile.ParseLax(file, data, fix)`, -2, "modfile.ParseLax", file, data, fix)
 		return
 	}
 	parsed = &File{File: *f}
@@ -123,7 +125,7 @@ func parseToFile(file string, data []byte, fix VersionFixer, strict bool) (parse
 		}
 	}
 	if len(errs) > 0 {
-		return nil, errs
+		return nil, errors.NewWith(errs, `len(errs) > 0`, -1, ">", len(errs), 0)
 	}
 	return
 }
@@ -138,15 +140,22 @@ func (f *File) parseVerb(errs *ErrorList, verb string, line *Line, args []string
 			Err:      err,
 		})
 	}
-	wrapError := func(err error) {
+	wrapError1 := func(err error) {
 		*errs = append(*errs, Error{
 			Filename: f.Syntax.Name,
 			Pos:      line.Start,
 			Err:      err,
 		})
 	}
+	wrapError := func(err error) {
+		file, line := fileLine(2)
+		e := errors.NewFrame(err, "", file, line, "wrapError", err)
+		wrapError1(e)
+	}
 	errorf := func(format string, args ...interface{}) {
-		wrapError(fmt.Errorf(format, args...))
+		file, line := fileLine(2)
+		e := errors.NewFrame(fmt.Errorf(format, args...), "", file, line, "errorf", format, args)
+		wrapError1(e)
 	}
 	switch verb {
 	case "require", "exclude", "module", "go", "retract":
@@ -252,7 +261,7 @@ func (f *File) parseVerb(errs *ErrorList, verb string, line *Line, args []string
 			return
 		}
 		if len(args) < 3 {
-			errorf("usage: classfile projExt workExt [classFilePkgPath ...]")
+			errorf("usage: classfile projExt workExt classFilePkgPath ...")
 			return
 		}
 		projExt, err := parseExt(&args[0])
@@ -278,6 +287,11 @@ func (f *File) parseVerb(errs *ErrorList, verb string, line *Line, args []string
 			errorf("unknown directive: %s", verb)
 		}
 	}
+}
+
+func fileLine(n int) (file string, line int) {
+	_, file, line, _ = runtime.Caller(n)
+	return
 }
 
 func parseVersion(verb string, path string, s *string) (string, error) {

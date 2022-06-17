@@ -28,6 +28,7 @@ import (
 	"github.com/goplus/mod/modcache"
 	"github.com/goplus/mod/modfetch"
 	"github.com/goplus/mod/modload"
+	"github.com/qiniu/x/errors"
 	"golang.org/x/mod/module"
 )
 
@@ -183,7 +184,7 @@ func New(mod modload.Module) *Module {
 func Load(dir string, mode mod.Mode) (*Module, error) {
 	mod, err := modload.Load(dir, mode)
 	if err != nil {
-		return nil, err
+		return nil, errors.NewWith(err, `modload.Load(dir, mode)`, -2, "modload.Load", dir, mode)
 	}
 	return New(mod), nil
 }

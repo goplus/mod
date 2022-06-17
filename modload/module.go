@@ -17,7 +17,6 @@
 package modload
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -26,6 +25,7 @@ import (
 	"github.com/goplus/mod"
 	"github.com/goplus/mod/env"
 	"github.com/goplus/mod/modfile"
+	"github.com/qiniu/x/errors"
 	"golang.org/x/mod/module"
 
 	gomodfile "golang.org/x/mod/modfile"
@@ -121,23 +121,26 @@ func fixVersion(fixed *bool) modfile.VersionFixer {
 func Load(dir string, mode mod.Mode) (p Module, err error) {
 	gopmod, err := mod.GOPMOD(dir, mode)
 	if err != nil {
+		err = errors.NewWith(err, `mod.GOPMOD(dir, mode)`, -2, "mod.GOPMOD", dir, mode)
 		return
 	}
 
 	data, err := os.ReadFile(gopmod)
 	if err != nil {
+		err = errors.NewWith(err, `os.ReadFile(gopmod)`, -2, "os.ReadFile", gopmod)
 		return
 	}
 
 	var fixed bool
-	f, err := modfile.Parse(gopmod, data, fixVersion(&fixed))
+	fix := fixVersion(&fixed)
+	f, err := modfile.Parse(gopmod, data, fix)
 	if err != nil {
-		// Errors returned by modfile.Parse begin with file:line.
+		err = errors.NewWith(err, `modfile.Parse(gopmod, data, fix)`, -2, "modfile.Parse", gopmod, data, fix)
 		return
 	}
 	if f.Module == nil {
 		// No module declaration. Must add module path.
-		return Module{}, ErrNoModDecl
+		return Module{}, errors.NewWith(ErrNoModDecl, `f.Module == nil`, -2, "==", f.Module, nil)
 	}
 	return Module{File: f}, nil
 }
