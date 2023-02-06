@@ -34,9 +34,26 @@ import (
 // -----------------------------------------------------------------------------
 
 // GetPkg downloads the module that contains pkgPath to GOMODCACHE.
-func GetPkg(pkgPath, modBase string) (modVer module.Version, relPath string, err error) {
-	modPath, relPath := Split(pkgPath, modBase)
-	modVer, err = Get(modPath)
+func GetPkg(pkgPath, modBase string) (modVer module.Version, relPath, err error) {
+	var ver string
+	if pos := strings.IndexByte(pkgPath, '@'); pos > 0 {
+		pkgPath, ver = pkgPath[:pos], pkgPath[pos:]
+	}
+	list := strings.Split(pkgPath, "/")
+	for i := len(list); i > 0; i-- {
+		modPath := strings.Join(list[:i], "/") + ver
+		modVer, err = Get(modPath)
+		if err == nil {
+			encPath, _ := module.EscapePath(modVer.Path)
+			modRoot := filepath.Join(modcache.GOMODCACHE, encPath+"@"+modVer.Version, filepath.Join(list[i:]...))
+			if _, e := os.Stat(modRoot); e != nil {
+				err = fmt.Errorf("gop: module %v found, but does not contain package %v", modVer.Path, pkgPath)
+				return
+			}
+			return
+		}
+	}
+	err = fmt.Errorf("gop: %v not found.", pkgPath+ver)
 	return
 }
 
@@ -97,7 +114,7 @@ func Get(modPath string, noCache ...bool) (mod module.Version, err error) {
 	if strings.IndexByte(modPath, '@') < 0 {
 		modPathVer += "@latest"
 	}
-	cmd := exec.Command("go", "install", modPathVer)
+	cmd := exec.Command("go", "get", modPathVer)
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	cmd.Run()
@@ -106,6 +123,9 @@ func Get(modPath string, noCache ...bool) (mod module.Version, err error) {
 		if err != syscall.ENOENT {
 			return
 		}
+	}
+	if strings.HasSuffix(modPath, "@latest") {
+		modPath = modPath[:len(modPath)-7]
 	}
 	return getFromCache(modPath)
 }
