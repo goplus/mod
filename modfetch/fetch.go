@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path"
 	"path/filepath"
 	"strings"
 	"syscall"
@@ -51,7 +50,7 @@ func GetPkg(pkgPath, modBase string) (modVer module.Version, relPath string, err
 				err = fmt.Errorf("gop: module %v found, but does not contain package %v", modVer.Path, pkgPath)
 				return
 			}
-			relPath = path.Join(list[i:]...)
+			relPath = strings.Join(list[i:], "/")
 			return
 		}
 	}
