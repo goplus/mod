@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"strings"
 	"syscall"
@@ -34,7 +35,7 @@ import (
 // -----------------------------------------------------------------------------
 
 // GetPkg downloads the module that contains pkgPath to GOMODCACHE.
-func GetPkg(pkgPath, modBase string) (modVer module.Version, relPath, err error) {
+func GetPkg(pkgPath, modBase string) (modVer module.Version, relPath string, err error) {
 	var ver string
 	if pos := strings.IndexByte(pkgPath, '@'); pos > 0 {
 		pkgPath, ver = pkgPath[:pos], pkgPath[pos:]
@@ -50,6 +51,7 @@ func GetPkg(pkgPath, modBase string) (modVer module.Version, relPath, err error)
 				err = fmt.Errorf("gop: module %v found, but does not contain package %v", modVer.Path, pkgPath)
 				return
 			}
+			relPath = path.Join(list[i:]...)
 			return
 		}
 	}
