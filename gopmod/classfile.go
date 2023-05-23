@@ -109,8 +109,10 @@ func (p *Module) registerClassFrom(modVer module.Version, regcls func(c *Class))
 
 func (p *Module) registerClass(c *Class, regcls func(c *Class)) {
 	p.classes[c.ProjExt] = c
-	for _, ext := range strings.Split(c.WorkExt, ";") {
-		p.classes[ext] = c
+	if c.WorkExt != "" {
+		for _, ext := range strings.Split(c.WorkExt, ";") {
+			p.classes[ext] = c
+		}
 	}
 	if regcls != nil {
 		regcls(c)
