@@ -27,13 +27,15 @@ import (
 	"golang.org/x/mod/module"
 )
 
-type Class = modfile.Classfile
+type Class = modfile.Project
+type WorkClass = modfile.WorkClass
 
 var (
 	ClassSpx = &Class{
-		ProjExt:  ".gmx",
-		WorkExt:  ".spx",
-		PkgPaths: []string{"github.com/goplus/spx", "math"},
+		ProjExt:   ".gmx",
+		ProjClass: "Game",
+		WorkClass: []*WorkClass{&WorkClass{WorkExt: ".spx", WorkClass: "Sprite"}},
+		PkgPaths:  []string{"github.com/goplus/spx", "math"},
 	}
 )
 
@@ -62,7 +64,7 @@ func (p *Module) RegisterClasses(registerClass ...func(c *Class)) (err error) {
 		regcls = registerClass[0]
 	}
 	p.registerClass(ClassSpx, regcls)
-	if c := p.Classfile; c != nil {
+	if c := p.Project; c != nil {
 		p.registerClass(c, regcls)
 	}
 	for _, r := range p.Register {
@@ -98,7 +100,7 @@ func (p *Module) registerClassFrom(modVer module.Version, regcls func(c *Class))
 	if err != nil {
 		return
 	}
-	c := mod.Classfile
+	c := mod.Project
 	if c == nil {
 		return ErrNotClassFileMod
 	}
@@ -108,8 +110,8 @@ func (p *Module) registerClassFrom(modVer module.Version, regcls func(c *Class))
 
 func (p *Module) registerClass(c *Class, regcls func(c *Class)) {
 	p.classes[c.ProjExt] = c
-	if c.WorkExt != "" {
-		p.classes[c.WorkExt] = c
+	for _, w := range c.WorkClass {
+		p.classes[w.WorkExt] = c
 	}
 	if regcls != nil {
 		regcls(c)
