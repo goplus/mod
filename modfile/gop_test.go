@@ -49,76 +49,6 @@ module spx
 go 1.17
 gop 1.1
 
-classfile .gmx .spx github.com/goplus/spx math
-
-require (
-	github.com/ajstarks/svgo v0.0.0-20210927141636-6d70534b1098
-)
-`
-
-func TestGoModCompat(t *testing.T) {
-	const (
-		gopmod = gopmodSpx
-	)
-	f, err := modfile.ParseLax("go.mod", []byte(gopmod), nil)
-	if err != nil || len(f.Syntax.Stmt) != 5 {
-		t.Fatal("modfile.ParseLax failed:", f, err)
-	}
-
-	gop := f.Syntax.Stmt[2].(*modfile.Line)
-	if len(gop.Token) != 2 || gop.Token[0] != "gop" || gop.Token[1] != "1.1" {
-		t.Fatal("modfile.ParseLax gop:", gop)
-	}
-
-	require := f.Syntax.Stmt[4].(*modfile.LineBlock)
-	if len(require.Token) != 1 || require.Token[0] != "require" {
-		t.Fatal("modfile.ParseLax require:", require)
-	}
-	if len(require.Line) != 1 {
-		t.Fatal("modfile.ParseLax require.Line:", require.Line)
-	}
-}
-
-// -----------------------------------------------------------------------------
-
-func TestParse1(t *testing.T) {
-	const (
-		gopmod = gopmodSpx
-	)
-	f, err := ParseLax("github.com/goplus/gop/gop.mod", []byte(gopmod), nil)
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	if f.Gop.Version != "1.1" {
-		t.Errorf("gop version expected be 1.1, but %s got", f.Gop.Version)
-	}
-
-	if f.Classfile.ProjExt != ".gmx" {
-		t.Errorf("classfile exts expected be .gmx, but %s got", f.Classfile.ProjExt)
-	}
-	if f.Classfile.WorkExt != ".spx" {
-		t.Errorf("classfile exts expected be .spx, but %s got", f.Classfile.WorkExt)
-	}
-
-	if len(f.Classfile.PkgPaths) != 2 {
-		t.Errorf("classfile pkgpaths length expected be 2, but %d got", len(f.Classfile.PkgPaths))
-	}
-
-	if f.Classfile.PkgPaths[0] != "github.com/goplus/spx" {
-		t.Errorf("classfile path expected be github.com/goplus/spx, but %s got", f.Classfile.PkgPaths[0])
-	}
-	if f.Classfile.PkgPaths[1] != "math" {
-		t.Errorf("classfile path expected be math, but %s got", f.Classfile.PkgPaths[1])
-	}
-}
-
-const gopmodSpxNew = `
-module spx
-
-go 1.17
-gop 1.1
-
 project .gmx Game github.com/goplus/spx math
 class .spx Sprite
 class .spx2 *Sprite2
@@ -128,9 +58,9 @@ require (
 )
 `
 
-func TestGoModCompatNew(t *testing.T) {
+func TestGoModCompat(t *testing.T) {
 	const (
-		gopmod = gopmodSpxNew
+		gopmod = gopmodSpx
 	)
 	f, err := modfile.ParseLax("go.mod", []byte(gopmod), nil)
 	if err != nil || len(f.Syntax.Stmt) != 7 {
@@ -153,9 +83,9 @@ func TestGoModCompatNew(t *testing.T) {
 
 // -----------------------------------------------------------------------------
 
-func TestParseNew(t *testing.T) {
+func TestParse1(t *testing.T) {
 	const (
-		gopmod = gopmodSpxNew
+		gopmod = gopmodSpx
 	)
 	f, err := ParseLax("github.com/goplus/gop/gop.mod", []byte(gopmod), nil)
 	if err != nil {
@@ -308,21 +238,21 @@ register "\?"
 	doTestParseErr(t, `gop.mod:2: malformed module path "-": leading dash`, `
 register -
 `)
-	doTestParseErr(t, `gop.mod:3: repeated classfile statement`, `
-classfile .gmx .spx github.com/goplus/spx math
-classfile .gmx .spx github.com/goplus/spx math
+	doTestParseErr(t, `gop.mod:3: repeated project statement`, `
+project .gmx Game github.com/goplus/spx math
+project .gmx Game github.com/goplus/spx math
 `)
-	doTestParseErr(t, `gop.mod:2: usage: classfile projExt workExt classFilePkgPath ...`, `
-classfile .gmx .spx
+	doTestParseErr(t, `gop.mod:2: usage: project [.projExt ProjClass] classFilePkgPath ...`, `
+project .gmx Game
 `)
-	doTestParseErr(t, `gop.mod:2: ext . invalid: invalid ext format`, `
-classfile .gmx . math
+	doTestParseErr(t, `gop.mod:2: invalid Go export symbol`, `
+project .gmx game math
 `)
-	doTestParseErr(t, `gop.mod:2: ext "\?" invalid: invalid syntax`, `
-classfile "\?" .spx math
+	doTestParseErr(t, `gop.mod:2: invalid Go export symbol`, `
+project .gmx . math
 `)
 	doTestParseErr(t, `gop.mod:2: invalid quoted string: invalid syntax`, `
-classfile .123 .spx "\?"
+project .123 Game "\?"
 `)
 	doTestParseErr(t, `gop.mod:2: unknown directive: unknown`, `
 unknown .spx

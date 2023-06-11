@@ -32,10 +32,9 @@ import (
 // A File is the parsed, interpreted form of a gop.mod file.
 type File struct {
 	modfile.File
-	Gop       *Gop
-	Classfile *Classfile
-	Project   *Project
-	Register  []*Register
+	Gop      *Gop
+	Project  *Project
+	Register []*Register
 }
 
 // A Module is the module statement.
@@ -58,14 +57,6 @@ type Retract = modfile.Retract
 
 // A Gop is the gop statement.
 type Gop = modfile.Go
-
-// A Classfile is the classfile statement.
-type Classfile struct {
-	ProjExt  string   // ".gmx"
-	WorkExt  string   // ".spx"
-	PkgPaths []string // package paths of classfile
-	Syntax   *Line
-}
 
 // A Register is the register statement.
 type Register struct {
@@ -279,12 +270,12 @@ func (f *File) parseVerb(errs *ErrorList, verb string, line *Line, args []string
 			return
 		}
 		if len(args) < 1 {
-			errorf("usage: project [.projExt ProjClass] pkgPath ...")
+			errorf("usage: project [.projExt ProjClass] classFilePkgPath ...")
 			return
 		}
 		if strings.HasPrefix(args[0], ".") {
 			if len(args) < 3 || strings.Contains(args[1], "/") {
-				errorf("usage: project [.projExt ProjClass] pkgPath ...")
+				errorf("usage: project [.projExt ProjClass] classFilePkgPath ...")
 				return
 			}
 			ext, err := parseExt(&args[0])
@@ -339,33 +330,6 @@ func (f *File) parseVerb(errs *ErrorList, verb string, line *Line, args []string
 			WorkClass: class,
 			Syntax:    line,
 		})
-	case "classfile":
-		if f.Classfile != nil {
-			errorf("repeated classfile statement")
-			return
-		}
-		if len(args) < 3 {
-			errorf("usage: classfile projExt workExt classFilePkgPath ...")
-			return
-		}
-		projExt, err := parseExt(&args[0])
-		if err != nil {
-			wrapError(err)
-			return
-		}
-		workExt, err := parseExt(&args[1])
-		if err != nil {
-			wrapError(err)
-			return
-		}
-		pkgPaths, err := parseStrings(args[2:])
-		if err != nil {
-			errorf("invalid quoted string: %v", err)
-			return
-		}
-		f.Classfile = &Classfile{
-			ProjExt: projExt, WorkExt: workExt, PkgPaths: pkgPaths, Syntax: line,
-		}
 	default:
 		if strict {
 			errorf("unknown directive: %s", verb)
