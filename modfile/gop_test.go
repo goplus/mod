@@ -43,7 +43,7 @@ func TestGetWeight(t *testing.T) {
 
 // -----------------------------------------------------------------------------
 
-const gopmodSpx = `
+const gopmodSpx1 = `
 module spx
 
 go 1.17
@@ -58,9 +58,9 @@ require (
 )
 `
 
-func TestGoModCompat(t *testing.T) {
+func TestGoModCompat1(t *testing.T) {
 	const (
-		gopmod = gopmodSpx
+		gopmod = gopmodSpx1
 	)
 	f, err := modfile.ParseLax("go.mod", []byte(gopmod), nil)
 	if err != nil || len(f.Syntax.Stmt) != 7 {
@@ -85,7 +85,7 @@ func TestGoModCompat(t *testing.T) {
 
 func TestParse1(t *testing.T) {
 	const (
-		gopmod = gopmodSpx
+		gopmod = gopmodSpx1
 	)
 	f, err := ParseLax("github.com/goplus/gop/gop.mod", []byte(gopmod), nil)
 	if err != nil {
@@ -130,6 +130,88 @@ func TestParse1(t *testing.T) {
 	}
 }
 
+// -----------------------------------------------------------------------------
+
+const gopmodSpx2 = `
+module spx
+
+go 1.17
+gop 1.1
+
+project github.com/goplus/spx math
+class .spx Sprite
+
+require (
+	github.com/ajstarks/svgo v0.0.0-20210927141636-6d70534b1098
+)
+`
+
+func TestGoModCompat2(t *testing.T) {
+	const (
+		gopmod = gopmodSpx2
+	)
+	f, err := modfile.ParseLax("go.mod", []byte(gopmod), nil)
+	if err != nil || len(f.Syntax.Stmt) != 6 {
+		t.Fatal("modfile.ParseLax failed:", f, err)
+	}
+
+	gop := f.Syntax.Stmt[2].(*modfile.Line)
+	if len(gop.Token) != 2 || gop.Token[0] != "gop" || gop.Token[1] != "1.1" {
+		t.Fatal("modfile.ParseLax gop:", gop)
+	}
+
+	require := f.Syntax.Stmt[5].(*modfile.LineBlock)
+	if len(require.Token) != 1 || require.Token[0] != "require" {
+		t.Fatal("modfile.ParseLax require:", require)
+	}
+	if len(require.Line) != 1 {
+		t.Fatal("modfile.ParseLax require.Line:", require.Line)
+	}
+}
+
+// -----------------------------------------------------------------------------
+
+func TestParse2(t *testing.T) {
+	const (
+		gopmod = gopmodSpx2
+	)
+	f, err := ParseLax("github.com/goplus/gop/gop.mod", []byte(gopmod), nil)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	if f.Gop.Version != "1.1" {
+		t.Errorf("gop version expected be 1.1, but %s got", f.Gop.Version)
+	}
+	if f.Project.ProjExt != "" {
+		t.Errorf("project exts expected be .gmx, but %s got", f.Project.ProjExt)
+	}
+	if f.Project.ProjClass != "" {
+		t.Errorf("project class expected be Game, but %s got", f.Project.ProjClass)
+	}
+
+	if len(f.Project.PkgPaths) != 2 {
+		t.Errorf("project pkgpaths length expected be 2, but %d got", len(f.Project.PkgPaths))
+	}
+
+	if f.Project.PkgPaths[0] != "github.com/goplus/spx" {
+		t.Errorf("project path expected be github.com/goplus/spx, but %s got", f.Project.PkgPaths[0])
+	}
+	if f.Project.PkgPaths[1] != "math" {
+		t.Errorf("project path expected be math, but %s got", f.Project.PkgPaths[1])
+	}
+
+	if len(f.Project.WorkClass) != 1 {
+		t.Errorf("project workclass length expected be 2, but %d got", len(f.Project.WorkClass))
+	}
+	if f.Project.WorkClass[0].WorkExt != ".spx" {
+		t.Errorf("project class[0] exts expected be .spx, but %s got", f.Project.WorkClass[0].WorkExt)
+	}
+	if f.Project.WorkClass[0].WorkClass != "Sprite" {
+		t.Errorf("project class[0] class expected be Sprite, but %s got", f.Project.WorkClass[0].WorkClass)
+	}
+}
+
 const gopmodUserProj = `
 module moduleUserProj
 
@@ -148,7 +230,7 @@ replace (
 )
 `
 
-func TestParse2(t *testing.T) {
+func TestParseUser(t *testing.T) {
 	const (
 		gopmod = gopmodUserProj
 	)
