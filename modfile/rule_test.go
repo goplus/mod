@@ -53,6 +53,9 @@ func TestParseExt(t *testing.T) {
 	if (&InvalidExtError{Err: syscall.EINVAL}).Unwrap() != syscall.EINVAL {
 		t.Fatal("InvalidExtError.Unwrap failed")
 	}
+	if (&InvalidSymbolError{Err: syscall.EINVAL}).Unwrap() != syscall.EINVAL {
+		t.Fatal("InvalidSymbolError.Unwrap failed")
+	}
 	for _, tt := range addParseExtTests {
 		t.Run(tt.desc, func(t *testing.T) {
 			ext, err := parseExt(&tt.ext)

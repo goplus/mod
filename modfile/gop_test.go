@@ -325,16 +325,48 @@ project .gmx Game github.com/goplus/spx math
 project .gmx Game github.com/goplus/spx math
 `)
 	doTestParseErr(t, `gop.mod:2: usage: project [.projExt ProjClass] classFilePkgPath ...`, `
+project
+`)
+	doTestParseErr(t, `gop.mod:2: usage: project [.projExt ProjClass] classFilePkgPath ...`, `
 project .gmx Game
 `)
-	doTestParseErr(t, `gop.mod:2: invalid Go export symbol`, `
+	doTestParseErr(t, `gop.mod:2: ext . invalid: invalid ext format`, `
+project . Game math
+`)
+	doTestParseErr(t, `gop.mod:2: symbol game invalid: invalid Go export symbol format`, `
 project .gmx game math
 `)
-	doTestParseErr(t, `gop.mod:2: invalid Go export symbol`, `
+	doTestParseErr(t, `gop.mod:2: symbol . invalid: invalid Go export symbol format`, `
 project .gmx . math
 `)
 	doTestParseErr(t, `gop.mod:2: invalid quoted string: invalid syntax`, `
 project .123 Game "\?"
+`)
+	doTestParseErr(t, `gop.mod:2: invalid quoted string: invalid syntax`, `
+project "\?"
+`)
+	doTestParseErr(t, `gop.mod:2: work class must declare a project`, `
+class .spx Sprite
+`)
+	doTestParseErr(t, `gop.mod:3: usage: class .workExt WorkClass`, `
+project github.com/goplus/spx math
+class .spx
+`)
+	doTestParseErr(t, `gop.mod:3: ext . invalid: invalid ext format`, `
+project github.com/goplus/spx math
+class . Sprite
+`)
+	doTestParseErr(t, `gop.mod:3: symbol S"prite invalid: unquoted string cannot contain quote`, `
+project github.com/goplus/spx math
+class .spx S"prite
+`)
+	doTestParseErr(t, `gop.mod:3: ext ."spx invalid: unquoted string cannot contain quote`, `
+project github.com/goplus/spx math
+class ."spx Sprite
+`)
+	doTestParseErr(t, `gop.mod:3: symbol sprite invalid: invalid Go export symbol format`, `
+project github.com/goplus/spx math
+class .spx sprite
 `)
 	doTestParseErr(t, `gop.mod:2: unknown directive: unknown`, `
 unknown .spx

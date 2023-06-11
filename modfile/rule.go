@@ -402,11 +402,19 @@ var (
 )
 
 func parseSymbol(s *string) (t string, err error) {
-	t = *s
-	if !symbolRE.MatchString(t) {
-		err = fmt.Errorf("invalid Go export symbol")
+	t, err = parseString(s)
+	if err != nil {
+		goto failed
 	}
-	return
+	if symbolRE.MatchString(t) {
+		return
+	}
+	err = errors.New("invalid Go export symbol format")
+failed:
+	return "", &InvalidSymbolError{
+		Sym: *s,
+		Err: err,
+	}
 }
 
 func parseString(s *string) (string, error) {
@@ -462,6 +470,17 @@ func (e *InvalidExtError) Error() string {
 }
 
 func (e *InvalidExtError) Unwrap() error { return e.Err }
+
+type InvalidSymbolError struct {
+	Sym string
+	Err error
+}
+
+func (e *InvalidSymbolError) Error() string {
+	return fmt.Sprintf("symbol %s invalid: %s", e.Sym, e.Err)
+}
+
+func (e *InvalidSymbolError) Unwrap() error { return e.Err }
 
 type ErrorList = errors.List
 type Error modfile.Error
