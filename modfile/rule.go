@@ -64,7 +64,7 @@ type Register struct {
 	Syntax       *Line
 }
 
-// project [.projExt ProjClass] pkgPath ...
+// A Project is the project statement.
 type Project struct {
 	ProjExt   string       // ".gmx"
 	ProjClass string       // "Game"
@@ -73,7 +73,7 @@ type Project struct {
 	Syntax    *Line
 }
 
-// class .workExt WorkClass
+// A WorkClass is the project class statement.
 type WorkClass struct {
 	WorkExt   string // ".spx"
 	WorkClass string // "Sprite"
