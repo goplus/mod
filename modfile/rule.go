@@ -34,6 +34,7 @@ type File struct {
 	modfile.File
 	Gop      *Gop
 	Project  *Project
+	Classes  []*Class
 	Register []*Register
 }
 
@@ -66,15 +67,14 @@ type Register struct {
 
 // A Project is the project statement.
 type Project struct {
-	Ext       string       // ".gmx"
-	Class     string       // "Game"
-	PkgPaths  []string     // package paths of classfile
-	WorkClass []*WorkClass // work classes list
-	Syntax    *Line
+	Ext      string   // ".gmx"
+	Class    string   // "Game"
+	PkgPaths []string // package paths of classfile
+	Syntax   *Line
 }
 
 // A WorkClass is the project class statement.
-type WorkClass struct {
+type Class struct {
 	Ext    string // ".spx"
 	Class  string // "Sprite"
 	Syntax *Line
@@ -325,7 +325,7 @@ func (f *File) parseVerb(errs *ErrorList, verb string, line *Line, args []string
 			wrapError(err)
 			return
 		}
-		f.Project.WorkClass = append(f.Project.WorkClass, &WorkClass{
+		f.Classes = append(f.Classes, &Class{
 			Ext:    workExt,
 			Class:  class,
 			Syntax: line,
