@@ -66,8 +66,8 @@ type Register struct {
 
 // A Project is the project statement.
 type Project struct {
-	ProjExt   string       // ".gmx"
-	ProjClass string       // "Game"
+	Ext       string       // ".gmx"
+	Class     string       // "Game"
 	PkgPaths  []string     // package paths of classfile
 	WorkClass []*WorkClass // work classes list
 	Syntax    *Line
@@ -75,9 +75,9 @@ type Project struct {
 
 // A WorkClass is the project class statement.
 type WorkClass struct {
-	WorkExt   string // ".spx"
-	WorkClass string // "Sprite"
-	Syntax    *Line
+	Ext    string // ".spx"
+	Class  string // "Sprite"
+	Syntax *Line
 }
 
 // A VersionInterval represents a range of versions with upper and lower bounds.
@@ -294,7 +294,7 @@ func (f *File) parseVerb(errs *ErrorList, verb string, line *Line, args []string
 				return
 			}
 			f.Project = &Project{
-				ProjExt: ext, ProjClass: class, PkgPaths: pkgPaths, Syntax: line,
+				Ext: ext, Class: class, PkgPaths: pkgPaths, Syntax: line,
 			}
 			return
 		}
@@ -326,9 +326,9 @@ func (f *File) parseVerb(errs *ErrorList, verb string, line *Line, args []string
 			return
 		}
 		f.Project.WorkClass = append(f.Project.WorkClass, &WorkClass{
-			WorkExt:   workExt,
-			WorkClass: class,
-			Syntax:    line,
+			Ext:    workExt,
+			Class:  class,
+			Syntax: line,
 		})
 	default:
 		if strict {

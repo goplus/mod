@@ -95,11 +95,11 @@ func TestParse1(t *testing.T) {
 	if f.Gop.Version != "1.1" {
 		t.Errorf("gop version expected be 1.1, but %s got", f.Gop.Version)
 	}
-	if f.Project.ProjExt != ".gmx" {
-		t.Errorf("project exts expected be .gmx, but %s got", f.Project.ProjExt)
+	if f.Project.Ext != ".gmx" {
+		t.Errorf("project exts expected be .gmx, but %s got", f.Project.Ext)
 	}
-	if f.Project.ProjClass != "Game" {
-		t.Errorf("project class expected be Game, but %s got", f.Project.ProjClass)
+	if f.Project.Class != "Game" {
+		t.Errorf("project class expected be Game, but %s got", f.Project.Class)
 	}
 
 	if len(f.Project.PkgPaths) != 2 {
@@ -116,17 +116,17 @@ func TestParse1(t *testing.T) {
 	if len(f.Project.WorkClass) != 2 {
 		t.Errorf("project workclass length expected be 2, but %d got", len(f.Project.WorkClass))
 	}
-	if f.Project.WorkClass[0].WorkExt != ".spx" {
-		t.Errorf("project class[0] exts expected be .spx, but %s got", f.Project.WorkClass[0].WorkExt)
+	if f.Project.WorkClass[0].Ext != ".spx" {
+		t.Errorf("project class[0] exts expected be .spx, but %s got", f.Project.WorkClass[0].Ext)
 	}
-	if f.Project.WorkClass[0].WorkClass != "Sprite" {
-		t.Errorf("project class[0] class expected be Sprite, but %s got", f.Project.WorkClass[0].WorkClass)
+	if f.Project.WorkClass[0].Class != "Sprite" {
+		t.Errorf("project class[0] class expected be Sprite, but %s got", f.Project.WorkClass[0].Class)
 	}
-	if f.Project.WorkClass[1].WorkExt != ".spx2" {
-		t.Errorf("project class[1] exts expected be .spx2, but %s got", f.Project.WorkClass[1].WorkExt)
+	if f.Project.WorkClass[1].Ext != ".spx2" {
+		t.Errorf("project class[1] exts expected be .spx2, but %s got", f.Project.WorkClass[1].Ext)
 	}
-	if f.Project.WorkClass[1].WorkClass != "*Sprite2" {
-		t.Errorf("project class[1] class expected be Sprite, but %s got", f.Project.WorkClass[1].WorkClass)
+	if f.Project.WorkClass[1].Class != "*Sprite2" {
+		t.Errorf("project class[1] class expected be Sprite, but %s got", f.Project.WorkClass[1].Class)
 	}
 }
 
@@ -183,11 +183,11 @@ func TestParse2(t *testing.T) {
 	if f.Gop.Version != "1.1" {
 		t.Errorf("gop version expected be 1.1, but %s got", f.Gop.Version)
 	}
-	if f.Project.ProjExt != "" {
-		t.Errorf("project exts expected be .gmx, but %s got", f.Project.ProjExt)
+	if f.Project.Ext != "" {
+		t.Errorf("project exts expected be .gmx, but %s got", f.Project.Ext)
 	}
-	if f.Project.ProjClass != "" {
-		t.Errorf("project class expected be Game, but %s got", f.Project.ProjClass)
+	if f.Project.Class != "" {
+		t.Errorf("project class expected be Game, but %s got", f.Project.Class)
 	}
 
 	if len(f.Project.PkgPaths) != 2 {
@@ -204,11 +204,11 @@ func TestParse2(t *testing.T) {
 	if len(f.Project.WorkClass) != 1 {
 		t.Errorf("project workclass length expected be 2, but %d got", len(f.Project.WorkClass))
 	}
-	if f.Project.WorkClass[0].WorkExt != ".spx" {
-		t.Errorf("project class[0] exts expected be .spx, but %s got", f.Project.WorkClass[0].WorkExt)
+	if f.Project.WorkClass[0].Ext != ".spx" {
+		t.Errorf("project class[0] exts expected be .spx, but %s got", f.Project.WorkClass[0].Ext)
 	}
-	if f.Project.WorkClass[0].WorkClass != "Sprite" {
-		t.Errorf("project class[0] class expected be Sprite, but %s got", f.Project.WorkClass[0].WorkClass)
+	if f.Project.WorkClass[0].Class != "Sprite" {
+		t.Errorf("project class[0] class expected be Sprite, but %s got", f.Project.WorkClass[0].Class)
 	}
 }
 

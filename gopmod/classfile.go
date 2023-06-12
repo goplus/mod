@@ -32,9 +32,9 @@ type WorkClass = modfile.WorkClass
 
 var (
 	ClassSpx = &Class{
-		ProjExt:   ".gmx",
-		ProjClass: "Game",
-		WorkClass: []*WorkClass{&WorkClass{WorkExt: ".spx", WorkClass: "Sprite"}},
+		Ext:       ".gmx",
+		Class:     "Game",
+		WorkClass: []*WorkClass{&WorkClass{Ext: ".spx", Class: "Sprite"}},
 		PkgPaths:  []string{"github.com/goplus/spx", "math"},
 	}
 )
@@ -48,7 +48,7 @@ var (
 func (p *Module) IsClass(ext string) (isProj bool, ok bool) {
 	c, ok := p.classes[ext]
 	if ok {
-		isProj = (ext == c.ProjExt)
+		isProj = (ext == c.Ext)
 	}
 	return
 }
@@ -109,9 +109,9 @@ func (p *Module) registerClassFrom(modVer module.Version, regcls func(c *Class))
 }
 
 func (p *Module) registerClass(c *Class, regcls func(c *Class)) {
-	p.classes[c.ProjExt] = c
+	p.classes[c.Ext] = c
 	for _, w := range c.WorkClass {
-		p.classes[w.WorkExt] = c
+		p.classes[w.Ext] = c
 	}
 	if regcls != nil {
 		regcls(c)
