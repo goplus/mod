@@ -116,7 +116,7 @@ func (p *Module) registerClass(c *Project, works []*Class, regcls func(c *Projec
 	p.classes[c.Ext] = c.Class
 	for _, w := range works {
 		p.projects[w.Ext] = c
-		p.classes[w.Ext] = c.Class
+		p.classes[w.Ext] = w.Class
 	}
 	if regcls != nil {
 		regcls(c)
