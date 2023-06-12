@@ -506,7 +506,6 @@ const (
 	directiveModule
 	directiveGo
 	directiveGop
-	directiveClassfile
 	directiveProject
 	directiveClass
 )
@@ -521,17 +520,16 @@ const (
 )
 
 var directiveWeights = map[string]int{
-	"module":    directiveModule,
-	"go":        directiveGo,
-	"gop":       directiveGop,
-	"classfile": directiveClassfile,
-	"register":  directiveRegister,
-	"require":   directiveRequire,
-	"exclude":   directiveExclude,
-	"replace":   directiveReplace,
-	"retract":   directiveRetract,
-	"project":   directiveProject,
-	"class":     directiveClass,
+	"module":   directiveModule,
+	"go":       directiveGo,
+	"gop":      directiveGop,
+	"register": directiveRegister,
+	"require":  directiveRequire,
+	"exclude":  directiveExclude,
+	"replace":  directiveReplace,
+	"retract":  directiveRetract,
+	"project":  directiveProject,
+	"class":    directiveClass,
 }
 
 func getWeight(e Expr) int {
