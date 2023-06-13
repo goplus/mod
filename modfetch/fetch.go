@@ -58,7 +58,7 @@ func Split(pkgPath, modBase string) (modPath, relPath string) {
 	switch parts[0] {
 	case ".", "..": // local package
 		return modBase, pkgPath
-	case "github.com":
+	case "github.com", "golang.org":
 		if len(parts) > 3 {
 			relPath = parts[3]
 			if pos := strings.IndexByte(relPath, '@'); pos > 0 {
