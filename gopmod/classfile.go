@@ -27,16 +27,22 @@ import (
 	"golang.org/x/mod/module"
 )
 
-type Project = modfile.Project
 type Class = modfile.Class
+
+type Project struct {
+	Ext      string
+	Class    string
+	Classes  []*Class
+	PkgPaths []string
+}
 
 var (
 	SpxProject = &Project{
 		Ext:      ".gmx",
 		Class:    "Game",
+		Classes:  []*Class{{Ext: ".spx", Class: "Sprite"}},
 		PkgPaths: []string{"github.com/goplus/spx", "math"},
 	}
-	SpxClasses = []*Class{&Class{Ext: ".spx", Class: "Sprite"}}
 )
 
 var (
@@ -53,11 +59,8 @@ func (p *Module) IsClass(ext string) (isProj bool, ok bool) {
 	return
 }
 
-func (p *Module) LookupClass(ext string) (c *Project, class string, ok bool) {
+func (p *Module) LookupClass(ext string) (c *Project, ok bool) {
 	c, ok = p.projects[ext]
-	if ok {
-		class, ok = p.classes[ext]
-	}
 	return
 }
 
@@ -66,9 +69,9 @@ func (p *Module) RegisterClasses(registerClass ...func(c *Project)) (err error) 
 	if registerClass != nil {
 		regcls = registerClass[0]
 	}
-	p.registerClass(SpxProject, SpxClasses, regcls)
+	p.registerClass(SpxProject, regcls)
 	if c := p.Project; c != nil {
-		p.registerClass(c, p.Classes, regcls)
+		p.registerClass(&Project{Ext: c.Ext, Class: c.Class, Classes: p.Classes, PkgPaths: c.PkgPaths}, regcls)
 	}
 	for _, r := range p.Register {
 		if err = p.registerMod(r.ClassfileMod, regcls); err != nil {
@@ -107,16 +110,14 @@ func (p *Module) registerClassFrom(modVer module.Version, regcls func(c *Project
 	if c == nil {
 		return ErrNotClassFileMod
 	}
-	p.registerClass(c, mod.Classes, regcls)
+	p.registerClass(&Project{Ext: c.Ext, Class: c.Class, Classes: mod.Classes, PkgPaths: c.PkgPaths}, regcls)
 	return
 }
 
-func (p *Module) registerClass(c *Project, works []*Class, regcls func(c *Project)) {
+func (p *Module) registerClass(c *Project, regcls func(c *Project)) {
 	p.projects[c.Ext] = c
-	p.classes[c.Ext] = c.Class
-	for _, w := range works {
+	for _, w := range c.Classes {
 		p.projects[w.Ext] = c
-		p.classes[w.Ext] = w.Class
 	}
 	if regcls != nil {
 		regcls(c)
