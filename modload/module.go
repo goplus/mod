@@ -249,7 +249,7 @@ func cloneExpr(e modfile.Expr) modfile.Expr {
 
 func isGopOrDeletedExpr(e modfile.Expr) bool {
 	switch verb := getVerb(e); verb {
-	case "", "gop", "register", "classfile":
+	case "", "gop", "register", "project", "class":
 		return true
 	}
 	return false
