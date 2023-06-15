@@ -30,17 +30,16 @@ import (
 type Class = modfile.Class
 
 type Project struct {
-	Ext      string
-	Class    string
-	Classes  []*Class
-	PkgPaths []string
+	Ext, Class string // NOTE: allow Ext/Class empty if there is no ProjectClass.
+	Works      []*Class
+	PkgPaths   []string
 }
 
 var (
 	SpxProject = &Project{
 		Ext:      ".gmx",
 		Class:    "Game",
-		Classes:  []*Class{{Ext: ".spx", Class: "Sprite"}},
+		Works:    []*Class{{Ext: ".spx", Class: "Sprite"}},
 		PkgPaths: []string{"github.com/goplus/spx", "math"},
 	}
 )
@@ -71,7 +70,7 @@ func (p *Module) RegisterClasses(registerClass ...func(c *Project)) (err error) 
 	}
 	p.registerClass(SpxProject, regcls)
 	if c := p.Project; c != nil {
-		p.registerClass(&Project{Ext: c.Ext, Class: c.Class, Classes: p.Classes, PkgPaths: c.PkgPaths}, regcls)
+		p.registerClass(&Project{Ext: c.Ext, Class: c.Class, Works: p.Classes, PkgPaths: c.PkgPaths}, regcls)
 	}
 	for _, r := range p.Register {
 		if err = p.registerMod(r.ClassfileMod, regcls); err != nil {
@@ -110,13 +109,13 @@ func (p *Module) registerClassFrom(modVer module.Version, regcls func(c *Project
 	if c == nil {
 		return ErrNotClassFileMod
 	}
-	p.registerClass(&Project{Ext: c.Ext, Class: c.Class, Classes: mod.Classes, PkgPaths: c.PkgPaths}, regcls)
+	p.registerClass(&Project{Ext: c.Ext, Class: c.Class, Works: mod.Classes, PkgPaths: c.PkgPaths}, regcls)
 	return
 }
 
 func (p *Module) registerClass(c *Project, regcls func(c *Project)) {
 	p.projects[c.Ext] = c
-	for _, w := range c.Classes {
+	for _, w := range c.Works {
 		p.projects[w.Ext] = c
 	}
 	if regcls != nil {
