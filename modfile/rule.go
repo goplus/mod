@@ -401,6 +401,7 @@ var (
 	symbolRE = regexp.MustCompile("\\*?[A-Z]\\w*")
 )
 
+// TODO: to be optimized
 func parseSymbol(s *string) (t string, err error) {
 	t, err = parseString(s)
 	if err != nil {
