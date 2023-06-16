@@ -43,25 +43,27 @@ func TestGetWeight(t *testing.T) {
 
 // -----------------------------------------------------------------------------
 
-const gopmodSpx = `
+const gopmodSpx1 = `
 module spx
 
 go 1.17
 gop 1.1
 
-classfile .gmx .spx github.com/goplus/spx math
+project .gmx Game github.com/goplus/spx math
+class .spx Sprite
+class .spx2 *Sprite2
 
 require (
 	github.com/ajstarks/svgo v0.0.0-20210927141636-6d70534b1098
 )
 `
 
-func TestGoModCompat(t *testing.T) {
+func TestGoModCompat1(t *testing.T) {
 	const (
-		gopmod = gopmodSpx
+		gopmod = gopmodSpx1
 	)
 	f, err := modfile.ParseLax("go.mod", []byte(gopmod), nil)
-	if err != nil || len(f.Syntax.Stmt) != 5 {
+	if err != nil || len(f.Syntax.Stmt) != 7 {
 		t.Fatal("modfile.ParseLax failed:", f, err)
 	}
 
@@ -70,7 +72,7 @@ func TestGoModCompat(t *testing.T) {
 		t.Fatal("modfile.ParseLax gop:", gop)
 	}
 
-	require := f.Syntax.Stmt[4].(*modfile.LineBlock)
+	require := f.Syntax.Stmt[6].(*modfile.LineBlock)
 	if len(require.Token) != 1 || require.Token[0] != "require" {
 		t.Fatal("modfile.ParseLax require:", require)
 	}
@@ -83,7 +85,7 @@ func TestGoModCompat(t *testing.T) {
 
 func TestParse1(t *testing.T) {
 	const (
-		gopmod = gopmodSpx
+		gopmod = gopmodSpx1
 	)
 	f, err := ParseLax("github.com/goplus/gop/gop.mod", []byte(gopmod), nil)
 	if err != nil {
@@ -93,23 +95,120 @@ func TestParse1(t *testing.T) {
 	if f.Gop.Version != "1.1" {
 		t.Errorf("gop version expected be 1.1, but %s got", f.Gop.Version)
 	}
-
-	if f.Classfile.ProjExt != ".gmx" {
-		t.Errorf("classfile exts expected be .gmx, but %s got", f.Classfile.ProjExt)
+	if f.Project.Ext != ".gmx" {
+		t.Errorf("project exts expected be .gmx, but %s got", f.Project.Ext)
 	}
-	if f.Classfile.WorkExt != ".spx" {
-		t.Errorf("classfile exts expected be .spx, but %s got", f.Classfile.WorkExt)
-	}
-
-	if len(f.Classfile.PkgPaths) != 2 {
-		t.Errorf("classfile pkgpaths length expected be 2, but %d got", len(f.Classfile.PkgPaths))
+	if f.Project.Class != "Game" {
+		t.Errorf("project class expected be Game, but %s got", f.Project.Class)
 	}
 
-	if f.Classfile.PkgPaths[0] != "github.com/goplus/spx" {
-		t.Errorf("classfile path expected be github.com/goplus/spx, but %s got", f.Classfile.PkgPaths[0])
+	if len(f.Project.PkgPaths) != 2 {
+		t.Errorf("project pkgpaths length expected be 2, but %d got", len(f.Project.PkgPaths))
 	}
-	if f.Classfile.PkgPaths[1] != "math" {
-		t.Errorf("classfile path expected be math, but %s got", f.Classfile.PkgPaths[1])
+
+	if f.Project.PkgPaths[0] != "github.com/goplus/spx" {
+		t.Errorf("project path expected be github.com/goplus/spx, but %s got", f.Project.PkgPaths[0])
+	}
+	if f.Project.PkgPaths[1] != "math" {
+		t.Errorf("project path expected be math, but %s got", f.Project.PkgPaths[1])
+	}
+
+	if len(f.Classes) != 2 {
+		t.Errorf("project workclass length expected be 2, but %d got", len(f.Classes))
+	}
+	if f.Classes[0].Ext != ".spx" {
+		t.Errorf("project class[0] exts expected be .spx, but %s got", f.Classes[0].Ext)
+	}
+	if f.Classes[0].Class != "Sprite" {
+		t.Errorf("project class[0] class expected be Sprite, but %s got", f.Classes[0].Class)
+	}
+	if f.Classes[1].Ext != ".spx2" {
+		t.Errorf("project class[1] exts expected be .spx2, but %s got", f.Classes[1].Ext)
+	}
+	if f.Classes[1].Class != "*Sprite2" {
+		t.Errorf("project class[1] class expected be Sprite, but %s got", f.Classes[1].Class)
+	}
+}
+
+// -----------------------------------------------------------------------------
+
+const gopmodSpx2 = `
+module spx
+
+go 1.17
+gop 1.1
+
+project github.com/goplus/spx math
+class .spx Sprite
+
+require (
+	github.com/ajstarks/svgo v0.0.0-20210927141636-6d70534b1098
+)
+`
+
+func TestGoModCompat2(t *testing.T) {
+	const (
+		gopmod = gopmodSpx2
+	)
+	f, err := modfile.ParseLax("go.mod", []byte(gopmod), nil)
+	if err != nil || len(f.Syntax.Stmt) != 6 {
+		t.Fatal("modfile.ParseLax failed:", f, err)
+	}
+
+	gop := f.Syntax.Stmt[2].(*modfile.Line)
+	if len(gop.Token) != 2 || gop.Token[0] != "gop" || gop.Token[1] != "1.1" {
+		t.Fatal("modfile.ParseLax gop:", gop)
+	}
+
+	require := f.Syntax.Stmt[5].(*modfile.LineBlock)
+	if len(require.Token) != 1 || require.Token[0] != "require" {
+		t.Fatal("modfile.ParseLax require:", require)
+	}
+	if len(require.Line) != 1 {
+		t.Fatal("modfile.ParseLax require.Line:", require.Line)
+	}
+}
+
+// -----------------------------------------------------------------------------
+
+func TestParse2(t *testing.T) {
+	const (
+		gopmod = gopmodSpx2
+	)
+	f, err := ParseLax("github.com/goplus/gop/gop.mod", []byte(gopmod), nil)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	if f.Gop.Version != "1.1" {
+		t.Errorf("gop version expected be 1.1, but %s got", f.Gop.Version)
+	}
+	if f.Project.Ext != "" {
+		t.Errorf("project exts expected be .gmx, but %s got", f.Project.Ext)
+	}
+	if f.Project.Class != "" {
+		t.Errorf("project class expected be Game, but %s got", f.Project.Class)
+	}
+
+	if len(f.Project.PkgPaths) != 2 {
+		t.Errorf("project pkgpaths length expected be 2, but %d got", len(f.Project.PkgPaths))
+	}
+
+	if f.Project.PkgPaths[0] != "github.com/goplus/spx" {
+		t.Errorf("project path expected be github.com/goplus/spx, but %s got", f.Project.PkgPaths[0])
+	}
+	if f.Project.PkgPaths[1] != "math" {
+		t.Errorf("project path expected be math, but %s got", f.Project.PkgPaths[1])
+	}
+
+	if len(f.Classes) != 1 {
+		t.Errorf("project workclass length expected be 2, but %d got", len(f.Classes))
+	}
+	if f.Classes[0].Ext != ".spx" {
+		t.Errorf("project class[0] exts expected be .spx, but %s got", f.Classes[0].Ext)
+	}
+	if f.Classes[0].Class != "Sprite" {
+		t.Errorf("project class[0] class expected be Sprite, but %s got", f.Classes[0].Class)
 	}
 }
 
@@ -131,7 +230,7 @@ replace (
 )
 `
 
-func TestParse2(t *testing.T) {
+func TestParseUser(t *testing.T) {
 	const (
 		gopmod = gopmodUserProj
 	)
@@ -221,21 +320,53 @@ register "\?"
 	doTestParseErr(t, `gop.mod:2: malformed module path "-": leading dash`, `
 register -
 `)
-	doTestParseErr(t, `gop.mod:3: repeated classfile statement`, `
-classfile .gmx .spx github.com/goplus/spx math
-classfile .gmx .spx github.com/goplus/spx math
+	doTestParseErr(t, `gop.mod:3: repeated project statement`, `
+project .gmx Game github.com/goplus/spx math
+project .gmx Game github.com/goplus/spx math
 `)
-	doTestParseErr(t, `gop.mod:2: usage: classfile projExt workExt classFilePkgPath ...`, `
-classfile .gmx .spx
+	doTestParseErr(t, `gop.mod:2: usage: project [.projExt ProjClass] classFilePkgPath ...`, `
+project
+`)
+	doTestParseErr(t, `gop.mod:2: usage: project [.projExt ProjClass] classFilePkgPath ...`, `
+project .gmx Game
 `)
 	doTestParseErr(t, `gop.mod:2: ext . invalid: invalid ext format`, `
-classfile .gmx . math
+project . Game math
 `)
-	doTestParseErr(t, `gop.mod:2: ext "\?" invalid: invalid syntax`, `
-classfile "\?" .spx math
+	doTestParseErr(t, `gop.mod:2: symbol game invalid: invalid Go export symbol format`, `
+project .gmx game math
+`)
+	doTestParseErr(t, `gop.mod:2: symbol . invalid: invalid Go export symbol format`, `
+project .gmx . math
 `)
 	doTestParseErr(t, `gop.mod:2: invalid quoted string: invalid syntax`, `
-classfile .123 .spx "\?"
+project .123 Game "\?"
+`)
+	doTestParseErr(t, `gop.mod:2: invalid quoted string: invalid syntax`, `
+project "\?"
+`)
+	doTestParseErr(t, `gop.mod:2: work class must declare a project`, `
+class .spx Sprite
+`)
+	doTestParseErr(t, `gop.mod:3: usage: class .workExt WorkClass`, `
+project github.com/goplus/spx math
+class .spx
+`)
+	doTestParseErr(t, `gop.mod:3: ext . invalid: invalid ext format`, `
+project github.com/goplus/spx math
+class . Sprite
+`)
+	doTestParseErr(t, `gop.mod:3: symbol S"prite invalid: unquoted string cannot contain quote`, `
+project github.com/goplus/spx math
+class .spx S"prite
+`)
+	doTestParseErr(t, `gop.mod:3: ext ."spx invalid: unquoted string cannot contain quote`, `
+project github.com/goplus/spx math
+class ."spx Sprite
+`)
+	doTestParseErr(t, `gop.mod:3: symbol sprite invalid: invalid Go export symbol format`, `
+project github.com/goplus/spx math
+class .spx sprite
 `)
 	doTestParseErr(t, `gop.mod:2: unknown directive: unknown`, `
 unknown .spx
