@@ -73,7 +73,7 @@ type Project struct {
 	Syntax   *Line
 }
 
-// A WorkClass is the project class statement.
+// A Class is the work class statement.
 type Class struct {
 	Ext    string // ".spx"
 	Class  string // "Sprite"
