@@ -113,20 +113,20 @@ func TestParse1(t *testing.T) {
 		t.Errorf("project path expected be math, but %s got", f.Project.PkgPaths[1])
 	}
 
-	if len(f.Classes) != 2 {
-		t.Errorf("project workclass length expected be 2, but %d got", len(f.Classes))
+	if len(f.Project.Works) != 2 {
+		t.Errorf("project workclass length expected be 2, but %d got", len(f.Project.Works))
 	}
-	if f.Classes[0].Ext != ".spx" {
-		t.Errorf("project class[0] exts expected be .spx, but %s got", f.Classes[0].Ext)
+	if f.Project.Works[0].Ext != ".spx" {
+		t.Errorf("project class[0] exts expected be .spx, but %s got", f.Project.Works[0].Ext)
 	}
-	if f.Classes[0].Class != "Sprite" {
-		t.Errorf("project class[0] class expected be Sprite, but %s got", f.Classes[0].Class)
+	if f.Project.Works[0].Class != "Sprite" {
+		t.Errorf("project class[0] class expected be Sprite, but %s got", f.Project.Works[0].Class)
 	}
-	if f.Classes[1].Ext != ".spx2" {
-		t.Errorf("project class[1] exts expected be .spx2, but %s got", f.Classes[1].Ext)
+	if f.Project.Works[1].Ext != ".spx2" {
+		t.Errorf("project class[1] exts expected be .spx2, but %s got", f.Project.Works[1].Ext)
 	}
-	if f.Classes[1].Class != "*Sprite2" {
-		t.Errorf("project class[1] class expected be Sprite, but %s got", f.Classes[1].Class)
+	if f.Project.Works[1].Class != "*Sprite2" {
+		t.Errorf("project class[1] class expected be Sprite, but %s got", f.Project.Works[1].Class)
 	}
 }
 
@@ -201,14 +201,14 @@ func TestParse2(t *testing.T) {
 		t.Errorf("project path expected be math, but %s got", f.Project.PkgPaths[1])
 	}
 
-	if len(f.Classes) != 1 {
-		t.Errorf("project workclass length expected be 2, but %d got", len(f.Classes))
+	if len(f.Project.Works) != 1 {
+		t.Errorf("project workclass length expected be 2, but %d got", len(f.Project.Works))
 	}
-	if f.Classes[0].Ext != ".spx" {
-		t.Errorf("project class[0] exts expected be .spx, but %s got", f.Classes[0].Ext)
+	if f.Project.Works[0].Ext != ".spx" {
+		t.Errorf("project class[0] exts expected be .spx, but %s got", f.Project.Works[0].Ext)
 	}
-	if f.Classes[0].Class != "Sprite" {
-		t.Errorf("project class[0] class expected be Sprite, but %s got", f.Classes[0].Class)
+	if f.Project.Works[0].Class != "Sprite" {
+		t.Errorf("project class[0] class expected be Sprite, but %s got", f.Project.Works[0].Class)
 	}
 }
 

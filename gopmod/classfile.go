@@ -28,12 +28,7 @@ import (
 )
 
 type Class = modfile.Class
-
-type Project struct {
-	Ext, Class string // NOTE: allow Ext/Class empty if there is no ProjectClass.
-	Works      []*Class
-	PkgPaths   []string
-}
+type Project = modfile.Project
 
 var (
 	SpxProject = &Project{
@@ -70,7 +65,7 @@ func (p *Module) RegisterClasses(registerClass ...func(c *Project)) (err error) 
 	}
 	p.registerClass(SpxProject, regcls)
 	if c := p.Project; c != nil {
-		p.registerClass(&Project{Ext: c.Ext, Class: c.Class, Works: p.Classes, PkgPaths: c.PkgPaths}, regcls)
+		p.registerClass(c, regcls)
 	}
 	for _, r := range p.Register {
 		if err = p.registerMod(r.ClassfileMod, regcls); err != nil {
@@ -109,7 +104,7 @@ func (p *Module) registerClassFrom(modVer module.Version, regcls func(c *Project
 	if c == nil {
 		return ErrNotClassFileMod
 	}
-	p.registerClass(&Project{Ext: c.Ext, Class: c.Class, Works: mod.Classes, PkgPaths: c.PkgPaths}, regcls)
+	p.registerClass(c, regcls)
 	return
 }
 
