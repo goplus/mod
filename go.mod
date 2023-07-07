@@ -4,5 +4,5 @@ go 1.16
 
 require (
 	github.com/qiniu/x v1.11.9
-	golang.org/x/mod v0.11.0
+	golang.org/x/mod v0.12.0
 )
