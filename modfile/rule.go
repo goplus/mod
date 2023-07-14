@@ -19,6 +19,7 @@ package modfile
 import (
 	"fmt"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
@@ -31,9 +32,9 @@ import (
 // A File is the parsed, interpreted form of a gop.mod file.
 type File struct {
 	modfile.File
-	Gop       *Gop
-	Classfile *Classfile
-	Register  []*Register
+	Gop      *Gop
+	Project  *Project
+	Register []*Register
 }
 
 // A Module is the module statement.
@@ -57,18 +58,26 @@ type Retract = modfile.Retract
 // A Gop is the gop statement.
 type Gop = modfile.Go
 
-// A Classfile is the classfile statement.
-type Classfile struct {
-	ProjExt  string   // ".gmx"
-	WorkExt  string   // ".spx"
-	PkgPaths []string // package paths of classfile
-	Syntax   *Line
-}
-
 // A Register is the register statement.
 type Register struct {
 	ClassfileMod string // module path of classfile
 	Syntax       *Line
+}
+
+// A Project is the project statement.
+type Project struct {
+	Ext      string   // ".gmx"
+	Class    string   // "Game"
+	Works    []*Class // work class of classfile
+	PkgPaths []string // package paths of classfile
+	Syntax   *Line
+}
+
+// A Class is the work class statement.
+type Class struct {
+	Ext    string // ".spx"
+	Class  string // "Sprite"
+	Syntax *Line
 }
 
 // A VersionInterval represents a range of versions with upper and lower bounds.
@@ -255,33 +264,72 @@ func (f *File) parseVerb(errs *ErrorList, verb string, line *Line, args []string
 			ClassfileMod: s,
 			Syntax:       line,
 		})
-	case "classfile":
-		if f.Classfile != nil {
-			errorf("repeated classfile statement")
+	case "project":
+		if f.Project != nil {
+			errorf("repeated project statement")
 			return
 		}
-		if len(args) < 3 {
-			errorf("usage: classfile projExt workExt classFilePkgPath ...")
+		if len(args) < 1 {
+			errorf("usage: project [.projExt ProjClass] classFilePkgPath ...")
 			return
 		}
-		projExt, err := parseExt(&args[0])
-		if err != nil {
-			wrapError(err)
+		if strings.HasPrefix(args[0], ".") {
+			if len(args) < 3 || strings.Contains(args[1], "/") {
+				errorf("usage: project [.projExt ProjClass] classFilePkgPath ...")
+				return
+			}
+			ext, err := parseExt(&args[0])
+			if err != nil {
+				wrapError(err)
+				return
+			}
+			class, err := parseSymbol(&args[1])
+			if err != nil {
+				wrapError(err)
+				return
+			}
+			pkgPaths, err := parseStrings(args[2:])
+			if err != nil {
+				errorf("invalid quoted string: %v", err)
+				return
+			}
+			f.Project = &Project{
+				Ext: ext, Class: class, PkgPaths: pkgPaths, Syntax: line,
+			}
 			return
 		}
-		workExt, err := parseExt(&args[1])
-		if err != nil {
-			wrapError(err)
-			return
-		}
-		pkgPaths, err := parseStrings(args[2:])
+		pkgPaths, err := parseStrings(args)
 		if err != nil {
 			errorf("invalid quoted string: %v", err)
 			return
 		}
-		f.Classfile = &Classfile{
-			ProjExt: projExt, WorkExt: workExt, PkgPaths: pkgPaths, Syntax: line,
+		f.Project = &Project{
+			PkgPaths: pkgPaths, Syntax: line,
 		}
+	case "class":
+		if f.Project == nil {
+			errorf("work class must declare a project")
+			return
+		}
+		if len(args) < 2 {
+			errorf("usage: class .workExt WorkClass")
+			return
+		}
+		workExt, err := parseExt(&args[0])
+		if err != nil {
+			wrapError(err)
+			return
+		}
+		class, err := parseSymbol(&args[1])
+		if err != nil {
+			wrapError(err)
+			return
+		}
+		f.Project.Works = append(f.Project.Works, &Class{
+			Ext:    workExt,
+			Class:  class,
+			Syntax: line,
+		})
 	default:
 		if strict {
 			errorf("unknown directive: %s", verb)
@@ -349,6 +397,27 @@ func AutoQuote(s string) string {
 	return modfile.AutoQuote(s)
 }
 
+var (
+	symbolRE = regexp.MustCompile("\\*?[A-Z]\\w*")
+)
+
+// TODO: to be optimized
+func parseSymbol(s *string) (t string, err error) {
+	t, err = parseString(s)
+	if err != nil {
+		goto failed
+	}
+	if symbolRE.MatchString(t) {
+		return
+	}
+	err = errors.New("invalid Go export symbol format")
+failed:
+	return "", &InvalidSymbolError{
+		Sym: *s,
+		Err: err,
+	}
+}
+
 func parseString(s *string) (string, error) {
 	t := *s
 	if strings.HasPrefix(t, `"`) {
@@ -403,6 +472,17 @@ func (e *InvalidExtError) Error() string {
 
 func (e *InvalidExtError) Unwrap() error { return e.Err }
 
+type InvalidSymbolError struct {
+	Sym string
+	Err error
+}
+
+func (e *InvalidSymbolError) Error() string {
+	return fmt.Sprintf("symbol %s invalid: %s", e.Sym, e.Err)
+}
+
+func (e *InvalidSymbolError) Unwrap() error { return e.Err }
+
 type ErrorList = errors.List
 type Error modfile.Error
 
@@ -427,7 +507,8 @@ const (
 	directiveModule
 	directiveGo
 	directiveGop
-	directiveClassfile
+	directiveProject
+	directiveClass
 )
 
 const (
@@ -440,15 +521,16 @@ const (
 )
 
 var directiveWeights = map[string]int{
-	"module":    directiveModule,
-	"go":        directiveGo,
-	"gop":       directiveGop,
-	"classfile": directiveClassfile,
-	"register":  directiveRegister,
-	"require":   directiveRequire,
-	"exclude":   directiveExclude,
-	"replace":   directiveReplace,
-	"retract":   directiveRetract,
+	"module":   directiveModule,
+	"go":       directiveGo,
+	"gop":      directiveGop,
+	"register": directiveRegister,
+	"require":  directiveRequire,
+	"exclude":  directiveExclude,
+	"replace":  directiveReplace,
+	"retract":  directiveRetract,
+	"project":  directiveProject,
+	"class":    directiveClass,
 }
 
 func getWeight(e Expr) int {
