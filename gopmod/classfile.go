@@ -45,9 +45,13 @@ var (
 
 // -----------------------------------------------------------------------------
 
-func (p *Module) IsClass(ext string) (isProj bool, isClass bool) {
+func (p *Module) IsClass(ext string) (isProj bool, ok bool) {
 	_, isProj = p.projects[ext]
-	_, isClass = p.classes[ext]
+	if isProj {
+		ok = true
+		return
+	}
+	_, ok = p.classes[ext]
 	return
 }
 
@@ -55,6 +59,27 @@ func (p *Module) LookupClass(ext string) (c *Project, ok bool) {
 	c, ok = p.projects[ext]
 	if !ok {
 		c, ok = p.classes[ext]
+	}
+	return
+}
+
+type Kind int
+
+const (
+	KindNone Kind = iota << 1
+	KindWork
+	KindProj
+	KindBoth = KindProj | KindWork
+)
+
+func (p *Module) ClassKind(ext string) (kind Kind) {
+	_, isProj := p.projects[ext]
+	if isProj {
+		kind = KindProj
+	}
+	_, isClass := p.classes[ext]
+	if isClass {
+		kind |= KindWork
 	}
 	return
 }
