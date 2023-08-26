@@ -266,7 +266,7 @@ func (f *File) parseVerb(errs *ErrorList, verb string, line *Line, args []string
 		}
 		f.Gop = &Gop{Syntax: line}
 		f.Gop.Version = args[0]
-	case "import", "register":
+	case "import", "register": // register => import
 		if len(args) != 1 {
 			errorf("import directive expects exactly one argument")
 			return
@@ -534,7 +534,7 @@ const (
 
 const (
 	directiveLineBlock = 0x80 + iota
-	directiveRegister
+	directiveImport
 	directiveRequire
 	directiveExclude
 	directiveReplace
@@ -545,7 +545,8 @@ var directiveWeights = map[string]int{
 	"module":   directiveModule,
 	"go":       directiveGo,
 	"gop":      directiveGop,
-	"register": directiveRegister,
+	"import":   directiveImport,
+	"register": directiveImport, // register => import
 	"require":  directiveRequire,
 	"exclude":  directiveExclude,
 	"replace":  directiveReplace,
