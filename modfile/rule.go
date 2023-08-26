@@ -32,9 +32,9 @@ import (
 // A File is the parsed, interpreted form of a gop.mod file.
 type File struct {
 	modfile.File
-	Gop      *Gop
-	Project  *Project
-	Register []*Register
+	Gop     *Gop
+	Project *Project
+	Import  []*Import
 }
 
 // A Module is the module statement.
@@ -58,8 +58,8 @@ type Retract = modfile.Retract
 // A Gop is the gop statement.
 type Gop = modfile.Go
 
-// A Register is the register statement.
-type Register struct {
+// A Import is the import statement.
+type Import struct {
 	ClassfileMod string // module path of classfile
 	Syntax       *Line
 }
@@ -78,6 +78,27 @@ type Class struct {
 	Ext    string // ".spx"
 	Class  string // "Sprite"
 	Syntax *Line
+}
+
+type Kind int
+
+const (
+	KindNone    Kind = 0
+	KindWork         = 1
+	KindProject      = 2
+	KindBoth         = KindProject | KindWork
+)
+
+func (p *Project) Kind(ext string) (kind Kind) {
+	for _, w := range p.Works {
+		if w.Ext == ext {
+			kind |= KindWork
+		}
+	}
+	if p.Ext == ext {
+		kind |= KindProject
+	}
+	return
 }
 
 // A VersionInterval represents a range of versions with upper and lower bounds.
@@ -245,9 +266,9 @@ func (f *File) parseVerb(errs *ErrorList, verb string, line *Line, args []string
 		}
 		f.Gop = &Gop{Syntax: line}
 		f.Gop.Version = args[0]
-	case "register":
+	case "import", "register":
 		if len(args) != 1 {
-			errorf("register directive expects exactly one argument")
+			errorf("import directive expects exactly one argument")
 			return
 		}
 		s, err := parseString(&args[0])
@@ -260,7 +281,7 @@ func (f *File) parseVerb(errs *ErrorList, verb string, line *Line, args []string
 			wrapError(err)
 			return
 		}
-		f.Register = append(f.Register, &Register{
+		f.Import = append(f.Import, &Import{
 			ClassfileMod: s,
 			Syntax:       line,
 		})
@@ -582,22 +603,22 @@ func (f *File) AddGopStmt(version string) error {
 	return nil
 }
 
-func (f *File) AddRegister(modPath string) {
-	for _, r := range f.Register {
+func (f *File) AddImport(modPath string) {
+	for _, r := range f.Import {
 		if r.ClassfileMod == modPath {
 			return
 		}
 	}
-	f.AddNewRegister(modPath)
+	f.AddNewImport(modPath)
 }
 
-func (f *File) AddNewRegister(modPath string) {
-	line := addLine(f.Syntax, "register", AutoQuote(modPath))
-	r := &Register{
+func (f *File) AddNewImport(modPath string) {
+	line := addLine(f.Syntax, "import", AutoQuote(modPath))
+	r := &Import{
 		ClassfileMod: modPath,
 		Syntax:       line,
 	}
-	f.Register = append(f.Register, r)
+	f.Import = append(f.Import, r)
 }
 
 // -----------------------------------------------------------------------------
