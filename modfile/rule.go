@@ -80,18 +80,6 @@ type Class struct {
 	Syntax *Line
 }
 
-func (p *Project) Kind(ext string) (isWork, isProj bool) {
-	for _, w := range p.Works {
-		if w.Ext == ext {
-			isWork = true
-		}
-	}
-	if p.Ext == ext {
-		isProj = true
-	}
-	return
-}
-
 // A VersionInterval represents a range of versions with upper and lower bounds.
 // Intervals are closed: both bounds are included. When Low is equal to High,
 // the interval may refer to a single version ('v1.2.3') or an interval

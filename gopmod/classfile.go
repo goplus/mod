@@ -18,6 +18,7 @@ package gopmod
 
 import (
 	"errors"
+	"path"
 	"syscall"
 
 	"github.com/goplus/mod/modcache"
@@ -32,7 +33,7 @@ type Project = modfile.Project
 
 var (
 	SpxProject = &Project{
-		Ext:      ".gmx",
+		Ext:      ".spx",
 		Class:    "Game",
 		Works:    []*Class{{Ext: ".spx", Class: "Sprite"}},
 		PkgPaths: []string{"github.com/goplus/spx", "math"},
@@ -45,9 +46,18 @@ var (
 
 // -----------------------------------------------------------------------------
 
-func (p *Module) ClassKind(ext string) (isWork, isProj bool) {
+func (p *Module) ClassKind(fname string) (isProj, ok bool) {
+	ext := path.Ext(fname)
 	if c, ok := p.projects[ext]; ok {
-		isWork, isProj = c.Kind(ext)
+		for _, w := range c.Works {
+			if w.Ext == ext {
+				if ext != c.Ext || fname != "main"+ext {
+					return false, true
+				}
+				break
+			}
+		}
+		return true, true
 	}
 	return
 }
@@ -68,6 +78,7 @@ func (p *Module) ImportClasses(importClass ...func(c *Project)) (err error) {
 		impcls = importClass[0]
 	}
 	p.importClass(SpxProject, impcls)
+	p.projects[".gmx"] = SpxProject // old style
 	if c := p.Project; c != nil {
 		p.importClass(c, impcls)
 	}
