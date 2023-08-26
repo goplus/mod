@@ -42,8 +42,7 @@ type depmodInfo struct {
 
 type Module struct {
 	modload.Module
-	projects map[string]*Project // project ext -> project
-	classes  map[string]*Project // class ext -> project
+	projects map[string]*Project // ext -> project
 	depmods  []depmodInfo
 }
 
@@ -176,10 +175,9 @@ func getDepMods(mod modload.Module) []depmodInfo {
 
 // New creates a module from a modload.Module instance.
 func New(mod modload.Module) *Module {
+	projects := make(map[string]*Project)
 	depmods := getDepMods(mod)
-	return &Module{projects: make(map[string]*Project),
-		classes: make(map[string]*Project),
-		depmods: depmods, Module: mod}
+	return &Module{projects: projects, depmods: depmods, Module: mod}
 }
 
 // Load loads a module from a local dir.
