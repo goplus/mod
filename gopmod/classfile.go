@@ -45,11 +45,17 @@ var (
 
 // -----------------------------------------------------------------------------
 
-func (p *Module) IsClass(ext string) (isProj bool, ok bool) {
-	c, ok := p.projects[ext]
-	if ok {
-		isProj = (ext == c.Ext)
+type Kind = modfile.Kind
+
+func (p *Module) ClassKind(ext string) (kind Kind) {
+	if c, ok := p.projects[ext]; ok {
+		kind = c.Kind(ext)
 	}
+	return
+}
+
+func (p *Module) IsClass(ext string) (ok bool) {
+	_, ok = p.projects[ext]
 	return
 }
 
