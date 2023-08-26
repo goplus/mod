@@ -80,23 +80,14 @@ type Class struct {
 	Syntax *Line
 }
 
-type Kind int
-
-const (
-	KindNone    Kind = 0
-	KindWork         = 1
-	KindProject      = 2
-	KindBoth         = KindProject | KindWork
-)
-
-func (p *Project) Kind(ext string) (kind Kind) {
+func (p *Project) Kind(ext string) (isWork, isProj bool) {
 	for _, w := range p.Works {
 		if w.Ext == ext {
-			kind |= KindWork
+			isWork = true
 		}
 	}
 	if p.Ext == ext {
-		kind |= KindProject
+		isProj = true
 	}
 	return
 }
