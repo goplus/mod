@@ -91,16 +91,6 @@ func TestMustQuote(t *testing.T) {
 
 // -----------------------------------------------------------------------------
 
-func TestKind(t *testing.T) {
-	proj := &Project{Works: []*Class{{Ext: ".spx"}}, Ext: ".spx"}
-	isWork, isProj := proj.Kind(".spx")
-	if !isWork || !isProj {
-		t.Fatal("proj.Kind:", isWork, isProj)
-	}
-}
-
-// -----------------------------------------------------------------------------
-
 var addGopTests = []struct {
 	desc    string
 	in      string
