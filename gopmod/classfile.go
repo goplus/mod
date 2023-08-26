@@ -46,15 +46,41 @@ var (
 // -----------------------------------------------------------------------------
 
 func (p *Module) IsClass(ext string) (isProj bool, ok bool) {
-	c, ok := p.projects[ext]
-	if ok {
-		isProj = (ext == c.Ext)
+	_, isProj = p.projects[ext]
+	if isProj {
+		ok = true
+		return
 	}
+	_, ok = p.classes[ext]
 	return
 }
 
 func (p *Module) LookupClass(ext string) (c *Project, ok bool) {
 	c, ok = p.projects[ext]
+	if !ok {
+		c, ok = p.classes[ext]
+	}
+	return
+}
+
+type Kind int
+
+const (
+	KindNone Kind = iota << 1
+	KindWork
+	KindProj
+	KindBoth = KindProj | KindWork
+)
+
+func (p *Module) ClassKind(ext string) (kind Kind) {
+	_, isProj := p.projects[ext]
+	if isProj {
+		kind = KindProj
+	}
+	_, isClass := p.classes[ext]
+	if isClass {
+		kind |= KindWork
+	}
 	return
 }
 
@@ -111,7 +137,7 @@ func (p *Module) registerClassFrom(modVer module.Version, regcls func(c *Project
 func (p *Module) registerClass(c *Project, regcls func(c *Project)) {
 	p.projects[c.Ext] = c
 	for _, w := range c.Works {
-		p.projects[w.Ext] = c
+		p.classes[w.Ext] = c
 	}
 	if regcls != nil {
 		regcls(c)
