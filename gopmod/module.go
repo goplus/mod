@@ -102,7 +102,7 @@ type Package struct {
 func (p *Module) Lookup(pkgPath string) (pkg *Package, err error) {
 	switch pt := p.PkgType(pkgPath); pt {
 	case PkgtStandard:
-		modDir := runtime.GOROOT()
+		modDir := runtime.GOROOT() + "/src"
 		pkg = &Package{Type: PkgtStandard, ModDir: modDir, Dir: filepath.Join(modDir, pkgPath)}
 	case PkgtModule:
 		modPath := p.Path()
