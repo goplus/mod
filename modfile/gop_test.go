@@ -371,7 +371,7 @@ class .spx sprite
 	doTestParseErr(t, `gop.mod:2: unknown directive: unknown`, `
 unknown .spx
 `)
-	doTestParseErr(t, `gop.mod:2: invalid go version '1.x': must match format 1.23`, `
+	doTestParseErr(t, `gop.mod:2: invalid go version '1.x': must match format 1.23.0`, `
 go 1.x
 `)
 }
