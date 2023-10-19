@@ -222,3 +222,8 @@ func (e *MissingError) Error() string {
 }
 
 // -----------------------------------------------------------------------------
+
+// Default represents the default gop.mod object.
+var Default = New(modload.Default)
+
+// -----------------------------------------------------------------------------

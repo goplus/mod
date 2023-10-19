@@ -169,6 +169,19 @@ func TestGoModCompat2(t *testing.T) {
 	}
 }
 
+func TestGoModStd(t *testing.T) {
+	const (
+		gopmod = "module std\n"
+	)
+	f, err := ParseLax("go.mod", []byte(gopmod), nil)
+	if err != nil {
+		t.Fatal("modfile.ParseLax failed:", err)
+	}
+	if f.Module.Mod.Path != "" {
+		t.Fatal("modfile.ParseLax:", f.Module.Mod.Path)
+	}
+}
+
 // -----------------------------------------------------------------------------
 
 func TestParse2(t *testing.T) {

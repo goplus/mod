@@ -266,3 +266,21 @@ func getVerb(e modfile.Expr) string {
 }
 
 // -----------------------------------------------------------------------------
+
+const (
+	defaultGoVer  = "1.18"
+	defaultGopVer = "1.1"
+)
+
+// Default represents the default gop.mod object.
+var Default = Module{
+	File: &modfile.File{
+		File: gomodfile.File{
+			Module: &gomodfile.Module{},
+			Go:     &gomodfile.Go{Version: defaultGoVer},
+		},
+		Gop: &modfile.Gop{Version: defaultGopVer},
+	},
+}
+
+// -----------------------------------------------------------------------------

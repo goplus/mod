@@ -118,6 +118,9 @@ func parseToFile(file string, data []byte, fix VersionFixer, strict bool) (parse
 		err = errors.NewWith(err, `modfile.ParseLax(file, data, fix)`, -2, "modfile.ParseLax", file, data, fix)
 		return
 	}
+	if mod := f.Module; mod != nil && mod.Mod.Path == "std" {
+		mod.Mod.Path = "" // the Go std module
+	}
 	parsed = &File{File: *f}
 
 	var errs ErrorList
