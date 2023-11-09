@@ -117,25 +117,29 @@ func fixVersion(fixed *bool) modfile.VersionFixer {
 	}
 }
 
-// Load loads a module from `dir`.
+// Load loads a module from specified directory.
 func Load(dir string, mode mod.Mode) (p Module, err error) {
 	gopmod, err := mod.GOPMOD(dir, mode)
 	if err != nil {
 		err = errors.NewWith(err, `mod.GOPMOD(dir, mode)`, -2, "mod.GOPMOD", dir, mode)
 		return
 	}
+	return LoadFrom(gopmod)
+}
 
-	data, err := os.ReadFile(gopmod)
+// LoadFrom loads a module from specified gop.mod or go.mod file.
+func LoadFrom(file string) (p Module, err error) {
+	data, err := os.ReadFile(file)
 	if err != nil {
-		err = errors.NewWith(err, `os.ReadFile(gopmod)`, -2, "os.ReadFile", gopmod)
+		err = errors.NewWith(err, `os.ReadFile(gopmod)`, -2, "os.ReadFile", file)
 		return
 	}
 
 	var fixed bool
 	fix := fixVersion(&fixed)
-	f, err := modfile.Parse(gopmod, data, fix)
+	f, err := modfile.Parse(file, data, fix)
 	if err != nil {
-		err = errors.NewWith(err, `modfile.Parse(gopmod, data, fix)`, -2, "modfile.Parse", gopmod, data, fix)
+		err = errors.NewWith(err, `modfile.Parse(gopmod, data, fix)`, -2, "modfile.Parse", file, data, fix)
 		return
 	}
 	if f.Module == nil {
