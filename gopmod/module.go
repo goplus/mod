@@ -180,12 +180,20 @@ func New(mod modload.Module) *Module {
 	return &Module{projects: projects, depmods: depmods, Module: mod}
 }
 
-// Load loads a module from a local dir.
-// If we only want to load a Go modfile, pass env parameter as nil.
+// Load loads a module from a local directory.
 func Load(dir string, mode mod.Mode) (*Module, error) {
 	mod, err := modload.Load(dir, mode)
 	if err != nil {
 		return nil, errors.NewWith(err, `modload.Load(dir, mode)`, -2, "modload.Load", dir, mode)
+	}
+	return New(mod), nil
+}
+
+// LoadFrom loads a module from specified gop.mod or go.mod file.
+func LoadFrom(file string) (*Module, error) {
+	mod, err := modload.LoadFrom(file)
+	if err != nil {
+		return nil, errors.NewWith(err, `modload.LoadFrom(file)`, -2, "modload.LoadFrom", file)
 	}
 	return New(mod), nil
 }
