@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -30,6 +31,23 @@ import (
 	"golang.org/x/mod/module"
 	"golang.org/x/mod/semver"
 )
+
+type dbgFlags int
+
+const (
+	DbgFlagVerbose dbgFlags = 1 << iota
+	DbgFlagShowError
+	DbgFlagAll = DbgFlagShowError | DbgFlagVerbose
+)
+
+var (
+	debugVerbose bool
+)
+
+// SetDebug sets debug flags.
+func SetDebug(flags dbgFlags) {
+	debugVerbose = (flags & DbgFlagVerbose) != 0
+}
 
 // -----------------------------------------------------------------------------
 
@@ -70,7 +88,7 @@ func Split(pkgPath, modBase string) (modPath, relPath string) {
 		}
 	}
 	parts := strings.SplitN(pkgPath, "/", 4)
-	if strings.Index(parts[0], ".") < 0 { // standard package
+	if !strings.Contains(parts[0], ".") { // standard package
 		return "", pkgPath
 	}
 	switch parts[0] {
@@ -100,6 +118,9 @@ var (
 
 // Get downloads a modPath to GOMODCACHE.
 func Get(modPath string, noCache ...bool) (mod module.Version, err error) {
+	if debugVerbose {
+		log.Println("modfetch.Get", modPath)
+	}
 	if modPath == "" {
 		err = errEmptyModPath
 		return
@@ -116,12 +137,18 @@ func Get(modPath string, noCache ...bool) (mod module.Version, err error) {
 		modPathVer += "@latest"
 	}
 	cmd := exec.Command("go", "get", modPathVer)
+	if debugVerbose {
+		log.Println("==>", cmd)
+	}
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	cmd.Run()
 	if stderr.Len() > 0 {
 		mod, err = getResult(stderr.String())
 		if err != syscall.ENOENT {
+			if debugVerbose {
+				log.Println("modfetch.Get ret:", err)
+			}
 			return
 		}
 	}
@@ -132,6 +159,9 @@ func Get(modPath string, noCache ...bool) (mod module.Version, err error) {
 }
 
 func getResult(data string) (mod module.Version, err error) {
+	if debugVerbose {
+		log.Println("modfetch.getResult:", data)
+	}
 	// go: downloading github.com/xushiwei/foogop v0.1.0
 	const downloading = "go: downloading "
 	if strings.HasPrefix(data, downloading) {

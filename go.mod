@@ -3,6 +3,6 @@ module github.com/goplus/mod
 go 1.16
 
 require (
-	github.com/qiniu/x v1.11.9
-	golang.org/x/mod v0.12.0
+	github.com/qiniu/x v1.13.1
+	golang.org/x/mod v0.14.0
 )

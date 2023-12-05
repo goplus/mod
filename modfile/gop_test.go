@@ -169,6 +169,19 @@ func TestGoModCompat2(t *testing.T) {
 	}
 }
 
+func TestGoModStd(t *testing.T) {
+	const (
+		gopmod = "module std\n"
+	)
+	f, err := ParseLax("go.mod", []byte(gopmod), nil)
+	if err != nil {
+		t.Fatal("modfile.ParseLax failed:", err)
+	}
+	if f.Module.Mod.Path != "" {
+		t.Fatal("modfile.ParseLax:", f.Module.Mod.Path)
+	}
+}
+
 // -----------------------------------------------------------------------------
 
 func TestParse2(t *testing.T) {
@@ -218,7 +231,7 @@ module moduleUserProj
 go 1.17
 gop 1.1
 
-register github.com/goplus/spx
+import github.com/goplus/spx
 
 require (
     github.com/goplus/spx v1.0
@@ -235,12 +248,12 @@ func TestParseUser(t *testing.T) {
 		gopmod = gopmodUserProj
 	)
 	f, err := Parse("github.com/goplus/gop/gop.mod", []byte(gopmod), nil)
-	if err != nil || len(f.Register) != 1 {
+	if err != nil || len(f.Import) != 1 {
 		t.Fatal("Parse:", f, err)
 		return
 	}
-	if f.Register[0].ClassfileMod != "github.com/goplus/spx" {
-		t.Fatal("Parse => Register:", f.Register)
+	if f.Import[0].ClassfileMod != "github.com/goplus/spx" {
+		t.Fatal("Parse => Register:", f.Import)
 	}
 	if len(f.Replace) != 2 {
 		t.Fatal("Parse => Replace:", f.Replace)
@@ -249,12 +262,12 @@ func TestParseUser(t *testing.T) {
 	if f.Require != nil {
 		t.Fatal("DropAllRequire failed")
 	}
-	f.AddRegister("github.com/goplus/spx")
-	if len(f.Register) != 1 {
+	f.AddImport("github.com/goplus/spx")
+	if len(f.Import) != 1 {
 		t.Fatal("AddRegister not exist?")
 	}
-	f.AddRegister("github.com/xushiwei/foogop")
-	if len(f.Register) != 2 {
+	f.AddImport("github.com/xushiwei/foogop")
+	if len(f.Import) != 2 {
 		t.Fatal("AddRegister failed")
 	}
 	f.AddReplace("github.com/goplus/spx", "v1.0", "/Users/xushiwei/work/spx", "")
@@ -311,7 +324,7 @@ gop 1.1 1.2
 	doTestParseErr(t, `gop.mod:2: invalid gop version '1.x': must match format 1.23`, `
 gop 1.x
 `)
-	doTestParseErr(t, `gop.mod:2: register directive expects exactly one argument`, `
+	doTestParseErr(t, `gop.mod:2: import directive expects exactly one argument`, `
 register 1 2 3
 `)
 	doTestParseErr(t, `gop.mod:2: invalid quoted string: invalid syntax`, `
@@ -371,7 +384,7 @@ class .spx sprite
 	doTestParseErr(t, `gop.mod:2: unknown directive: unknown`, `
 unknown .spx
 `)
-	doTestParseErr(t, `gop.mod:2: invalid go version '1.x': must match format 1.23`, `
+	doTestParseErr(t, `gop.mod:2: invalid go version '1.x': must match format 1.23.0`, `
 go 1.x
 `)
 }

@@ -102,7 +102,7 @@ type Package struct {
 func (p *Module) Lookup(pkgPath string) (pkg *Package, err error) {
 	switch pt := p.PkgType(pkgPath); pt {
 	case PkgtStandard:
-		modDir := runtime.GOROOT()
+		modDir := runtime.GOROOT() + "/src"
 		pkg = &Package{Type: PkgtStandard, ModDir: modDir, Dir: filepath.Join(modDir, pkgPath)}
 	case PkgtModule:
 		modPath := p.Path()
@@ -180,12 +180,20 @@ func New(mod modload.Module) *Module {
 	return &Module{projects: projects, depmods: depmods, Module: mod}
 }
 
-// Load loads a module from a local dir.
-// If we only want to load a Go modfile, pass env parameter as nil.
+// Load loads a module from a local directory.
 func Load(dir string, mode mod.Mode) (*Module, error) {
 	mod, err := modload.Load(dir, mode)
 	if err != nil {
 		return nil, errors.NewWith(err, `modload.Load(dir, mode)`, -2, "modload.Load", dir, mode)
+	}
+	return New(mod), nil
+}
+
+// LoadFrom loads a module from specified gop.mod or go.mod file.
+func LoadFrom(file string) (*Module, error) {
+	mod, err := modload.LoadFrom(file)
+	if err != nil {
+		return nil, errors.NewWith(err, `modload.LoadFrom(file)`, -2, "modload.LoadFrom", file)
 	}
 	return New(mod), nil
 }
@@ -220,5 +228,10 @@ func (e *MissingError) Error() string {
 	return fmt.Sprintf(`no required module provides package %v; to add it:
 	gop get %v`, e.Path, e.Path)
 }
+
+// -----------------------------------------------------------------------------
+
+// Default represents the default gop.mod object.
+var Default = New(modload.Default)
 
 // -----------------------------------------------------------------------------

@@ -32,9 +32,9 @@ import (
 // A File is the parsed, interpreted form of a gop.mod file.
 type File struct {
 	modfile.File
-	Gop      *Gop
-	Project  *Project
-	Register []*Register
+	Gop     *Gop
+	Project *Project
+	Import  []*Import
 }
 
 // A Module is the module statement.
@@ -58,8 +58,8 @@ type Retract = modfile.Retract
 // A Gop is the gop statement.
 type Gop = modfile.Go
 
-// A Register is the register statement.
-type Register struct {
+// A Import is the import statement.
+type Import struct {
 	ClassfileMod string // module path of classfile
 	Syntax       *Line
 }
@@ -117,6 +117,9 @@ func parseToFile(file string, data []byte, fix VersionFixer, strict bool) (parse
 	if err != nil {
 		err = errors.NewWith(err, `modfile.ParseLax(file, data, fix)`, -2, "modfile.ParseLax", file, data, fix)
 		return
+	}
+	if mod := f.Module; mod != nil && mod.Mod.Path == "std" {
+		mod.Mod.Path = "" // the Go std module
 	}
 	parsed = &File{File: *f}
 
@@ -245,9 +248,9 @@ func (f *File) parseVerb(errs *ErrorList, verb string, line *Line, args []string
 		}
 		f.Gop = &Gop{Syntax: line}
 		f.Gop.Version = args[0]
-	case "register":
+	case "import", "register": // register => import
 		if len(args) != 1 {
-			errorf("register directive expects exactly one argument")
+			errorf("import directive expects exactly one argument")
 			return
 		}
 		s, err := parseString(&args[0])
@@ -260,7 +263,7 @@ func (f *File) parseVerb(errs *ErrorList, verb string, line *Line, args []string
 			wrapError(err)
 			return
 		}
-		f.Register = append(f.Register, &Register{
+		f.Import = append(f.Import, &Import{
 			ClassfileMod: s,
 			Syntax:       line,
 		})
@@ -513,7 +516,7 @@ const (
 
 const (
 	directiveLineBlock = 0x80 + iota
-	directiveRegister
+	directiveImport
 	directiveRequire
 	directiveExclude
 	directiveReplace
@@ -524,7 +527,8 @@ var directiveWeights = map[string]int{
 	"module":   directiveModule,
 	"go":       directiveGo,
 	"gop":      directiveGop,
-	"register": directiveRegister,
+	"import":   directiveImport,
+	"register": directiveImport, // register => import
 	"require":  directiveRequire,
 	"exclude":  directiveExclude,
 	"replace":  directiveReplace,
@@ -582,22 +586,22 @@ func (f *File) AddGopStmt(version string) error {
 	return nil
 }
 
-func (f *File) AddRegister(modPath string) {
-	for _, r := range f.Register {
+func (f *File) AddImport(modPath string) {
+	for _, r := range f.Import {
 		if r.ClassfileMod == modPath {
 			return
 		}
 	}
-	f.AddNewRegister(modPath)
+	f.AddNewImport(modPath)
 }
 
-func (f *File) AddNewRegister(modPath string) {
-	line := addLine(f.Syntax, "register", AutoQuote(modPath))
-	r := &Register{
+func (f *File) AddNewImport(modPath string) {
+	line := addLine(f.Syntax, "import", AutoQuote(modPath))
+	r := &Import{
 		ClassfileMod: modPath,
 		Syntax:       line,
 	}
-	f.Register = append(f.Register, r)
+	f.Import = append(f.Import, r)
 }
 
 // -----------------------------------------------------------------------------

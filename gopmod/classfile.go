@@ -18,6 +18,7 @@ package gopmod
 
 import (
 	"errors"
+	"path"
 	"syscall"
 
 	"github.com/goplus/mod/modcache"
@@ -32,7 +33,7 @@ type Project = modfile.Project
 
 var (
 	SpxProject = &Project{
-		Ext:      ".gmx",
+		Ext:      ".spx",
 		Class:    "Game",
 		Works:    []*Class{{Ext: ".spx", Class: "Sprite"}},
 		PkgPaths: []string{"github.com/goplus/spx", "math"},
@@ -45,11 +46,24 @@ var (
 
 // -----------------------------------------------------------------------------
 
-func (p *Module) IsClass(ext string) (isProj bool, ok bool) {
-	c, ok := p.projects[ext]
-	if ok {
-		isProj = (ext == c.Ext)
+func (p *Module) ClassKind(fname string) (isProj, ok bool) {
+	ext := path.Ext(fname)
+	if c, ok := p.projects[ext]; ok {
+		for _, w := range c.Works {
+			if w.Ext == ext {
+				if ext != c.Ext || fname != "main"+ext {
+					return false, true
+				}
+				break
+			}
+		}
+		return true, true
 	}
+	return
+}
+
+func (p *Module) IsClass(ext string) (ok bool) {
+	_, ok = p.projects[ext]
 	return
 }
 
@@ -58,29 +72,30 @@ func (p *Module) LookupClass(ext string) (c *Project, ok bool) {
 	return
 }
 
-func (p *Module) RegisterClasses(registerClass ...func(c *Project)) (err error) {
-	var regcls func(c *Project)
-	if registerClass != nil {
-		regcls = registerClass[0]
+func (p *Module) ImportClasses(importClass ...func(c *Project)) (err error) {
+	var impcls func(c *Project)
+	if importClass != nil {
+		impcls = importClass[0]
 	}
-	p.registerClass(SpxProject, regcls)
+	p.importClass(SpxProject, impcls)
+	p.projects[".gmx"] = SpxProject // old style
 	if c := p.Project; c != nil {
-		p.registerClass(c, regcls)
+		p.importClass(c, impcls)
 	}
-	for _, r := range p.Register {
-		if err = p.registerMod(r.ClassfileMod, regcls); err != nil {
+	for _, r := range p.Import {
+		if err = p.importMod(r.ClassfileMod, impcls); err != nil {
 			return
 		}
 	}
 	return
 }
 
-func (p *Module) registerMod(modPath string, regcls func(c *Project)) (err error) {
+func (p *Module) importMod(modPath string, imcls func(c *Project)) (err error) {
 	mod, ok := p.LookupDepMod(modPath)
 	if !ok {
 		return syscall.ENOENT
 	}
-	err = p.registerClassFrom(mod, regcls)
+	err = p.importClassFrom(mod, imcls)
 	if err != syscall.ENOENT {
 		return
 	}
@@ -88,10 +103,10 @@ func (p *Module) registerMod(modPath string, regcls func(c *Project)) (err error
 	if err != nil {
 		return
 	}
-	return p.registerClassFrom(mod, regcls)
+	return p.importClassFrom(mod, imcls)
 }
 
-func (p *Module) registerClassFrom(modVer module.Version, regcls func(c *Project)) (err error) {
+func (p *Module) importClassFrom(modVer module.Version, impcls func(c *Project)) (err error) {
 	dir, err := modcache.Path(modVer)
 	if err != nil {
 		return
@@ -104,17 +119,17 @@ func (p *Module) registerClassFrom(modVer module.Version, regcls func(c *Project
 	if c == nil {
 		return ErrNotClassFileMod
 	}
-	p.registerClass(c, regcls)
+	p.importClass(c, impcls)
 	return
 }
 
-func (p *Module) registerClass(c *Project, regcls func(c *Project)) {
+func (p *Module) importClass(c *Project, impcls func(c *Project)) {
 	p.projects[c.Ext] = c
 	for _, w := range c.Works {
 		p.projects[w.Ext] = c
 	}
-	if regcls != nil {
-		regcls(c)
+	if impcls != nil {
+		impcls(c)
 	}
 }
 

@@ -117,25 +117,29 @@ func fixVersion(fixed *bool) modfile.VersionFixer {
 	}
 }
 
-// Load loads a module from `dir`.
+// Load loads a module from specified directory.
 func Load(dir string, mode mod.Mode) (p Module, err error) {
 	gopmod, err := mod.GOPMOD(dir, mode)
 	if err != nil {
 		err = errors.NewWith(err, `mod.GOPMOD(dir, mode)`, -2, "mod.GOPMOD", dir, mode)
 		return
 	}
+	return LoadFrom(gopmod)
+}
 
-	data, err := os.ReadFile(gopmod)
+// LoadFrom loads a module from specified gop.mod or go.mod file.
+func LoadFrom(file string) (p Module, err error) {
+	data, err := os.ReadFile(file)
 	if err != nil {
-		err = errors.NewWith(err, `os.ReadFile(gopmod)`, -2, "os.ReadFile", gopmod)
+		err = errors.NewWith(err, `os.ReadFile(gopmod)`, -2, "os.ReadFile", file)
 		return
 	}
 
 	var fixed bool
 	fix := fixVersion(&fixed)
-	f, err := modfile.Parse(gopmod, data, fix)
+	f, err := modfile.Parse(file, data, fix)
 	if err != nil {
-		err = errors.NewWith(err, `modfile.Parse(gopmod, data, fix)`, -2, "modfile.Parse", gopmod, data, fix)
+		err = errors.NewWith(err, `modfile.Parse(gopmod, data, fix)`, -2, "modfile.Parse", file, data, fix)
 		return
 	}
 	if f.Module == nil {
@@ -263,6 +267,24 @@ func getVerb(e modfile.Expr) string {
 		return "" // deleted line
 	}
 	return e.(*modfile.LineBlock).Token[0]
+}
+
+// -----------------------------------------------------------------------------
+
+const (
+	defaultGoVer  = "1.18"
+	defaultGopVer = "1.1"
+)
+
+// Default represents the default gop.mod object.
+var Default = Module{
+	File: &modfile.File{
+		File: gomodfile.File{
+			Module: &gomodfile.Module{},
+			Go:     &gomodfile.Go{Version: defaultGoVer},
+		},
+		Gop: &modfile.Gop{Version: defaultGopVer},
+	},
 }
 
 // -----------------------------------------------------------------------------
