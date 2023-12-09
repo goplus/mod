@@ -52,12 +52,61 @@ func SetDebug(flags dbgFlags) {
 // -----------------------------------------------------------------------------
 
 // GetPkg downloads the module that contains pkgPath to GOMODCACHE.
-func GetPkg(pkgPath, modBase string) (modVer module.Version, relPath string, err error) {
-	modPath, relPath := Split(pkgPath, modBase)
-	if debugVerbose {
-		log.Println("modfetch.GetPkg", pkgPath, modBase, "modPath:", modPath)
+func GetPkg(pkgPathVer, modBase string) (modVer module.Version, relPath string, err error) {
+	var ver string
+	var pkgPath string = pkgPathVer
+	if pos := strings.IndexByte(pkgPath, '@'); pos > 0 {
+		pkgPath, ver = pkgPath[:pos], pkgPath[pos+1:]
 	}
-	modVer, err = Get(modPath)
+	if debugVerbose {
+		log.Println("modfetch.GetPkg", pkgPathVer, modBase)
+	}
+	if semver.IsValid(ver) {
+		modVer, relPath, err = lookupListFromCache(pkgPath, "@"+ver)
+		if err == nil {
+			return
+		}
+	}
+	var stdout, stderr bytes.Buffer
+	cmd := exec.Command("go", "get", pkgPathVer)
+	if debugVerbose {
+		log.Println("==>", cmd)
+	}
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	cmd.Run()
+	if stderr.Len() > 0 {
+		modVer, err = getResult(stderr.String())
+		if err != syscall.ENOENT {
+			if debugVerbose {
+				log.Println("modfetch.Get ret:", err)
+			}
+			return
+		}
+	}
+	var foundVer string
+	if semver.IsValid(ver) {
+		foundVer = "@" + ver
+	}
+	return lookupListFromCache(pkgPath, foundVer)
+}
+
+func lookupListFromCache(pkgPath string, ver string) (modVer module.Version, relPath string, err error) {
+	list := strings.Split(pkgPath, "/")
+	for i := len(list); i > 0; i-- {
+		modPath := strings.Join(list[:i], "/") + ver
+		_, modVer, err = lookupFromCache(modPath)
+		if err == nil {
+			encPath, _ := module.EscapePath(modVer.Path)
+			modRoot := filepath.Join(modcache.GOMODCACHE, encPath+"@"+modVer.Version, filepath.Join(list[i:]...))
+			if _, e := os.Stat(modRoot); e != nil {
+				err = fmt.Errorf("gop: module %v found, but does not contain package %v", modVer.Path, pkgPath)
+				return
+			}
+			relPath = strings.Join(list[i:], "/")
+			return
+		}
+	}
 	return
 }
 
@@ -121,7 +170,7 @@ func Get(modPath string, noCache ...bool) (mod module.Version, err error) {
 	if strings.IndexByte(modPath, '@') < 0 {
 		modPathVer += "@latest"
 	}
-	cmd := exec.Command("go", "install", modPathVer)
+	cmd := exec.Command("go", "get", modPathVer)
 	if debugVerbose {
 		log.Println("==>", cmd)
 	}
