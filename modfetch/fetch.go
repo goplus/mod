@@ -18,9 +18,11 @@ package modfetch
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"log"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -61,34 +63,43 @@ func GetPkg(pkgPathVer, modBase string) (modVer module.Version, relPath string, 
 	if debugVerbose {
 		log.Println("modfetch.GetPkg", pkgPathVer, modBase)
 	}
-	if semver.IsValid(ver) {
+	semIsValid := semver.IsValid(ver)
+	if semIsValid {
 		modVer, relPath, err = lookupListFromCache(pkgPath, "@"+ver)
 		if err == nil {
 			return
 		}
 	}
 	var stdout, stderr bytes.Buffer
-	cmd := exec.Command("go", "get", pkgPathVer)
+	cmd := exec.Command("go", "install", "-x", pkgPathVer)
 	if debugVerbose {
 		log.Println("==>", cmd)
 	}
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	cmd.Run()
-	if stderr.Len() > 0 {
-		modVer, err = getResult(stderr.String())
-		if err != syscall.ENOENT {
-			if debugVerbose {
-				log.Println("modfetch.Get ret:", err)
-			}
-			return
-		}
-	}
+	proxy, pkg, found := foundBestRepo(stderr.String(), pkgPath)
 	var foundVer string
-	if semver.IsValid(ver) {
+	if semIsValid {
 		foundVer = "@" + ver
 	}
-	return lookupListFromCache(pkgPath, foundVer)
+	if found {
+		if !semIsValid {
+			if rev, err := foundRevInfo(proxy, pkg, ver); err == nil {
+				foundVer = "@" + rev.Version
+			}
+		}
+		if strings.HasPrefix(pkgPath, pkg+"/") {
+			relPath = pkgPath[len(pkg)+1:]
+		}
+		_, modVer, err = lookupFromCache(pkg + foundVer)
+	} else {
+		modVer, relPath, err = lookupListFromCache(pkgPath, foundVer)
+	}
+	if debugVerbose {
+		log.Println("==>", modVer, relPath, err)
+	}
+	return
 }
 
 func lookupListFromCache(pkgPath string, ver string) (modVer module.Version, relPath string, err error) {
@@ -170,7 +181,7 @@ func Get(modPath string, noCache ...bool) (mod module.Version, err error) {
 	if strings.IndexByte(modPath, '@') < 0 {
 		modPathVer += "@latest"
 	}
-	cmd := exec.Command("go", "get", modPathVer)
+	cmd := exec.Command("go", "get", "-x", modPathVer)
 	if debugVerbose {
 		log.Println("==>", cmd)
 	}
@@ -263,6 +274,48 @@ func lookupFromCache(modPath string) (modRoot string, mod module.Version, err er
 		}
 	}
 	return
+}
+
+// check rev info or list
+// # get https://goproxy.cn/github.com/goplus/goxls/@v/main.info: 200 OK
+// # get https://goproxy.cn/github.com/goplus/goxls/@v/list: 200 OK
+// check pkglist match
+// # get https://goproxy.cn/github.com/go-playground/validator/@v/list: 200 OK (0.530s)
+// # get https://goproxy.cn/github.com/go-playground/validator/v10/@v/list: 200 OK (0.383s)
+func foundBestRepo(data string, pkgPath string) (proxy string, best string, found bool) {
+	for _, line := range strings.Split(data, "\n") {
+		if strings.HasPrefix(line, "# get ") {
+			if !strings.Contains(line, ": 200 OK") {
+				continue
+			}
+			if n := strings.Index(line, "/@v/"); n > 0 {
+				base, err := url.Parse(line[6:n])
+				if err != nil {
+					continue
+				}
+				pkg := base.Path[1:]
+				if strings.HasPrefix(pkgPath, pkg) {
+					proxy = base.Scheme + "://" + base.Host
+					found = true
+					if len(best) < len(pkg) {
+						best = pkg
+					}
+				}
+			}
+		}
+	}
+	return
+}
+
+func foundRevInfo(proxy string, pkg string, rev string) (*RevInfo, error) {
+	repo, err := newProxyRepo(proxy, pkg)
+	if err != nil {
+		return nil, err
+	}
+	if rev == "latest" {
+		return repo.Latest(context.Background())
+	}
+	return repo.Stat(context.Background(), rev)
 }
 
 // -----------------------------------------------------------------------------
