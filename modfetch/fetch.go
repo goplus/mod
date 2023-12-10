@@ -181,7 +181,7 @@ func Get(modPath string, noCache ...bool) (mod module.Version, err error) {
 	if strings.IndexByte(modPath, '@') < 0 {
 		modPathVer += "@latest"
 	}
-	cmd := exec.Command("go", "get", "-x", modPathVer)
+	cmd := exec.Command("go", "get", modPathVer)
 	if debugVerbose {
 		log.Println("==>", cmd)
 	}
