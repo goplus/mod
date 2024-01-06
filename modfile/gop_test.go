@@ -32,6 +32,9 @@ func TestUpdateLine(t *testing.T) {
 }
 
 func TestGetWeight(t *testing.T) {
+	if getWeight(&modfile.LineBlock{Token: []string{"gop"}}) != directiveGop {
+		t.Fatal("getWeight require failed")
+	}
 	if getWeight(&modfile.LineBlock{Token: []string{"unknown"}}) != directiveLineBlock {
 		t.Fatal("getWeight unknown failed")
 	}
@@ -224,8 +227,6 @@ func TestParse2(t *testing.T) {
 }
 
 const gopmodUserProj = `
-module moduleUserProj
-
 gop 1.1
 
 import github.com/goplus/spx
@@ -254,6 +255,12 @@ func TestParseUser(t *testing.T) {
 }
 
 func TestParseErr(t *testing.T) {
+	doTestParseErr(t, `gop.mod:2: unknown directive: module`, `
+module foo
+`)
+	doTestParseErr(t, `gop.mod:2:9: unexpected newline in string`, `
+foo "foo
+`)
 	doTestParseErr(t, `gop.mod:3: repeated gop statement`, `
 gop 1.1
 gop 1.2

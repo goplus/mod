@@ -98,12 +98,10 @@ var addGopTests = []struct {
 	out     string
 }{
 	{
-		`module_only`,
-		`module m
-		`,
-		`1.14`,
-		`module m
-		gop 1.14
+		`empty_only`,
+		``,
+		`1.1`,
+		`gop 1.1
 		`,
 	},
 }
@@ -119,8 +117,18 @@ func TestAddGop(t *testing.T) {
 }
 
 func TestAddGopErr(t *testing.T) {
-	if new(File).AddGopStmt("1.x") == nil {
-		t.Fatal("AddGoStmt failed")
+	f := new(File)
+	if e := f.AddGopStmt("1.x"); e == nil {
+		t.Fatal("AddGoStmt:", e)
+	}
+	if e := f.AddGopStmt("1.1"); e != nil {
+		t.Fatal("AddGoStmt failed:", e)
+	}
+	if e := f.AddGopStmt("1.2"); e != nil {
+		t.Fatal("AddGoStmt failed:", e)
+	}
+	if n := len(f.Syntax.Stmt); n != 1 {
+		t.Fatal("AddGoStmt: len(f.Syntax.Stmt) =", n)
 	}
 }
 

@@ -137,7 +137,6 @@ func (f *File) parseVerb(errs *ErrorList, verb string, line *Line, args []string
 		wrapError1(e)
 	}
 	switch verb {
-	case "module":
 	case "gop":
 		if f.Gop != nil {
 			errorf("repeated gop statement")
@@ -433,6 +432,9 @@ func (f *File) AddGopStmt(version string) error {
 		return fmt.Errorf("invalid language version string %q", version)
 	}
 	if f.Gop == nil {
+		if f.Syntax == nil {
+			f.Syntax = new(FileSyntax)
+		}
 		f.Gop = &Gop{
 			Version: version,
 			Syntax:  addLine(f.Syntax, "gop", version),
