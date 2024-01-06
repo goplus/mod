@@ -30,7 +30,6 @@ import (
 
 // A File is the parsed, interpreted form of a gop.mod file.
 type File struct {
-	Module  *Module
 	Gop     *Gop
 	Project *Project
 	Import  []*Import
@@ -98,10 +97,7 @@ func parseToFile(file string, data []byte, fix VersionFixer, strict bool) (parse
 		err = errors.NewWith(err, `modfile.ParseLax(file, data, fix)`, -2, "modfile.ParseLax", file, data, fix)
 		return
 	}
-	if mod := f.Module; mod != nil && mod.Mod.Path == "std" {
-		mod.Mod.Path = "" // the Go std module
-	}
-	parsed = &File{Module: f.Module, Syntax: f.Syntax}
+	parsed = &File{Syntax: f.Syntax}
 
 	var errs ErrorList
 	var fs = f.Syntax
@@ -430,22 +426,6 @@ func addLine(x *FileSyntax, tokens ...string) *Line {
 	}
 	x.Stmt = append(x.Stmt, new)
 	return new
-}
-
-func (f *File) AddModuleStmt(path string) error {
-	if f.Syntax == nil {
-		f.Syntax = new(FileSyntax)
-	}
-	if f.Module == nil {
-		f.Module = &Module{
-			Mod:    module.Version{Path: path},
-			Syntax: addLine(f.Syntax, "module", AutoQuote(path)),
-		}
-	} else {
-		f.Module.Mod.Path = path
-		updateLine(f.Module.Syntax, "module", AutoQuote(path))
-	}
-	return nil
 }
 
 func (f *File) AddGopStmt(version string) error {

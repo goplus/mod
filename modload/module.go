@@ -109,7 +109,7 @@ func Create(dir string, modPath, goVer, gopVer string) (p Module, err error) {
 	}
 
 	mod := newGoMod(gomod, modPath, goVer)
-	opt := newGopMod(gopmod, modPath, gopVer)
+	opt := newGopMod(gopmod, gopVer)
 	return Module{mod, opt}, nil
 }
 
@@ -121,9 +121,8 @@ func newGoMod(gomod, modPath, goVer string) *gomodfile.File {
 	return mod
 }
 
-func newGopMod(gopmod, modPath, gopVer string) *modfile.File {
+func newGopMod(gopmod, gopVer string) *modfile.File {
 	opt := new(modfile.File)
-	opt.AddModuleStmt(modPath)
 	opt.AddGopStmt(gopVer)
 	opt.Syntax.Name = gopmod
 	return opt
@@ -168,26 +167,24 @@ func LoadFrom(gomod, gopmod string) (p Module, err error) {
 		err = errors.NewWith(err, `gomodfile.Parse(gomod, data, fix)`, -2, "gomodfile.Parse", gomod, data, fix)
 		return
 	}
-	module := f.Module
-	if module == nil {
+	mod := f.Module
+	if mod == nil {
 		// No module declaration. Must add module path.
-		err = errors.NewWith(ErrNoModDecl, `module == nil`, -2, "==", module, nil)
+		err = errors.NewWith(ErrNoModDecl, `mod == nil`, -2, "==", mod, nil)
 		return
+	}
+	if mod.Mod.Path == "std" {
+		mod.Mod.Path = "" // the Go std module
 	}
 
 	var opt *modfile.File
 	data, err = os.ReadFile(gopmod)
 	if err != nil {
-		opt = newGopMod(gopmod, module.Mod.Path, defaultGopVer)
+		opt = newGopMod(gopmod, defaultGopVer)
 	} else {
 		opt, err = modfile.Parse(gopmod, data, fix)
 		if err != nil {
 			err = errors.NewWith(err, `modfile.Parse(gopmod, data, fix)`, -2, "modfile.Parse", gopmod, data, fix)
-			return
-		}
-		if opt.Module == nil {
-			// No module declaration. Must add module path.
-			err = errors.NewWith(ErrNoModDecl, `opt.Module == nil`, -2, "==", opt.Module, nil)
 			return
 		}
 	}
@@ -350,8 +347,7 @@ var Default = Module{
 		Go:     &gomodfile.Go{Version: defaultGoVer},
 	},
 	Opt: &modfile.File{
-		Module: &gomodfile.Module{},
-		Gop:    &modfile.Gop{Version: defaultGopVer},
+		Gop: &modfile.Gop{Version: defaultGopVer},
 	},
 }
 

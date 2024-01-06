@@ -165,6 +165,7 @@ func TestGoModCompat2(t *testing.T) {
 	}
 }
 
+/* TODO
 func TestGoModStd(t *testing.T) {
 	const (
 		gopmod = "module std\n"
@@ -177,6 +178,7 @@ func TestGoModStd(t *testing.T) {
 		t.Fatal("modfile.ParseLax:", f.Module.Mod.Path)
 	}
 }
+*/
 
 // -----------------------------------------------------------------------------
 
