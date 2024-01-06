@@ -25,7 +25,6 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/goplus/mod"
 	"github.com/goplus/mod/modcache"
 	"github.com/goplus/mod/modfetch"
 	"github.com/goplus/mod/modload"
@@ -181,27 +180,27 @@ func New(mod modload.Module) *Module {
 }
 
 // Load loads a module from a local directory.
-func Load(dir string, mode mod.Mode) (*Module, error) {
-	mod, err := modload.Load(dir, mode)
+func Load(dir string) (*Module, error) {
+	mod, err := modload.Load(dir)
 	if err != nil {
-		return nil, errors.NewWith(err, `modload.Load(dir, mode)`, -2, "modload.Load", dir, mode)
+		return nil, errors.NewWith(err, `modload.Load(dir)`, -2, "modload.Load", dir)
 	}
 	return New(mod), nil
 }
 
-// LoadFrom loads a module from specified gop.mod or go.mod file.
-func LoadFrom(file string) (*Module, error) {
-	mod, err := modload.LoadFrom(file)
+// LoadFrom loads a module from specified go.mod file and an optional gop.mod file.
+func LoadFrom(gomod, gopmod string) (*Module, error) {
+	mod, err := modload.LoadFrom(gomod, gopmod)
 	if err != nil {
-		return nil, errors.NewWith(err, `modload.LoadFrom(file)`, -2, "modload.LoadFrom", file)
+		return nil, errors.NewWith(err, `modload.LoadFrom(gomod, gopmod)`, -2, "modload.LoadFrom", gomod, gopmod)
 	}
 	return New(mod), nil
 }
 
 // LoadMod loads a module from a versioned module path.
 // If we only want to load a Go modfile, pass env parameter as nil.
-func LoadMod(mod module.Version, mode mod.Mode) (p *Module, err error) {
-	p, err = loadModFrom(mod, mode)
+func LoadMod(mod module.Version) (p *Module, err error) {
+	p, err = loadModFrom(mod)
 	if err != syscall.ENOENT {
 		return
 	}
@@ -209,15 +208,15 @@ func LoadMod(mod module.Version, mode mod.Mode) (p *Module, err error) {
 	if err != nil {
 		return
 	}
-	return loadModFrom(mod, mode)
+	return loadModFrom(mod)
 }
 
-func loadModFrom(mod module.Version, mode mod.Mode) (p *Module, err error) {
+func loadModFrom(mod module.Version) (p *Module, err error) {
 	dir, err := modcache.Path(mod)
 	if err != nil {
 		return
 	}
-	return Load(dir, mode)
+	return Load(dir)
 }
 
 type MissingError struct {

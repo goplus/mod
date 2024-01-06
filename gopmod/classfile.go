@@ -79,10 +79,11 @@ func (p *Module) ImportClasses(importClass ...func(c *Project)) (err error) {
 	}
 	p.importClass(SpxProject, impcls)
 	p.projects[".gmx"] = SpxProject // old style
-	if c := p.Project; c != nil {
+	opt := p.Opt
+	if c := opt.Project; c != nil {
 		p.importClass(c, impcls)
 	}
-	for _, r := range p.Import {
+	for _, r := range opt.Import {
 		if err = p.importMod(r.ClassfileMod, impcls); err != nil {
 			return
 		}
@@ -111,11 +112,11 @@ func (p *Module) importClassFrom(modVer module.Version, impcls func(c *Project))
 	if err != nil {
 		return
 	}
-	mod, err := modload.Load(dir, 0)
+	mod, err := modload.Load(dir)
 	if err != nil {
 		return
 	}
-	c := mod.Project
+	c := mod.Opt.Project
 	if c == nil {
 		return ErrNotClassFileMod
 	}

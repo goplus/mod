@@ -17,7 +17,6 @@
 package modfile
 
 import (
-	"path/filepath"
 	"testing"
 
 	"github.com/qiniu/x/errors"
@@ -33,9 +32,6 @@ func TestUpdateLine(t *testing.T) {
 }
 
 func TestGetWeight(t *testing.T) {
-	if getWeight(&modfile.LineBlock{Token: []string{"require"}}) != directiveRequire {
-		t.Fatal("getWeight require failed")
-	}
 	if getWeight(&modfile.LineBlock{Token: []string{"unknown"}}) != directiveLineBlock {
 		t.Fatal("getWeight unknown failed")
 	}
@@ -228,19 +224,9 @@ func TestParse2(t *testing.T) {
 const gopmodUserProj = `
 module moduleUserProj
 
-go 1.17
 gop 1.1
 
 import github.com/goplus/spx
-
-require (
-    github.com/goplus/spx v1.0
-)
-
-replace (
-	github.com/goplus/spx v1.0 => github.com/xushiwei/spx v1.2
-	github.com/goplus/gop => /Users/xushiwei/work/gop
-)
 `
 
 func TestParseUser(t *testing.T) {
@@ -255,13 +241,6 @@ func TestParseUser(t *testing.T) {
 	if f.Import[0].ClassfileMod != "github.com/goplus/spx" {
 		t.Fatal("Parse => Register:", f.Import)
 	}
-	if len(f.Replace) != 2 {
-		t.Fatal("Parse => Replace:", f.Replace)
-	}
-	f.DropAllRequire()
-	if f.Require != nil {
-		t.Fatal("DropAllRequire failed")
-	}
 	f.AddImport("github.com/goplus/spx")
 	if len(f.Import) != 1 {
 		t.Fatal("AddRegister not exist?")
@@ -270,55 +249,14 @@ func TestParseUser(t *testing.T) {
 	if len(f.Import) != 2 {
 		t.Fatal("AddRegister failed")
 	}
-	f.AddReplace("github.com/goplus/spx", "v1.0", "/Users/xushiwei/work/spx", "")
-	f.DropAllReplace()
-	if f.Replace != nil {
-		t.Fatal("DropAllReplace failed")
-	}
 }
 
 func TestParseErr(t *testing.T) {
-	doTestParseErr(t, `gop.mod:2: replace github.com/goplus/gop/v2: version "v1.2.0" invalid: should be v2, not v1`, `
-replace github.com/goplus/gop/v2 v1.2 => ../
-`)
-	if filepath.Separator == '/' {
-		doTestParseErr(t, `gop.mod:2:3: replacement directory appears to be Windows path (on a non-windows system)`, `
-		replace github.com/goplus/gop v1.2 => ..\
-		`)
-	}
-	doTestParseErr(t, `gop.mod:2: replacement module directory path "../" cannot have version`, `
-replace github.com/goplus/gop v1.2 => ../ v1.3
-`)
-	doTestParseErr(t, `gop.mod:2: replacement module without version must be directory path (rooted or starting with ./ or ../)`, `
-replace github.com/goplus/gop v1.2 => abc.com
-`)
-	doTestParseErr(t, `gop.mod:2: invalid quoted string: unquoted string cannot contain quote`, `
-replace github.com/goplus/gop v1.2 => /"
-`)
-	doTestParseErr(t, `gop.mod:2: replace github.com/goplus/gop: version "v1.2\"" invalid: unquoted string cannot contain quote`, `
-replace github.com/goplus/gop v1.2" => /
-`)
-	doTestParseErr(t, `gop.mod:2: invalid quoted string: unquoted string cannot contain quote`, `
-replace gopkg.in/" v1.2 => /
-`)
-	doTestParseErr(t, `gop.mod:2: replace gopkg.in/?: invalid module path`, `
-replace gopkg.in/? v1.2 => /
-`)
-	doTestParseErr(t, `gop.mod:2: replace /: version "?" invalid: must be of the form v1.2.3`, `
-replace github.com/goplus/gop => / ?
-`)
-	doTestParseErr(t, `gop.mod:2: replace github.com/goplus/gop: version "?" invalid: must be of the form v1.2.3`, `
-replace github.com/goplus/gop ? => /
-`)
-	doTestParseErr(t, `gop.mod:2: usage: replace module/path [v1.2.3] => other/module v1.4
-	 or replace module/path [v1.2.3] => ../local/directory`, `
-replace ?
-`)
-	doTestParseErr(t, `gop.mod:3: repeated go statement`, `
+	doTestParseErr(t, `gop.mod:3: repeated gop statement`, `
 gop 1.1
 gop 1.2
 `)
-	doTestParseErr(t, `gop.mod:2: go directive expects exactly one argument`, `
+	doTestParseErr(t, `gop.mod:2: gop directive expects exactly one argument`, `
 gop 1.1 1.2
 `)
 	doTestParseErr(t, `gop.mod:2: invalid gop version '1.x': must match format 1.23`, `
@@ -383,9 +321,6 @@ class .spx sprite
 `)
 	doTestParseErr(t, `gop.mod:2: unknown directive: unknown`, `
 unknown .spx
-`)
-	doTestParseErr(t, `gop.mod:2: invalid go version '1.x': must match format 1.23.0`, `
-go 1.x
 `)
 }
 

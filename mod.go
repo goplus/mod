@@ -25,47 +25,24 @@ import (
 
 // -----------------------------------------------------------------------------
 
-type Mode int
-
-const (
-	GoModOnly  Mode = 1
-	GopModOnly Mode = 2
-)
-
-// GOPMOD checks the modfile in this dir or its ancestors.
-// If mode == 0, it checks both gop.mod and go.mod
-// If mode == GoModOnly, it checks go.mod
-// If mode == GopModOnly, it checks gop.mod
-func GOPMOD(dir string, mode Mode) (file string, err error) {
-	if dir == "" {
-		dir = "."
+func FindGoMod(dirFrom string) (dir, file string, err error) {
+	if dirFrom == "" {
+		dirFrom = "."
 	}
-	if dir, err = filepath.Abs(dir); err != nil {
+	if dir, err = filepath.Abs(dirFrom); err != nil {
 		return
 	}
 	for dir != "" {
-		if mode != GoModOnly {
-			file = filepath.Join(dir, "gop.mod")
-			if fi, e := os.Lstat(file); e == nil && !fi.IsDir() {
-				return
-			}
-		}
-		if mode != GopModOnly {
-			file = filepath.Join(dir, "go.mod")
-			if fi, e := os.Lstat(file); e == nil && !fi.IsDir() {
-				return
-			}
+		file = filepath.Join(dir, "go.mod")
+		if fi, e := os.Lstat(file); e == nil && !fi.IsDir() {
+			return
 		}
 		if dir, file = filepath.Split(strings.TrimRight(dir, "/\\")); file == "" {
 			break
 		}
 	}
-	return "", syscall.ENOENT
-}
-
-// GOMOD checks the modfile (go.mod) in this dir or its ancestors.
-func GOMOD(dir string) (file string, err error) {
-	return GOPMOD(dir, GoModOnly)
+	err = syscall.ENOENT
+	return
 }
 
 // -----------------------------------------------------------------------------

@@ -23,7 +23,6 @@ import (
 	"strings"
 
 	"github.com/goplus/mod"
-	"github.com/goplus/mod/env"
 	"github.com/goplus/mod/modfile"
 	"github.com/qiniu/x/errors"
 	"golang.org/x/mod/module"
@@ -32,15 +31,21 @@ import (
 )
 
 var (
-	ErrNoModDecl = errors.New("no module declaration in gop.mod (or go.mod)")
-	ErrNoModRoot = errors.New("gop.mod or go.mod file not found in current directory or any parent directory")
+	ErrNoModDecl   = errors.New("no module declaration in a .mod file")
+	ErrNoModRoot   = errors.New("go.mod file not found in current directory or any parent directory")
+	ErrSaveDefault = errors.New("attemp to save default project")
 )
 
 type Module struct {
-	*modfile.File
+	*gomodfile.File
+	Opt *modfile.File
 }
 
-// Modfile returns absolute path of the module file (gop.mod or go.mod).
+func (p Module) IsDefault() bool {
+	return p.Syntax == nil
+}
+
+// Modfile returns absolute path of the module file.
 func (p Module) Modfile() string {
 	return p.Syntax.Name
 }
@@ -88,19 +93,40 @@ func (p Module) DepMods() map[string]module.Version {
 // Create creates a new module in `dir`.
 // You should call `Save` manually to save this module.
 func Create(dir string, modPath, goVer, gopVer string) (p Module, err error) {
-	gopmod, err := filepath.Abs(filepath.Join(dir, "gop.mod"))
+	dir, err = filepath.Abs(dir)
 	if err != nil {
 		return
 	}
+
+	gomod := filepath.Join(dir, "go.mod")
+	if _, err := os.Stat(gomod); err == nil {
+		return Module{}, fmt.Errorf("gop: %s already exists", gomod)
+	}
+
+	gopmod := filepath.Join(dir, "gop.mod")
 	if _, err := os.Stat(gopmod); err == nil {
 		return Module{}, fmt.Errorf("gop: %s already exists", gopmod)
 	}
-	mod := new(modfile.File)
+
+	mod := newGoMod(gomod, modPath, goVer)
+	opt := newGopMod(gopmod, modPath, gopVer)
+	return Module{mod, opt}, nil
+}
+
+func newGoMod(gomod, modPath, goVer string) *gomodfile.File {
+	mod := new(gomodfile.File)
 	mod.AddModuleStmt(modPath)
 	mod.AddGoStmt(goVer)
-	mod.AddGopStmt(gopVer)
-	mod.Syntax.Name = gopmod
-	return Module{File: mod}, nil
+	mod.Syntax.Name = gomod
+	return mod
+}
+
+func newGopMod(gopmod, modPath, gopVer string) *modfile.File {
+	opt := new(modfile.File)
+	opt.AddModuleStmt(modPath)
+	opt.AddGopStmt(gopVer)
+	opt.Syntax.Name = gopmod
+	return opt
 }
 
 // fixVersion returns a modfile.VersionFixer implemented using the Query function.
@@ -118,49 +144,89 @@ func fixVersion(fixed *bool) modfile.VersionFixer {
 }
 
 // Load loads a module from specified directory.
-func Load(dir string, mode mod.Mode) (p Module, err error) {
-	gopmod, err := mod.GOPMOD(dir, mode)
+func Load(dir string) (p Module, err error) {
+	dir, gomod, err := mod.FindGoMod(dir)
 	if err != nil {
-		err = errors.NewWith(err, `mod.GOPMOD(dir, mode)`, -2, "mod.GOPMOD", dir, mode)
+		err = errors.NewWith(err, `mod.FindGoMod(dir)`, -2, "mod.FindGoMod", dir)
 		return
 	}
-	return LoadFrom(gopmod)
+	return LoadFrom(gomod, filepath.Join(dir, "gop.mod"))
 }
 
-// LoadFrom loads a module from specified gop.mod or go.mod file.
-func LoadFrom(file string) (p Module, err error) {
-	data, err := os.ReadFile(file)
+// LoadFrom loads a module from specified go.mod file and an optional gop.mod file.
+func LoadFrom(gomod, gopmod string) (p Module, err error) {
+	data, err := os.ReadFile(gomod)
 	if err != nil {
-		err = errors.NewWith(err, `os.ReadFile(gopmod)`, -2, "os.ReadFile", file)
+		err = errors.NewWith(err, `os.ReadFile(gomod)`, -2, "os.ReadFile", gomod)
 		return
 	}
 
 	var fixed bool
 	fix := fixVersion(&fixed)
-	f, err := modfile.Parse(file, data, fix)
+	f, err := gomodfile.Parse(gomod, data, fix)
 	if err != nil {
-		err = errors.NewWith(err, `modfile.Parse(gopmod, data, fix)`, -2, "modfile.Parse", file, data, fix)
+		err = errors.NewWith(err, `gomodfile.Parse(gomod, data, fix)`, -2, "gomodfile.Parse", gomod, data, fix)
 		return
 	}
-	if f.Module == nil {
+	module := f.Module
+	if module == nil {
 		// No module declaration. Must add module path.
-		return Module{}, errors.NewWith(ErrNoModDecl, `f.Module == nil`, -2, "==", f.Module, nil)
+		err = errors.NewWith(ErrNoModDecl, `module == nil`, -2, "==", module, nil)
+		return
 	}
-	return Module{File: f}, nil
+
+	var opt *modfile.File
+	data, err = os.ReadFile(gopmod)
+	if err != nil {
+		opt = newGopMod(gopmod, module.Mod.Path, defaultGopVer)
+	} else {
+		opt, err = modfile.Parse(gopmod, data, fix)
+		if err != nil {
+			err = errors.NewWith(err, `modfile.Parse(gopmod, data, fix)`, -2, "modfile.Parse", gopmod, data, fix)
+			return
+		}
+		if opt.Module == nil {
+			// No module declaration. Must add module path.
+			err = errors.NewWith(ErrNoModDecl, `opt.Module == nil`, -2, "==", opt.Module, nil)
+			return
+		}
+	}
+	return Module{f, opt}, nil
 }
 
 // -----------------------------------------------------------------------------
 
 // Save saves all changes of this module.
-func (p Module) Save() error {
+func (p Module) Save() (err error) {
+	if p.IsDefault() {
+		return ErrSaveDefault
+	}
+
 	modfile := p.Modfile()
 	data, err := p.Format()
-	if err == nil {
-		err = os.WriteFile(modfile, data, 0644)
+	if err != nil {
+		return
 	}
-	return err
+	err = os.WriteFile(modfile, data, 0644)
+	if err != nil {
+		return
+	}
+
+	if opt := p.Opt; gopExtended(opt) {
+		data, err = opt.Format()
+		if err != nil {
+			return
+		}
+		err = os.WriteFile(opt.Syntax.Name, data, 0644)
+	}
+	return
 }
 
+func gopExtended(opt *modfile.File) bool {
+	return opt.Project != nil || len(opt.Import) > 0
+}
+
+/*
 const (
 	gopMod = "github.com/goplus/gop"
 )
@@ -268,6 +334,7 @@ func getVerb(e modfile.Expr) string {
 	}
 	return e.(*modfile.LineBlock).Token[0]
 }
+*/
 
 // -----------------------------------------------------------------------------
 
@@ -278,12 +345,13 @@ const (
 
 // Default represents the default gop.mod object.
 var Default = Module{
-	File: &modfile.File{
-		File: gomodfile.File{
-			Module: &gomodfile.Module{},
-			Go:     &gomodfile.Go{Version: defaultGoVer},
-		},
-		Gop: &modfile.Gop{Version: defaultGopVer},
+	File: &gomodfile.File{
+		Module: &gomodfile.Module{},
+		Go:     &gomodfile.Go{Version: defaultGoVer},
+	},
+	Opt: &modfile.File{
+		Module: &gomodfile.Module{},
+		Gop:    &modfile.Gop{Version: defaultGopVer},
 	},
 }
 

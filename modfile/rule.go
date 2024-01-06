@@ -18,7 +18,6 @@ package modfile
 
 import (
 	"fmt"
-	"path/filepath"
 	"regexp"
 	"runtime"
 	"strconv"
@@ -31,29 +30,16 @@ import (
 
 // A File is the parsed, interpreted form of a gop.mod file.
 type File struct {
-	modfile.File
+	Module  *Module
 	Gop     *Gop
 	Project *Project
 	Import  []*Import
+
+	Syntax *FileSyntax
 }
 
 // A Module is the module statement.
 type Module = modfile.Module
-
-// A Go is the go statement.
-type Go = modfile.Go
-
-// A Require is a single require statement.
-type Require = modfile.Require
-
-// An Exclude is a single exclude statement.
-type Exclude = modfile.Exclude
-
-// A Replace is a single replace statement.
-type Replace = modfile.Replace
-
-// A Retract is a single retract statement.
-type Retract = modfile.Retract
 
 // A Gop is the gop statement.
 type Gop = modfile.Go
@@ -79,12 +65,6 @@ type Class struct {
 	Class  string // "Sprite"
 	Syntax *Line
 }
-
-// A VersionInterval represents a range of versions with upper and lower bounds.
-// Intervals are closed: both bounds are included. When Low is equal to High,
-// the interval may refer to a single version ('v1.2.3') or an interval
-// ('[v1.2.3, v1.2.3]'); both have the same representation.
-type VersionInterval = modfile.VersionInterval
 
 type VersionFixer = modfile.VersionFixer
 
@@ -121,7 +101,7 @@ func parseToFile(file string, data []byte, fix VersionFixer, strict bool) (parse
 	if mod := f.Module; mod != nil && mod.Mod.Path == "std" {
 		mod.Mod.Path = "" // the Go std module
 	}
-	parsed = &File{File: *f}
+	parsed = &File{Module: f.Module, Syntax: f.Syntax}
 
 	var errs ErrorList
 	var fs = f.Syntax
@@ -143,15 +123,6 @@ func parseToFile(file string, data []byte, fix VersionFixer, strict bool) (parse
 }
 
 func (f *File) parseVerb(errs *ErrorList, verb string, line *Line, args []string, strict bool) {
-	wrapModPathError := func(modPath string, err error) {
-		errs.Add(&Error{
-			Filename: f.Syntax.Name,
-			Pos:      line.Start,
-			ModPath:  modPath,
-			Verb:     verb,
-			Err:      err,
-		})
-	}
 	wrapError1 := func(err error) {
 		errs.Add(&Error{
 			Filename: f.Syntax.Name,
@@ -170,77 +141,14 @@ func (f *File) parseVerb(errs *ErrorList, verb string, line *Line, args []string
 		wrapError1(e)
 	}
 	switch verb {
-	case "require", "exclude", "module", "go", "retract":
-	case "replace":
-		arrow := 2
-		if len(args) >= 2 && args[1] == "=>" {
-			arrow = 1
-		}
-		if len(args) < arrow+2 || len(args) > arrow+3 || args[arrow] != "=>" {
-			errorf("usage: %s module/path [v1.2.3] => other/module v1.4\n\t or %s module/path [v1.2.3] => ../local/directory", verb, verb)
-			return
-		}
-		s, err := parseString(&args[0])
-		if err != nil {
-			errorf("invalid quoted string: %v", err)
-			return
-		}
-		pathMajor, err := modulePathMajor(s)
-		if err != nil {
-			wrapModPathError(s, err)
-			return
-		}
-		var v string
-		if arrow == 2 {
-			v, err = parseVersion(verb, s, &args[1])
-			if err != nil {
-				wrapError(err)
-				return
-			}
-			if err := module.CheckPathMajor(v, pathMajor); err != nil {
-				wrapModPathError(s, err)
-				return
-			}
-		}
-		ns, err := parseString(&args[arrow+1])
-		if err != nil {
-			errorf("invalid quoted string: %v", err)
-			return
-		}
-		nv := ""
-		if len(args) == arrow+2 {
-			if !IsDirectoryPath(ns) {
-				errorf("replacement module without version must be directory path (rooted or starting with ./ or ../)")
-				return
-			}
-			if filepath.Separator == '/' && strings.Contains(ns, `\`) {
-				errorf("replacement directory appears to be Windows path (on a non-windows system)")
-				return
-			}
-		}
-		if len(args) == arrow+3 {
-			nv, err = parseVersion(verb, ns, &args[arrow+2])
-			if err != nil {
-				wrapError(err)
-				return
-			}
-			if IsDirectoryPath(ns) {
-				errorf("replacement module directory path %q cannot have version", ns)
-				return
-			}
-		}
-		f.Replace = append(f.Replace, &Replace{
-			Old:    module.Version{Path: s, Version: v},
-			New:    module.Version{Path: ns, Version: nv},
-			Syntax: line,
-		})
+	case "module":
 	case "gop":
 		if f.Gop != nil {
-			errorf("repeated go statement")
+			errorf("repeated gop statement")
 			return
 		}
 		if len(args) != 1 {
-			errorf("go directive expects exactly one argument")
+			errorf("gop directive expects exactly one argument")
 			return
 		} else if !modfile.GoVersionRE.MatchString(args[0]) {
 			errorf("invalid gop version '%s': must match format 1.23", args[0])
@@ -343,42 +251,6 @@ func (f *File) parseVerb(errs *ErrorList, verb string, line *Line, args []string
 func fileLine(n int) (file string, line int) {
 	_, file, line, _ = runtime.Caller(n)
 	return
-}
-
-func parseVersion(verb string, path string, s *string) (string, error) {
-	t, err := parseString(s)
-	if err != nil {
-		return "", &Error{
-			Verb:    verb,
-			ModPath: path,
-			Err: &module.InvalidVersionError{
-				Version: *s,
-				Err:     err,
-			},
-		}
-	}
-	cv := module.CanonicalVersion(t)
-	if cv == "" {
-		return "", &Error{
-			Verb:    verb,
-			ModPath: path,
-			Err: &module.InvalidVersionError{
-				Version: t,
-				Err:     errors.New("must be of the form v1.2.3"),
-			},
-		}
-	}
-	t = cv
-	*s = t
-	return *s, nil
-}
-
-func modulePathMajor(path string) (string, error) {
-	_, major, ok := module.SplitPathVersion(path)
-	if !ok {
-		return "", fmt.Errorf("invalid module path")
-	}
-	return major, nil
 }
 
 // IsDirectoryPath reports whether the given path should be interpreted
@@ -508,7 +380,6 @@ func (p *Error) Summary() string {
 const (
 	directiveInvalid = iota
 	directiveModule
-	directiveGo
 	directiveGop
 	directiveProject
 	directiveClass
@@ -517,22 +388,13 @@ const (
 const (
 	directiveLineBlock = 0x80 + iota
 	directiveImport
-	directiveRequire
-	directiveExclude
-	directiveReplace
-	directiveRetract
 )
 
 var directiveWeights = map[string]int{
 	"module":   directiveModule,
-	"go":       directiveGo,
 	"gop":      directiveGop,
 	"import":   directiveImport,
 	"register": directiveImport, // register => import
-	"require":  directiveRequire,
-	"exclude":  directiveExclude,
-	"replace":  directiveReplace,
-	"retract":  directiveRetract,
 	"project":  directiveProject,
 	"class":    directiveClass,
 }
@@ -570,6 +432,22 @@ func addLine(x *FileSyntax, tokens ...string) *Line {
 	return new
 }
 
+func (f *File) AddModuleStmt(path string) error {
+	if f.Syntax == nil {
+		f.Syntax = new(FileSyntax)
+	}
+	if f.Module == nil {
+		f.Module = &Module{
+			Mod:    module.Version{Path: path},
+			Syntax: addLine(f.Syntax, "module", AutoQuote(path)),
+		}
+	} else {
+		f.Module.Mod.Path = path
+		updateLine(f.Module.Syntax, "module", AutoQuote(path))
+	}
+	return nil
+}
+
 func (f *File) AddGopStmt(version string) error {
 	if !modfile.GoVersionRE.MatchString(version) {
 		return fmt.Errorf("invalid language version string %q", version)
@@ -604,27 +482,8 @@ func (f *File) AddNewImport(modPath string) {
 	f.Import = append(f.Import, r)
 }
 
-// -----------------------------------------------------------------------------
-
-// markRemoved modifies line so that it (and its end-of-line comment, if any)
-// will be dropped by (*FileSyntax).Cleanup.
-func markRemoved(line *Line) {
-	line.Token = nil
-	line.Comments.Suffix = nil
-}
-
-func (f *File) DropAllRequire() {
-	for _, r := range f.Require {
-		markRemoved(r.Syntax)
-	}
-	f.Require = nil
-}
-
-func (f *File) DropAllReplace() {
-	for _, r := range f.Replace {
-		markRemoved(r.Syntax)
-	}
-	f.Replace = nil
+func (f *File) Format() ([]byte, error) {
+	return modfile.Format(f.Syntax), nil
 }
 
 // -----------------------------------------------------------------------------

@@ -106,47 +106,6 @@ var addGopTests = []struct {
 		gop 1.14
 		`,
 	},
-	{
-		`module_before_require`,
-		`module m
-		require x.y/a v1.2.3
-		`,
-		`1.14`,
-		`module m
-		gop 1.14
-		require x.y/a v1.2.3
-		`,
-	},
-	{
-		`require_before_module`,
-		`require x.y/a v1.2.3
-		module example.com/inverted
-		`,
-		`1.14`,
-		`gop 1.14
-		require x.y/a v1.2.3
-		module example.com/inverted
-		`,
-	},
-	{
-		`require_only`,
-		`require x.y/a v1.2.3
-		`,
-		`1.14`,
-		`gop 1.14
-		require x.y/a v1.2.3
-		`,
-	},
-	{
-		`replace gop`,
-		`require x.y/a v1.2.3
-		gop 1.10
-		`,
-		`1.14`,
-		`require x.y/a v1.2.3
-		gop 1.14
-		`,
-	},
 }
 
 func TestAddGop(t *testing.T) {
