@@ -340,27 +340,6 @@ func isPkgPath(s string) bool {
 	return s != "" && (s[0] != '.' && s[0] != '_')
 }
 
-// can be "_[class].gox" or ".[class]"
-func isExt(s string) bool {
-	return len(s) > 1 && (s[0] == '_' || s[0] == '.')
-}
-
-func parseExt(s *string) (t string, err error) {
-	t, err = parseString(s)
-	if err != nil {
-		goto failed
-	}
-	if isExt(t) {
-		return
-	}
-	err = errors.New("invalid ext format")
-failed:
-	return "", &InvalidExtError{
-		Ext: *s,
-		Err: err,
-	}
-}
-
 type InvalidExtError struct {
 	Ext string
 	Err error
