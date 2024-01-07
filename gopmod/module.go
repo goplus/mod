@@ -45,11 +45,6 @@ type Module struct {
 	depmods  []depmodInfo
 }
 
-// IsValid returns if this module exists or not.
-func (p *Module) IsValid() bool {
-	return p != nil && p.File != nil
-}
-
 // PkgType specifies a package type.
 type PkgType int
 
@@ -83,7 +78,7 @@ func (p *Module) PkgType(pkgPath string) PkgType {
 }
 
 func isPkgInMod(pkgPath, modPath string) bool {
-	if strings.HasPrefix(pkgPath, modPath) {
+	if modPath != "" && strings.HasPrefix(pkgPath, modPath) {
 		suffix := pkgPath[len(modPath):]
 		return suffix == "" || suffix[0] == '/'
 	}
