@@ -17,6 +17,7 @@
 package modfile
 
 import (
+	"fmt"
 	"path"
 	"strings"
 
@@ -43,6 +44,17 @@ failed:
 		Err: err,
 	}
 }
+
+type InvalidExtError struct {
+	Ext string
+	Err error
+}
+
+func (e *InvalidExtError) Error() string {
+	return fmt.Sprintf("ext %s invalid: %s", e.Ext, e.Err)
+}
+
+func (e *InvalidExtError) Unwrap() error { return e.Err }
 
 // SplitFname splits fname into (hasGoxExt, className, classExt).
 func SplitFname(fname string) (hasGoxExt bool, className, classExt string) {

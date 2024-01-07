@@ -340,17 +340,6 @@ func isPkgPath(s string) bool {
 	return s != "" && (s[0] != '.' && s[0] != '_')
 }
 
-type InvalidExtError struct {
-	Ext string
-	Err error
-}
-
-func (e *InvalidExtError) Error() string {
-	return fmt.Sprintf("ext %s invalid: %s", e.Ext, e.Err)
-}
-
-func (e *InvalidExtError) Unwrap() error { return e.Err }
-
 type InvalidSymbolError struct {
 	Sym string
 	Err error
