@@ -94,38 +94,38 @@ func TestParse1(t *testing.T) {
 	if f.Gop.Version != "1.1" {
 		t.Errorf("gop version expected be 1.1, but %s got", f.Gop.Version)
 	}
-	if f.Project.Ext != ".gmx" {
-		t.Errorf("project exts expected be .gmx, but %s got", f.Project.Ext)
+	if f.proj().Ext != ".gmx" {
+		t.Errorf("project exts expected be .gmx, but %s got", f.proj().Ext)
 	}
-	if f.Project.Class != "Game" {
-		t.Errorf("project class expected be Game, but %s got", f.Project.Class)
-	}
-
-	if len(f.Project.PkgPaths) != 2 {
-		t.Errorf("project pkgpaths length expected be 2, but %d got", len(f.Project.PkgPaths))
+	if f.proj().Class != "Game" {
+		t.Errorf("project class expected be Game, but %s got", f.proj().Class)
 	}
 
-	if f.Project.PkgPaths[0] != "github.com/goplus/spx" {
-		t.Errorf("project path expected be github.com/goplus/spx, but %s got", f.Project.PkgPaths[0])
-	}
-	if f.Project.PkgPaths[1] != "math" {
-		t.Errorf("project path expected be math, but %s got", f.Project.PkgPaths[1])
+	if len(f.proj().PkgPaths) != 2 {
+		t.Errorf("project pkgpaths length expected be 2, but %d got", len(f.proj().PkgPaths))
 	}
 
-	if len(f.Project.Works) != 2 {
-		t.Errorf("project workclass length expected be 2, but %d got", len(f.Project.Works))
+	if f.proj().PkgPaths[0] != "github.com/goplus/spx" {
+		t.Errorf("project path expected be github.com/goplus/spx, but %s got", f.proj().PkgPaths[0])
 	}
-	if f.Project.Works[0].Ext != ".spx" {
-		t.Errorf("project class[0] exts expected be .spx, but %s got", f.Project.Works[0].Ext)
+	if f.proj().PkgPaths[1] != "math" {
+		t.Errorf("project path expected be math, but %s got", f.proj().PkgPaths[1])
 	}
-	if f.Project.Works[0].Class != "Sprite" {
-		t.Errorf("project class[0] class expected be Sprite, but %s got", f.Project.Works[0].Class)
+
+	if len(f.proj().Works) != 2 {
+		t.Errorf("project workclass length expected be 2, but %d got", len(f.proj().Works))
 	}
-	if f.Project.Works[1].Ext != ".spx2" {
-		t.Errorf("project class[1] exts expected be .spx2, but %s got", f.Project.Works[1].Ext)
+	if f.proj().Works[0].Ext != ".spx" {
+		t.Errorf("project class[0] exts expected be .spx, but %s got", f.proj().Works[0].Ext)
 	}
-	if f.Project.Works[1].Class != "*Sprite2" {
-		t.Errorf("project class[1] class expected be Sprite, but %s got", f.Project.Works[1].Class)
+	if f.proj().Works[0].Class != "Sprite" {
+		t.Errorf("project class[0] class expected be Sprite, but %s got", f.proj().Works[0].Class)
+	}
+	if f.proj().Works[1].Ext != ".spx2" {
+		t.Errorf("project class[1] exts expected be .spx2, but %s got", f.proj().Works[1].Ext)
+	}
+	if f.proj().Works[1].Class != "*Sprite2" {
+		t.Errorf("project class[1] class expected be Sprite, but %s got", f.proj().Works[1].Class)
 	}
 }
 
@@ -197,32 +197,32 @@ func TestParse2(t *testing.T) {
 	if f.Gop.Version != "1.1" {
 		t.Errorf("gop version expected be 1.1, but %s got", f.Gop.Version)
 	}
-	if f.Project.Ext != "" {
-		t.Errorf("project exts expected be .gmx, but %s got", f.Project.Ext)
+	if f.proj().Ext != "" {
+		t.Errorf("project exts expected be .gmx, but %s got", f.proj().Ext)
 	}
-	if f.Project.Class != "" {
-		t.Errorf("project class expected be Game, but %s got", f.Project.Class)
-	}
-
-	if len(f.Project.PkgPaths) != 2 {
-		t.Errorf("project pkgpaths length expected be 2, but %d got", len(f.Project.PkgPaths))
+	if f.proj().Class != "" {
+		t.Errorf("project class expected be Game, but %s got", f.proj().Class)
 	}
 
-	if f.Project.PkgPaths[0] != "github.com/goplus/spx" {
-		t.Errorf("project path expected be github.com/goplus/spx, but %s got", f.Project.PkgPaths[0])
-	}
-	if f.Project.PkgPaths[1] != "math" {
-		t.Errorf("project path expected be math, but %s got", f.Project.PkgPaths[1])
+	if len(f.proj().PkgPaths) != 2 {
+		t.Errorf("project pkgpaths length expected be 2, but %d got", len(f.proj().PkgPaths))
 	}
 
-	if len(f.Project.Works) != 1 {
-		t.Errorf("project workclass length expected be 2, but %d got", len(f.Project.Works))
+	if f.proj().PkgPaths[0] != "github.com/goplus/spx" {
+		t.Errorf("project path expected be github.com/goplus/spx, but %s got", f.proj().PkgPaths[0])
 	}
-	if f.Project.Works[0].Ext != ".spx" {
-		t.Errorf("project class[0] exts expected be .spx, but %s got", f.Project.Works[0].Ext)
+	if f.proj().PkgPaths[1] != "math" {
+		t.Errorf("project path expected be math, but %s got", f.proj().PkgPaths[1])
 	}
-	if f.Project.Works[0].Class != "Sprite" {
-		t.Errorf("project class[0] class expected be Sprite, but %s got", f.Project.Works[0].Class)
+
+	if len(f.proj().Works) != 1 {
+		t.Errorf("project workclass length expected be 2, but %d got", len(f.proj().Works))
+	}
+	if f.proj().Works[0].Ext != ".spx" {
+		t.Errorf("project class[0] exts expected be .spx, but %s got", f.proj().Works[0].Ext)
+	}
+	if f.proj().Works[0].Class != "Sprite" {
+		t.Errorf("project class[0] class expected be Sprite, but %s got", f.proj().Works[0].Class)
 	}
 }
 
@@ -280,10 +280,6 @@ register "\?"
 	doTestParseErr(t, `gop.mod:2: malformed module path "-": leading dash`, `
 register -
 `)
-	doTestParseErr(t, `gop.mod:3: repeated project statement`, `
-project .gmx Game github.com/goplus/spx math
-project .gmx Game github.com/goplus/spx math
-`)
 	doTestParseErr(t, `gop.mod:2: usage: project [.projExt ProjClass] classFilePkgPath ...`, `
 project
 `)
@@ -305,7 +301,7 @@ project .123 Game "\?"
 	doTestParseErr(t, `gop.mod:2: invalid quoted string: invalid syntax`, `
 project "\?"
 `)
-	doTestParseErr(t, `gop.mod:2: work class must declare a project`, `
+	doTestParseErr(t, `gop.mod:2: work class must declare after a project definition`, `
 class .spx Sprite
 `)
 	doTestParseErr(t, `gop.mod:3: usage: class .workExt WorkClass`, `
