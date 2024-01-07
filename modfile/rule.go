@@ -63,7 +63,7 @@ type Import struct {
 
 // A Project is the project statement.
 type Project struct {
-	Ext      string   // ".gmx"
+	Ext      string   // can be "_[class].gox" or ".[class]", eg "_yap.gox" or ".gmx"
 	Class    string   // "Game"
 	Works    []*Class // work class of classfile
 	PkgPaths []string // package paths of classfile
@@ -72,7 +72,7 @@ type Project struct {
 
 // A Class is the work class statement.
 type Class struct {
-	Ext    string // ".spx"
+	Ext    string // can be "_[class].gox" or ".[class]", eg "_yap.gox" or ".spx"
 	Class  string // "Sprite"
 	Syntax *Line
 }
@@ -187,7 +187,7 @@ func (f *File) parseVerb(errs *ErrorList, verb string, line *Line, args []string
 			errorf("usage: project [.projExt ProjClass] classFilePkgPath ...")
 			return
 		}
-		if strings.HasPrefix(args[0], ".") {
+		if isExt(args[0]) {
 			if len(args) < 3 || strings.Contains(args[1], "/") {
 				errorf("usage: project [.projExt ProjClass] classFilePkgPath ...")
 				return
@@ -202,9 +202,9 @@ func (f *File) parseVerb(errs *ErrorList, verb string, line *Line, args []string
 				wrapError(err)
 				return
 			}
-			pkgPaths, err := parseStrings(args[2:])
+			pkgPaths, err := parsePkgPaths(args[2:])
 			if err != nil {
-				errorf("invalid quoted string: %v", err)
+				wrapError(err)
 				return
 			}
 			f.addProj(&Project{
@@ -212,9 +212,9 @@ func (f *File) parseVerb(errs *ErrorList, verb string, line *Line, args []string
 			})
 			return
 		}
-		pkgPaths, err := parseStrings(args)
+		pkgPaths, err := parsePkgPaths(args)
 		if err != nil {
-			errorf("invalid quoted string: %v", err)
+			wrapError(err)
 			return
 		}
 		f.addProj(&Project{
@@ -324,12 +324,33 @@ func parseStrings(args []string) (arr []string, err error) {
 	return
 }
 
+func parsePkgPaths(args []string) (paths []string, err error) {
+	if paths, err = parseStrings(args); err != nil {
+		return nil, fmt.Errorf("invalid quoted string: %v", err)
+	}
+	for _, pkg := range paths {
+		if !isPkgPath(pkg) {
+			return nil, fmt.Errorf(`"%s" is not a valid package path`, pkg)
+		}
+	}
+	return
+}
+
+func isPkgPath(s string) bool {
+	return s != "" && (s[0] != '.' && s[0] != '_')
+}
+
+// can be "_[class].gox" or ".[class]"
+func isExt(s string) bool {
+	return len(s) > 1 && (s[0] == '_' || s[0] == '.')
+}
+
 func parseExt(s *string) (t string, err error) {
 	t, err = parseString(s)
 	if err != nil {
 		goto failed
 	}
-	if len(t) > 1 && t[0] == '.' || t == "" {
+	if isExt(t) {
 		return
 	}
 	err = errors.New("invalid ext format")

@@ -286,7 +286,10 @@ project
 	doTestParseErr(t, `gop.mod:2: usage: project [.projExt ProjClass] classFilePkgPath ...`, `
 project .gmx Game
 `)
-	doTestParseErr(t, `gop.mod:2: ext . invalid: invalid ext format`, `
+	doTestParseErr(t, `gop.mod:2: ext ." invalid: unquoted string cannot contain quote`, `
+project ." Game math
+`)
+	doTestParseErr(t, `gop.mod:2: "." is not a valid package path`, `
 project . Game math
 `)
 	doTestParseErr(t, `gop.mod:2: symbol game invalid: invalid Go export symbol format`, `
@@ -330,16 +333,17 @@ unknown .spx
 }
 
 func doTestParseErr(t *testing.T, errMsg string, gopmod string) {
-	t.Run(errMsg, func(t *testing.T) {
-		_, err := Parse("gop.mod", []byte(gopmod), nil)
-		if err == nil || err.Error() == "" {
-			t.Fatal("Parse: no error?")
-			return
-		}
-		if errRet := errors.Summary(err); errRet != errMsg {
-			t.Error("Parse got:", errRet, "\nExpected:", errMsg)
-		}
-	})
+	t.Helper()
+	// t.Run(errMsg, func(t *testing.T) {
+	_, err := Parse("gop.mod", []byte(gopmod), nil)
+	if err == nil || err.Error() == "" {
+		t.Fatal("Parse: no error?")
+		return
+	}
+	if errRet := errors.Summary(err); errRet != errMsg {
+		t.Error("Parse got:", errRet, "\nExpected:", errMsg)
+	}
+	// })
 }
 
 // -----------------------------------------------------------------------------
