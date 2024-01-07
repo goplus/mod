@@ -45,11 +45,6 @@ type Module struct {
 	depmods  []depmodInfo
 }
 
-// IsValid returns if this module exists or not.
-func (p *Module) IsValid() bool {
-	return p != nil && p.File != nil
-}
-
 // PkgType specifies a package type.
 type PkgType int
 

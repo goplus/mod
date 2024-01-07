@@ -41,18 +41,25 @@ type Module struct {
 	Opt *modfile.File
 }
 
-func (p Module) IsDefault() bool {
-	return p.Syntax == nil
+// HasModfile returns if this module exists or not.
+func (p Module) HasModfile() bool {
+	return p.Syntax != nil
 }
 
 // Modfile returns absolute path of the module file.
 func (p Module) Modfile() string {
-	return p.Syntax.Name
+	if syn := p.Syntax; syn != nil {
+		return syn.Name
+	}
+	return ""
 }
 
 // Root returns absolute root path of this module.
 func (p Module) Root() string {
-	return filepath.Dir(p.Syntax.Name)
+	if syn := p.Syntax; syn != nil {
+		return filepath.Dir(syn.Name)
+	}
+	return ""
 }
 
 // Path returns the module path.
@@ -207,11 +214,10 @@ func hasGopExtended(opt *modfile.File) bool {
 
 // Save saves all changes of this module.
 func (p Module) Save() (err error) {
-	if p.IsDefault() {
+	modfile := p.Modfile()
+	if modfile == "" {
 		return ErrSaveDefault
 	}
-
-	modfile := p.Modfile()
 	data, err := p.Format()
 	if err != nil {
 		return
