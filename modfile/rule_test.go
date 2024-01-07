@@ -36,9 +36,9 @@ var addParseExtTests = []struct {
 		"",
 	},
 	{
-		"no ext",
-		"",
-		"",
+		"yap ok",
+		"_yap.gox",
+		"_yap.gox",
 		"",
 	},
 	{
