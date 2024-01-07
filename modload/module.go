@@ -161,15 +161,21 @@ func Load(dir string) (p Module, err error) {
 
 // LoadFrom loads a module from specified go.mod file and an optional gop.mod file.
 func LoadFrom(gomod, gopmod string) (p Module, err error) {
-	data, err := os.ReadFile(gomod)
+	return LoadFromEx(gomod, gopmod, os.ReadFile)
+}
+
+// LoadFromEx loads a module from specified go.mod file and an optional gop.mod file.
+// It can specify a customized `readFile` to read file content.
+func LoadFromEx(gomod, gopmod string, readFile func(string) ([]byte, error)) (p Module, err error) {
+	data, err := readFile(gomod)
 	if err != nil {
-		err = errors.NewWith(err, `os.ReadFile(gomod)`, -2, "os.ReadFile", gomod)
+		err = errors.NewWith(err, `readFile(gomod)`, -2, "readFile", gomod)
 		return
 	}
 
 	var fixed bool
 	fix := fixVersion(&fixed)
-	f, err := gomodfile.Parse(gomod, data, fix)
+	f, err := gomodfile.ParseLax(gomod, data, fix)
 	if err != nil {
 		err = errors.NewWith(err, `gomodfile.Parse(gomod, data, fix)`, -2, "gomodfile.Parse", gomod, data, fix)
 		return
@@ -185,17 +191,38 @@ func LoadFrom(gomod, gopmod string) (p Module, err error) {
 	}
 
 	var opt *modfile.File
-	data, err = os.ReadFile(gopmod)
+	data, err = readFile(gopmod)
 	if err != nil {
 		opt = newGopMod(gopmod, defaultGopVer)
 	} else {
-		opt, err = modfile.Parse(gopmod, data, fix)
+		opt, err = modfile.ParseLax(gopmod, data, fix)
 		if err != nil {
 			err = errors.NewWith(err, `modfile.Parse(gopmod, data, fix)`, -2, "modfile.Parse", gopmod, data, fix)
 			return
 		}
 	}
+	importClassfileFromGoMod(opt, f)
 	return Module{f, opt}, nil
+}
+
+func importClassfileFromGoMod(opt *modfile.File, f *gomodfile.File) {
+	for _, r := range f.Require {
+		if isClass(r) {
+			opt.AddImport(r.Mod.Path)
+		}
+	}
+}
+
+func isClass(r *gomodfile.Require) bool {
+	if line := r.Syntax; line != nil {
+		for _, c := range line.Suffix {
+			text := strings.TrimLeft(c.Token[2:], " \t")
+			if strings.HasPrefix(text, "gop:class") {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // -----------------------------------------------------------------------------
