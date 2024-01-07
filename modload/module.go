@@ -197,6 +197,10 @@ func (p Module) Projects() []*modfile.Project {
 	return p.Opt.Projects
 }
 
+func (p Module) HasProject() bool {
+	return len(p.Opt.Projects) > 0
+}
+
 func hasGopExtended(opt *modfile.File) bool {
 	return len(opt.Projects) > 0 || len(opt.Import) > 0
 }
