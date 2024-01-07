@@ -30,11 +30,23 @@ import (
 
 // A File is the parsed, interpreted form of a gop.mod file.
 type File struct {
-	Gop     *Gop
-	Project *Project
-	Import  []*Import
+	Gop      *Gop
+	Projects []*Project
+	Import   []*Import
 
 	Syntax *FileSyntax
+}
+
+func (p *File) addProj(proj *Project) {
+	p.Projects = append(p.Projects, proj)
+}
+
+func (p *File) proj() *Project { // current project
+	n := len(p.Projects)
+	if n == 0 {
+		return nil
+	}
+	return p.Projects[n-1]
 }
 
 // A Module is the module statement.
@@ -171,10 +183,6 @@ func (f *File) parseVerb(errs *ErrorList, verb string, line *Line, args []string
 			Syntax:       line,
 		})
 	case "project":
-		if f.Project != nil {
-			errorf("repeated project statement")
-			return
-		}
 		if len(args) < 1 {
 			errorf("usage: project [.projExt ProjClass] classFilePkgPath ...")
 			return
@@ -199,9 +207,9 @@ func (f *File) parseVerb(errs *ErrorList, verb string, line *Line, args []string
 				errorf("invalid quoted string: %v", err)
 				return
 			}
-			f.Project = &Project{
+			f.addProj(&Project{
 				Ext: ext, Class: class, PkgPaths: pkgPaths, Syntax: line,
-			}
+			})
 			return
 		}
 		pkgPaths, err := parseStrings(args)
@@ -209,12 +217,13 @@ func (f *File) parseVerb(errs *ErrorList, verb string, line *Line, args []string
 			errorf("invalid quoted string: %v", err)
 			return
 		}
-		f.Project = &Project{
+		f.addProj(&Project{
 			PkgPaths: pkgPaths, Syntax: line,
-		}
+		})
 	case "class":
-		if f.Project == nil {
-			errorf("work class must declare a project")
+		proj := f.proj()
+		if proj == nil {
+			errorf("work class must declare after a project definition")
 			return
 		}
 		if len(args) < 2 {
@@ -231,7 +240,7 @@ func (f *File) parseVerb(errs *ErrorList, verb string, line *Line, args []string
 			wrapError(err)
 			return
 		}
-		f.Project.Works = append(f.Project.Works, &Class{
+		proj.Works = append(proj.Works, &Class{
 			Ext:    workExt,
 			Class:  class,
 			Syntax: line,

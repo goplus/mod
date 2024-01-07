@@ -193,12 +193,16 @@ func LoadFrom(gomod, gopmod string) (p Module, err error) {
 
 // -----------------------------------------------------------------------------
 
-func (p Module) Project() *modfile.Project {
-	return p.Opt.Project
+func (p Module) Projects() []*modfile.Project {
+	return p.Opt.Projects
+}
+
+func (p Module) HasProject() bool {
+	return len(p.Opt.Projects) > 0
 }
 
 func hasGopExtended(opt *modfile.File) bool {
-	return opt.Project != nil || len(opt.Import) > 0
+	return len(opt.Projects) > 0 || len(opt.Import) > 0
 }
 
 // Save saves all changes of this module.
