@@ -56,11 +56,11 @@ func (e *InvalidExtError) Error() string {
 
 func (e *InvalidExtError) Unwrap() error { return e.Err }
 
-// SplitFname splits fname into (hasGoxExt, className, classExt).
-func SplitFname(fname string) (hasGoxExt bool, className, classExt string) {
+// SplitFname splits fname into (className, classExt).
+func SplitFname(fname string) (className, classExt string) {
 	classExt = path.Ext(fname)
 	className = fname[:len(fname)-len(classExt)]
-	if hasGoxExt = (classExt == ".gox"); hasGoxExt {
+	if hasGoxExt := (classExt == ".gox"); hasGoxExt {
 		if n := strings.LastIndexByte(className, '_'); n > 0 {
 			className, classExt = fname[:n], fname[n:]
 		}
@@ -70,6 +70,6 @@ func SplitFname(fname string) (hasGoxExt bool, className, classExt string) {
 
 // ClassExt returns classExt of specified fname.
 func ClassExt(fname string) string {
-	_, _, ext := SplitFname(fname)
+	_, ext := SplitFname(fname)
 	return ext
 }
