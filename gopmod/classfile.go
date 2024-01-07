@@ -116,7 +116,7 @@ func (p *Module) importClassFrom(modVer module.Version, impcls func(c *Project))
 	if err != nil {
 		return
 	}
-	c := mod.Opt.Project
+	c := mod.Project()
 	if c == nil {
 		return ErrNotClassFileMod
 	}
