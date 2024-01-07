@@ -78,7 +78,7 @@ func (p *Module) PkgType(pkgPath string) PkgType {
 }
 
 func isPkgInMod(pkgPath, modPath string) bool {
-	if strings.HasPrefix(pkgPath, modPath) {
+	if modPath != "" && strings.HasPrefix(pkgPath, modPath) {
 		suffix := pkgPath[len(modPath):]
 		return suffix == "" || suffix[0] == '/'
 	}
