@@ -193,6 +193,14 @@ func LoadFrom(gomod, gopmod string) (p Module, err error) {
 
 // -----------------------------------------------------------------------------
 
+func (p Module) Project() *modfile.Project {
+	return p.Opt.Project
+}
+
+func hasGopExtended(opt *modfile.File) bool {
+	return opt.Project != nil || len(opt.Import) > 0
+}
+
 // Save saves all changes of this module.
 func (p Module) Save() (err error) {
 	if p.IsDefault() {
@@ -209,7 +217,7 @@ func (p Module) Save() (err error) {
 		return
 	}
 
-	if opt := p.Opt; gopExtended(opt) {
+	if opt := p.Opt; hasGopExtended(opt) {
 		data, err = opt.Format()
 		if err != nil {
 			return
@@ -217,10 +225,6 @@ func (p Module) Save() (err error) {
 		err = os.WriteFile(opt.Syntax.Name, data, 0644)
 	}
 	return
-}
-
-func gopExtended(opt *modfile.File) bool {
-	return opt.Project != nil || len(opt.Import) > 0
 }
 
 /*
