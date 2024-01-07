@@ -45,4 +45,17 @@ func FindGoMod(dirFrom string) (dir, file string, err error) {
 	return
 }
 
+func GOMOD(dirFrom string) (file string, err error) {
+	_, file, err = FindGoMod(dirFrom)
+	return
+}
+
+func GOPMOD(dirFrom string) (file string, err error) {
+	dir, _, err := FindGoMod(dirFrom)
+	if err != nil {
+		return
+	}
+	return filepath.Join(dir, "gop.mod"), nil
+}
+
 // -----------------------------------------------------------------------------
