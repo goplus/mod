@@ -18,7 +18,6 @@ package gopmod
 
 import (
 	"errors"
-	"path"
 	"syscall"
 
 	"github.com/goplus/mod/modcache"
@@ -47,7 +46,7 @@ var (
 // -----------------------------------------------------------------------------
 
 func (p *Module) ClassKind(fname string) (isProj, ok bool) {
-	ext := path.Ext(fname)
+	ext := modfile.ClassExt(fname)
 	if c, ok := p.projects[ext]; ok {
 		for _, w := range c.Works {
 			if w.Ext == ext {
