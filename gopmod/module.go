@@ -56,6 +56,11 @@ const (
 	PkgtInvalid  = -1           // an invalid package
 )
 
+// IsPkgtStandard checks if a pkgPath is Go standard package or not.
+func (p *Module) IsPkgtStandard(pkgPath string) bool {
+	return p.PkgType(pkgPath) == PkgtStandard
+}
+
 // PkgType returns the package type of specified package.
 func (p *Module) PkgType(pkgPath string) PkgType {
 	if pkgPath == "" {
