@@ -23,6 +23,45 @@ import (
 	"golang.org/x/mod/modfile"
 )
 
+func TestClassKind(t *testing.T) {
+	type testCase struct {
+		fname  string
+		isProj bool
+	}
+	cases := []testCase{
+		{"foo.gmx", true},
+		{"foo.spx", false},
+		{"foo_spx.gox", false},
+		{"main_spx.gox", true},
+	}
+	for _, c := range cases {
+		ext := ClassExt(c.fname)
+		proj, ok := lookupClass(ext)
+		if !ok {
+			t.Fatal("TestClassKind: unkown ext -", c.fname)
+		}
+		if isProj := proj.IsProj(ext, c.fname); isProj != c.isProj {
+			t.Fatalf("proj.IsProj(%s, %s) => %v", ext, c.fname, isProj)
+		}
+	}
+}
+
+func lookupClass(ext string) (c *Project, ok bool) {
+	switch ext {
+	case ".gmx", ".spx":
+		return &Project{
+			Ext: ".gmx", Class: "*MyGame",
+			Works:    []*Class{{Ext: ".spx", Class: "Sprite"}},
+			PkgPaths: []string{"github.com/goplus/gop/cl/internal/spx", "math"}}, true
+	case "_spx.gox":
+		return &Project{
+			Ext: "_spx.gox", Class: "Game",
+			Works:    []*Class{{Ext: "_spx.gox", Class: "Sprite"}},
+			PkgPaths: []string{"github.com/goplus/gop/cl/internal/spx3", "math"}}, true
+	}
+	return
+}
+
 func TestUpdateLine(t *testing.T) {
 	line := &Line{InBlock: true}
 	updateLine(line, "foo", "bar")

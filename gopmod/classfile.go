@@ -37,6 +37,12 @@ var (
 		Works:    []*Class{{Ext: ".spx", Class: "Sprite"}},
 		PkgPaths: []string{"github.com/goplus/spx", "math"},
 	}
+	TestProject = &Project{
+		Ext:      "_test.gox",
+		Class:    "App",
+		Works:    []*modfile.Class{{Ext: "_test.gox", Class: "Case"}},
+		PkgPaths: []string{"github.com/goplus/gop/test", "testing"},
+	}
 )
 
 var (
@@ -45,37 +51,35 @@ var (
 
 // -----------------------------------------------------------------------------
 
+// ClassKind checks a fname is a known classfile or not.
+// If it is, then it checks the fname is a project file or not.
 func (p *Module) ClassKind(fname string) (isProj, ok bool) {
 	ext := modfile.ClassExt(fname)
 	if c, ok := p.projects[ext]; ok {
-		for _, w := range c.Works {
-			if w.Ext == ext {
-				if ext != c.Ext || fname != "main"+ext {
-					return false, true
-				}
-				break
-			}
-		}
-		return true, true
+		return c.IsProj(ext, fname), true
 	}
 	return
 }
 
+// IsClass checks ext is a known classfile or not.
 func (p *Module) IsClass(ext string) (ok bool) {
 	_, ok = p.projects[ext]
 	return
 }
 
+// LookupClass lookups a classfile by ext.
 func (p *Module) LookupClass(ext string) (c *Project, ok bool) {
 	c, ok = p.projects[ext]
 	return
 }
 
+// ImportClasses imports all classfiles found in this module (from go.mod/gop.mod).
 func (p *Module) ImportClasses(importClass ...func(c *Project)) (err error) {
 	var impcls func(c *Project)
 	if importClass != nil {
 		impcls = importClass[0]
 	}
+	p.importClass(TestProject, impcls)
 	p.importClass(SpxProject, impcls)
 	p.projects[".gmx"] = SpxProject // old style
 	opt := p.Opt
