@@ -70,6 +70,19 @@ type Project struct {
 	Syntax   *Line
 }
 
+// IsProj checks if a (ext, fname) pair is a project file or not.
+func (p *Project) IsProj(ext, fname string) bool {
+	for _, w := range p.Works {
+		if w.Ext == ext {
+			if ext != p.Ext || fname != "main"+ext {
+				return false
+			}
+			break
+		}
+	}
+	return true
+}
+
 // A Class is the work class statement.
 type Class struct {
 	Ext    string // can be "_[class].gox" or ".[class]", eg "_yap.gox" or ".spx"
