@@ -175,7 +175,8 @@ func LoadFromEx(gomod, gopmod string, readFile func(string) ([]byte, error)) (p 
 
 	var fixed bool
 	fix := fixVersion(&fixed)
-	f, err := gomodfile.ParseLax(gomod, data, fix)
+	// it is go.mod file, so we need to use "Parse" parse it
+	f, err := gomodfile.Parse(gomod, data, fix)
 	if err != nil {
 		err = errors.NewWith(err, `gomodfile.Parse(gomod, data, fix)`, -2, "gomodfile.Parse", gomod, data, fix)
 		return
