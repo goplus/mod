@@ -208,7 +208,7 @@ func LoadFromEx(gomod, gopmod string, readFile func(string) ([]byte, error)) (p 
 func importClassfileFromGoMod(opt *modfile.File, f *gomodfile.File) {
 	for _, r := range f.Require {
 		if isClass(r) {
-			opt.AddImport(r.Mod.Path)
+			opt.ClassMods = append(opt.ClassMods, r.Mod.Path)
 		}
 	}
 }
@@ -236,7 +236,7 @@ func (p Module) HasProject() bool {
 }
 
 func hasGopExtended(opt *modfile.File) bool {
-	return len(opt.Projects) > 0 || len(opt.Import) > 0
+	return len(opt.Projects) > 0
 }
 
 // Save saves all changes of this module.

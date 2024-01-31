@@ -86,8 +86,8 @@ func (p *Module) ImportClasses(importClass ...func(c *Project)) (err error) {
 	for _, c := range opt.Projects {
 		p.importClass(c, impcls)
 	}
-	for _, r := range opt.Import {
-		if err = p.importMod(r.ClassfileMod, impcls); err != nil {
+	for _, classMod := range opt.ClassMods {
+		if err = p.importMod(classMod, impcls); err != nil {
 			return
 		}
 	}

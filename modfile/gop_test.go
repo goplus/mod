@@ -265,34 +265,6 @@ func TestParse2(t *testing.T) {
 	}
 }
 
-const gopmodUserProj = `
-gop 1.1
-
-import github.com/goplus/spx
-`
-
-func TestParseUser(t *testing.T) {
-	const (
-		gopmod = gopmodUserProj
-	)
-	f, err := Parse("github.com/goplus/gop/gop.mod", []byte(gopmod), nil)
-	if err != nil || len(f.Import) != 1 {
-		t.Fatal("Parse:", f, err)
-		return
-	}
-	if f.Import[0].ClassfileMod != "github.com/goplus/spx" {
-		t.Fatal("Parse => Register:", f.Import)
-	}
-	f.AddImport("github.com/goplus/spx")
-	if len(f.Import) != 1 {
-		t.Fatal("AddRegister not exist?")
-	}
-	f.AddImport("github.com/xushiwei/foogop")
-	if len(f.Import) != 2 {
-		t.Fatal("AddRegister failed")
-	}
-}
-
 func TestParseErr(t *testing.T) {
 	doTestParseErr(t, `gop.mod:2: unknown directive: module`, `
 module foo
@@ -309,15 +281,6 @@ gop 1.1 1.2
 `)
 	doTestParseErr(t, `gop.mod:2: invalid gop version '1.x': must match format 1.23`, `
 gop 1.x
-`)
-	doTestParseErr(t, `gop.mod:2: import directive expects exactly one argument`, `
-register 1 2 3
-`)
-	doTestParseErr(t, `gop.mod:2: invalid quoted string: invalid syntax`, `
-register "\?"
-`)
-	doTestParseErr(t, `gop.mod:2: malformed module path "-": leading dash`, `
-register -
 `)
 	doTestParseErr(t, `gop.mod:2: usage: project [.projExt ProjClass] classFilePkgPath ...`, `
 project

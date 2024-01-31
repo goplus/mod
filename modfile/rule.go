@@ -25,14 +25,13 @@ import (
 
 	"github.com/qiniu/x/errors"
 	"golang.org/x/mod/modfile"
-	"golang.org/x/mod/module"
 )
 
 // A File is the parsed, interpreted form of a gop.mod file.
 type File struct {
-	Gop      *Gop
-	Projects []*Project
-	Import   []*Import
+	Gop       *Gop
+	Projects  []*Project
+	ClassMods []string
 
 	Syntax *FileSyntax
 }
@@ -55,8 +54,8 @@ type Module = modfile.Module
 // A Gop is the gop statement.
 type Gop = modfile.Go
 
-// A Import is the import statement.
-type Import struct {
+// A Register is the //gop:class statement.
+type Register struct {
 	ClassfileMod string // module path of classfile
 	Syntax       *Line
 }
@@ -176,25 +175,6 @@ func (f *File) parseVerb(errs *ErrorList, verb string, line *Line, args []string
 		}
 		f.Gop = &Gop{Syntax: line}
 		f.Gop.Version = args[0]
-	case "import", "register": // register => import
-		if len(args) != 1 {
-			errorf("import directive expects exactly one argument")
-			return
-		}
-		s, err := parseString(&args[0])
-		if err != nil {
-			errorf("invalid quoted string: %v", err)
-			return
-		}
-		err = module.CheckPath(s)
-		if err != nil {
-			wrapError(err)
-			return
-		}
-		f.Import = append(f.Import, &Import{
-			ClassfileMod: s,
-			Syntax:       line,
-		})
 	case "project":
 		if len(args) < 1 {
 			errorf("usage: project [.projExt ProjClass] classFilePkgPath ...")
@@ -455,24 +435,6 @@ func (f *File) AddGopStmt(version string) error {
 		updateLine(f.Gop.Syntax, "gop", version)
 	}
 	return nil
-}
-
-func (f *File) AddImport(modPath string) {
-	for _, r := range f.Import {
-		if r.ClassfileMod == modPath {
-			return
-		}
-	}
-	f.AddNewImport(modPath)
-}
-
-func (f *File) AddNewImport(modPath string) {
-	line := addLine(f.Syntax, "import", AutoQuote(modPath))
-	r := &Import{
-		ClassfileMod: modPath,
-		Syntax:       line,
-	}
-	f.Import = append(f.Import, r)
 }
 
 func (f *File) Format() ([]byte, error) {
