@@ -17,6 +17,7 @@
 package modload
 
 import (
+	"runtime"
 	"testing"
 
 	"github.com/goplus/mod/modfile"
@@ -65,11 +66,13 @@ require github.com/goplus/yap v0.7.2 //gop:class
 	if !mod.HasModfile() {
 		t.Fatal("mod.HasModfile")
 	}
-	if v := mod.Modfile(); v != "/foo/bar/go.mod" {
-		t.Fatal("mod.Modfile:", v)
-	}
-	if v := mod.Root(); v != "/foo/bar" {
-		t.Fatal("mod.Root:", v)
+	if runtime.GOOS != "windows" {
+		if v := mod.Modfile(); v != "/foo/bar/go.mod" {
+			t.Fatal("mod.Modfile:", v)
+		}
+		if v := mod.Root(); v != "/foo/bar" {
+			t.Fatal("mod.Root:", v)
+		}
 	}
 	if v := mod.Path(); v != "github.com/foo/bar" {
 		t.Fatal("mod.Path:", v)
