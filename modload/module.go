@@ -203,11 +203,37 @@ func LoadFromEx(gomod, gopmod string, readFile func(string) ([]byte, error)) (p 
 	return Module{f, opt}, nil
 }
 
+func (p Module) AddRequire(path, vers string, hasProj bool) error {
+	f := p.File
+	if err := f.AddRequire(path, vers); err != nil {
+		return err
+	}
+	for _, r := range f.Require {
+		if r.Mod.Path == path {
+			if !isClass(r) {
+				addClass(p.Opt, r)
+			}
+			break
+		}
+	}
+	return nil
+}
+
 func importClassfileFromGoMod(opt *modfile.File, f *gomodfile.File) {
 	for _, r := range f.Require {
 		if isClass(r) {
 			opt.ClassMods = append(opt.ClassMods, r.Mod.Path)
 		}
+	}
+}
+
+func addClass(opt *modfile.File, r *gomodfile.Require) {
+	if line := r.Syntax; line != nil {
+		line.Suffix = append(line.Suffix, modfile.Comment{
+			Token:  "//gop:class", // without trailing newline
+			Suffix: true,          // an end of line (not whole line) comment
+		})
+		opt.ClassMods = append(opt.ClassMods, r.Mod.Path)
 	}
 }
 
@@ -373,7 +399,7 @@ func getVerb(e modfile.Expr) string {
 
 const (
 	defaultGoVer  = "1.18"
-	defaultGopVer = "1.1"
+	defaultGopVer = "1.2"
 )
 
 // Default represents the default gop.mod object.
