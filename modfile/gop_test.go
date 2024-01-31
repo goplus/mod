@@ -62,23 +62,6 @@ func lookupClass(ext string) (c *Project, ok bool) {
 	return
 }
 
-func TestUpdateLine(t *testing.T) {
-	line := &Line{InBlock: true}
-	updateLine(line, "foo", "bar")
-	if len(line.Token) != 1 && line.Token[0] != "bar" {
-		t.Fatal("updateLine failed:", line.Token)
-	}
-}
-
-func TestGetWeight(t *testing.T) {
-	if getWeight(&modfile.LineBlock{Token: []string{"gop"}}) != directiveGop {
-		t.Fatal("getWeight require failed")
-	}
-	if getWeight(&modfile.LineBlock{Token: []string{"unknown"}}) != directiveLineBlock {
-		t.Fatal("getWeight unknown failed")
-	}
-}
-
 // -----------------------------------------------------------------------------
 
 const gopmodSpx1 = `

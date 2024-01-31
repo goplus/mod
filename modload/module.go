@@ -129,10 +129,7 @@ func newGoMod(gomod, modPath, goVer string) *gomodfile.File {
 }
 
 func newGopMod(gopmod, gopVer string) *modfile.File {
-	opt := new(modfile.File)
-	opt.AddGopStmt(gopVer)
-	opt.Syntax.Name = gopmod
-	return opt
+	return modfile.New(gopmod, gopVer)
 }
 
 // fixVersion returns a modfile.VersionFixer implemented using the Query function.
@@ -241,24 +238,21 @@ func hasGopExtended(opt *modfile.File) bool {
 
 // Save saves all changes of this module.
 func (p Module) Save() (err error) {
-	modfile := p.Modfile()
-	if modfile == "" {
+	modf := p.Modfile()
+	if modf == "" {
 		return ErrSaveDefault
 	}
 	data, err := p.Format()
 	if err != nil {
 		return
 	}
-	err = os.WriteFile(modfile, data, 0644)
+	err = os.WriteFile(modf, data, 0644)
 	if err != nil {
 		return
 	}
 
 	if opt := p.Opt; hasGopExtended(opt) {
-		data, err = opt.Format()
-		if err != nil {
-			return
-		}
+		data := modfile.Format(opt.Syntax)
 		err = os.WriteFile(opt.Syntax.Name, data, 0644)
 	}
 	return
