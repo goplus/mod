@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021 The GoPlus Authors (goplus.org). All rights reserved.
+ * Copyright (c) 2024 The GoPlus Authors (goplus.org). All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,33 +14,13 @@
  * limitations under the License.
  */
 
-package modfile_test
+package modload_test
 
 import (
 	"testing"
 
-	"github.com/goplus/mod/gopmod"
 	"github.com/goplus/mod/modload/modtest"
 )
-
-func TestGopMod(t *testing.T) {
-	mod := gopmod.Default
-	if mod.HasModfile() {
-		t.Fatal("gopmod.Default HasModfile?")
-	}
-	if path := mod.Modfile(); path != "" {
-		t.Fatal("gopmod.Default.Modfile?", path)
-	}
-	if path := mod.Path(); path != "" {
-		t.Fatal("gopmod.Default.Path?", path)
-	}
-	if path := mod.Root(); path != "" {
-		t.Fatal("gopmod.Default.Root?", path)
-	}
-	if pt := mod.PkgType("foo"); pt != gopmod.PkgtStandard {
-		t.Fatal("PkgType foo:", pt)
-	}
-}
 
 func TestGopClass(t *testing.T) {
 	modtest.GopClass(t)

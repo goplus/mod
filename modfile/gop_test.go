@@ -312,6 +312,21 @@ class ."spx Sprite
 project github.com/goplus/spx math
 class .spx sprite
 `)
+	doTestParseErr(t, `gop.mod:3: usage: import [name] pkgPath`, `
+project github.com/goplus/spx math
+import
+`)
+	doTestParseErr(t, `gop.mod:3: invalid quoted string: invalid syntax`, `
+project github.com/goplus/spx math
+import "\?"
+`)
+	doTestParseErr(t, `gop.mod:3: invalid syntax`, `
+project github.com/goplus/spx math
+import "\?" math
+`)
+	doTestParseErr(t, `gop.mod:2: import must declare after a project definition`, `
+import math
+`)
 	doTestParseErr(t, `gop.mod:2: unknown directive: unknown`, `
 unknown .spx
 `)

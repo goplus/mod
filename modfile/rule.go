@@ -31,7 +31,7 @@ import (
 type File struct {
 	Gop       *Gop
 	Projects  []*Project
-	ClassMods []string
+	ClassMods []string // calc by require statements in go.mod (not gop.mod).
 
 	Syntax *FileSyntax
 }
@@ -51,18 +51,27 @@ func (p *File) proj() *Project { // current project
 // A Gop is the gop statement.
 type Gop = modfile.Go
 
-// A Register is the //gop:class statement.
-type Register struct {
-	ClassfileMod string // module path of classfile
-	Syntax       *Line
+// A Class is the work class statement.
+type Class struct {
+	Ext    string // can be "_[class].gox" or ".[class]", eg "_yap.gox" or ".spx"
+	Class  string // "Sprite"
+	Syntax *Line
+}
+
+// A Import is the import statement.
+type Import struct {
+	Name   string // maybe empty
+	Path   string
+	Syntax *Line
 }
 
 // A Project is the project statement.
 type Project struct {
-	Ext      string   // can be "_[class].gox" or ".[class]", eg "_yap.gox" or ".gmx"
-	Class    string   // "Game"
-	Works    []*Class // work class of classfile
-	PkgPaths []string // package paths of classfile
+	Ext      string    // can be "_[class].gox" or ".[class]", eg "_yap.gox" or ".gmx"
+	Class    string    // "Game"
+	Works    []*Class  // work class of classfile
+	PkgPaths []string  // package paths of classfile and optional inline-imported packages.
+	Import   []*Import // auto-imported packages
 	Syntax   *Line
 }
 
@@ -77,13 +86,6 @@ func (p *Project) IsProj(ext, fname string) bool {
 		}
 	}
 	return true
-}
-
-// A Class is the work class statement.
-type Class struct {
-	Ext    string // can be "_[class].gox" or ".[class]", eg "_yap.gox" or ".spx"
-	Class  string // "Sprite"
-	Syntax *Line
 }
 
 func New(gopmod, gopVer string) *File {
@@ -251,6 +253,34 @@ func (f *File) parseVerb(errs *ErrorList, verb string, line *Line, args []string
 			Class:  class,
 			Syntax: line,
 		})
+	case "import":
+		proj := f.proj()
+		if proj == nil {
+			errorf("import must declare after a project definition")
+			return
+		}
+		var name string
+		switch len(args) {
+		case 2:
+			v, err := parseString(&args[0])
+			if err != nil {
+				wrapError(err)
+				return
+			}
+			name = v
+			args = args[1:]
+			fallthrough
+		case 1:
+			pkgPath, err := parsePkgPath(&args[0])
+			if err != nil {
+				wrapError(err)
+				return
+			}
+			proj.Import = append(proj.Import, &Import{Name: name, Path: pkgPath, Syntax: line})
+		default:
+			errorf("usage: import [name] pkgPath")
+			return
+		}
 	default:
 		if strict {
 			errorf("unknown directive: %s", verb)
@@ -320,23 +350,22 @@ func parseString(s *string) (string, error) {
 	return t, nil
 }
 
-func parseStrings(args []string) (arr []string, err error) {
-	arr = make([]string, len(args))
-	for i := range args {
-		if arr[i], err = parseString(&args[i]); err != nil {
-			return
-		}
+func parsePkgPath(s *string) (path string, err error) {
+	if path, err = parseString(s); err != nil {
+		err = fmt.Errorf("invalid quoted string: %v", err)
+		return
+	}
+	if !isPkgPath(path) {
+		err = fmt.Errorf(`"%s" is not a valid package path`, path)
 	}
 	return
 }
 
 func parsePkgPaths(args []string) (paths []string, err error) {
-	if paths, err = parseStrings(args); err != nil {
-		return nil, fmt.Errorf("invalid quoted string: %v", err)
-	}
-	for _, pkg := range paths {
-		if !isPkgPath(pkg) {
-			return nil, fmt.Errorf(`"%s" is not a valid package path`, pkg)
+	paths = make([]string, len(args))
+	for i := range args {
+		if paths[i], err = parsePkgPath(&args[i]); err != nil {
+			return
 		}
 	}
 	return
