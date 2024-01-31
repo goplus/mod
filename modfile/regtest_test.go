@@ -65,7 +65,7 @@ require (
 	if err != nil {
 		t.Fatal("LoadFromEx:", err)
 	}
-	if n := len(mod.Opt.Import); n != 2 {
+	if n := len(mod.Opt.ClassMods); n != 2 {
 		t.Fatal("len(mod.Opt.Import):", n)
 	}
 }

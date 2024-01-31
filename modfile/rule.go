@@ -25,14 +25,13 @@ import (
 
 	"github.com/qiniu/x/errors"
 	"golang.org/x/mod/modfile"
-	"golang.org/x/mod/module"
 )
 
 // A File is the parsed, interpreted form of a gop.mod file.
 type File struct {
-	Gop      *Gop
-	Projects []*Project
-	Import   []*Import
+	Gop       *Gop
+	Projects  []*Project
+	ClassMods []string
 
 	Syntax *FileSyntax
 }
@@ -49,14 +48,11 @@ func (p *File) proj() *Project { // current project
 	return p.Projects[n-1]
 }
 
-// A Module is the module statement.
-type Module = modfile.Module
-
 // A Gop is the gop statement.
 type Gop = modfile.Go
 
-// A Import is the import statement.
-type Import struct {
+// A Register is the //gop:class statement.
+type Register struct {
 	ClassfileMod string // module path of classfile
 	Syntax       *Line
 }
@@ -88,6 +84,22 @@ type Class struct {
 	Ext    string // can be "_[class].gox" or ".[class]", eg "_yap.gox" or ".spx"
 	Class  string // "Sprite"
 	Syntax *Line
+}
+
+func New(gopmod, gopVer string) *File {
+	gop := &Line{
+		Token: []string{"gop", gopVer},
+	}
+	return &File{
+		Gop: &Gop{
+			Version: gopVer,
+			Syntax:  gop,
+		},
+		Syntax: &FileSyntax{
+			Name: gopmod,
+			Stmt: []Expr{gop},
+		},
+	}
 }
 
 type VersionFixer = modfile.VersionFixer
@@ -176,25 +188,6 @@ func (f *File) parseVerb(errs *ErrorList, verb string, line *Line, args []string
 		}
 		f.Gop = &Gop{Syntax: line}
 		f.Gop.Version = args[0]
-	case "import", "register": // register => import
-		if len(args) != 1 {
-			errorf("import directive expects exactly one argument")
-			return
-		}
-		s, err := parseString(&args[0])
-		if err != nil {
-			errorf("invalid quoted string: %v", err)
-			return
-		}
-		err = module.CheckPath(s)
-		if err != nil {
-			wrapError(err)
-			return
-		}
-		f.Import = append(f.Import, &Import{
-			ClassfileMod: s,
-			Syntax:       line,
-		})
 	case "project":
 		if len(args) < 1 {
 			errorf("usage: project [.projExt ProjClass] classFilePkgPath ...")
@@ -379,104 +372,6 @@ func (p *Error) Summary() string {
 	cpy := *(*modfile.Error)(p)
 	cpy.Err = errors.New(errors.Summary(p.Unwrap()))
 	return cpy.Error()
-}
-
-// -----------------------------------------------------------------------------
-
-const (
-	directiveInvalid = iota
-	directiveModule
-	directiveGop
-	directiveProject
-	directiveClass
-)
-
-const (
-	directiveLineBlock = 0x80 + iota
-	directiveImport
-)
-
-var directiveWeights = map[string]int{
-	"module":   directiveModule,
-	"gop":      directiveGop,
-	"import":   directiveImport,
-	"register": directiveImport, // register => import
-	"project":  directiveProject,
-	"class":    directiveClass,
-}
-
-func getWeight(e Expr) int {
-	if line, ok := e.(*Line); ok {
-		return directiveWeights[line.Token[0]]
-	}
-	if w, ok := directiveWeights[e.(*LineBlock).Token[0]]; ok {
-		return w
-	}
-	return directiveLineBlock
-}
-
-func updateLine(line *Line, tokens ...string) {
-	if line.InBlock {
-		tokens = tokens[1:]
-	}
-	line.Token = tokens
-}
-
-func addLine(x *FileSyntax, tokens ...string) *Line {
-	new := &Line{Token: tokens}
-	w := directiveWeights[tokens[0]]
-	for i, e := range x.Stmt {
-		w2 := getWeight(e)
-		if w <= w2 {
-			x.Stmt = append(x.Stmt, nil)
-			copy(x.Stmt[i+1:], x.Stmt[i:])
-			x.Stmt[i] = new
-			return new
-		}
-	}
-	x.Stmt = append(x.Stmt, new)
-	return new
-}
-
-func (f *File) AddGopStmt(version string) error {
-	if !modfile.GoVersionRE.MatchString(version) {
-		return fmt.Errorf("invalid language version string %q", version)
-	}
-	if f.Gop == nil {
-		if f.Syntax == nil {
-			f.Syntax = new(FileSyntax)
-		}
-		f.Gop = &Gop{
-			Version: version,
-			Syntax:  addLine(f.Syntax, "gop", version),
-		}
-	} else {
-		f.Gop.Version = version
-		updateLine(f.Gop.Syntax, "gop", version)
-	}
-	return nil
-}
-
-func (f *File) AddImport(modPath string) {
-	for _, r := range f.Import {
-		if r.ClassfileMod == modPath {
-			return
-		}
-	}
-	f.AddNewImport(modPath)
-}
-
-func (f *File) AddNewImport(modPath string) {
-	line := addLine(f.Syntax, "import", AutoQuote(modPath))
-	r := &Import{
-		ClassfileMod: modPath,
-		Syntax:       line,
-	}
-	f.Import = append(f.Import, r)
-}
-
-func (f *File) Format() ([]byte, error) {
-	return modfile.Format(f.Syntax), nil
 }
 
 // -----------------------------------------------------------------------------

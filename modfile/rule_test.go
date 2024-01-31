@@ -16,7 +16,6 @@
 package modfile
 
 import (
-	"bytes"
 	"syscall"
 	"testing"
 )
@@ -83,86 +82,17 @@ func TestFormat(t *testing.T) {
 	}
 }
 
+func TestForma2t(t *testing.T) {
+	f := New("/foo/gop.mod", "1.2.0")
+	if b := string(Format(f.Syntax)); b != "gop 1.2.0\n" {
+		t.Fatal("Format failed:", b)
+	}
+}
+
 func TestMustQuote(t *testing.T) {
 	if !MustQuote("") {
 		t.Fatal("MustQuote failed")
 	}
-}
-
-// -----------------------------------------------------------------------------
-
-var addGopTests = []struct {
-	desc    string
-	in      string
-	version string
-	out     string
-}{
-	{
-		`empty_only`,
-		``,
-		`1.1`,
-		`gop 1.1
-		`,
-	},
-}
-
-func TestAddGop(t *testing.T) {
-	for _, tt := range addGopTests {
-		t.Run(tt.desc, func(t *testing.T) {
-			testEdit(t, tt.in, tt.out, true, func(f *File) error {
-				return f.AddGopStmt(tt.version)
-			})
-		})
-	}
-}
-
-func TestAddGopErr(t *testing.T) {
-	f := new(File)
-	if e := f.AddGopStmt("1.x"); e == nil {
-		t.Fatal("AddGoStmt:", e)
-	}
-	if e := f.AddGopStmt("1.1"); e != nil {
-		t.Fatal("AddGoStmt failed:", e)
-	}
-	if e := f.AddGopStmt("1.2"); e != nil {
-		t.Fatal("AddGoStmt failed:", e)
-	}
-	if n := len(f.Syntax.Stmt); n != 1 {
-		t.Fatal("AddGoStmt: len(f.Syntax.Stmt) =", n)
-	}
-}
-
-func testEdit(t *testing.T, in, want string, strict bool, transform func(f *File) error) *File {
-	t.Helper()
-	parse := Parse
-	if !strict {
-		parse = ParseLax
-	}
-	f, err := parse("in", []byte(in), nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	g, err := parse("out", []byte(want), nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	golden, err := g.Format()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if err := transform(f); err != nil {
-		t.Fatal(err)
-	}
-	out, err := f.Format()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !bytes.Equal(out, golden) {
-		t.Errorf("have:\n%s\nwant:\n%s", out, golden)
-	}
-
-	return f
 }
 
 // -----------------------------------------------------------------------------

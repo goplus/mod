@@ -49,7 +49,6 @@ type Line = modfile.Line
 //		"x"
 //		"y"
 //	)
-//
 type LineBlock = modfile.LineBlock
 
 // An LParen represents the beginning of a parenthesized line block.
@@ -59,10 +58,3 @@ type LParen = modfile.LParen
 // An RParen represents the end of a parenthesized line block.
 // It is a place to store whole-line (before) comments.
 type RParen = modfile.RParen
-
-// ModulePath returns the module path from the gopmod file text.
-// If it cannot find a module path, it returns an empty string.
-// It is tolerant of unrelated problems in the gop.mod file.
-func ModulePath(mod []byte) string {
-	return modfile.ModulePath(mod)
-}
