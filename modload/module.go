@@ -212,6 +212,7 @@ func (p Module) AddRequire(path, vers string, hasProj bool) error {
 			if !isClass(r) {
 				addClass(p.Opt, r)
 			}
+			break
 		}
 	}
 	return nil
