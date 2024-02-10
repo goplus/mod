@@ -90,4 +90,19 @@ require github.com/goplus/yap v0.7.2 //gop:class
 	if v := len(mod.Opt.ClassMods); v != 1 {
 		t.Fatal("len(mod.Opt.ClassMods):", v)
 	}
+
+	mod.AddRequire("github.com/qiniu/x", "v0.1.0", false)
+	if b, err := mod.File.Format(); err != nil {
+		t.Fatal("AddRequire & Format:", err)
+	} else if v := string(b); v != `module github.com/foo/bar
+
+go 1.18
+
+require (
+	github.com/goplus/yap v0.7.2 //gop:class
+	github.com/qiniu/x v0.1.0
+)
+` {
+		t.Fatal("AddRequire:", v)
+	}
 }

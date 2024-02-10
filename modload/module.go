@@ -205,15 +205,15 @@ func LoadFromEx(gomod, gopmod string, readFile func(string) ([]byte, error)) (p 
 
 func (p Module) AddRequire(path, vers string, hasProj bool) error {
 	f := p.File
-	if err := f.AddRequire(path, vers); err != nil {
-		return err
-	}
-	for _, r := range f.Require {
-		if r.Mod.Path == path {
-			if !isClass(r) {
-				addClass(p.Opt, r)
+	f.AddRequire(path, vers)
+	if hasProj {
+		for _, r := range f.Require {
+			if r.Mod.Path == path {
+				if !isClass(r) {
+					addClass(p.Opt, r)
+				}
+				break
 			}
-			break
 		}
 	}
 	return nil
