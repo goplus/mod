@@ -17,6 +17,7 @@
 package modload
 
 import (
+	"encoding/json"
 	"runtime"
 	"testing"
 
@@ -104,5 +105,29 @@ require (
 )
 ` {
 		t.Fatal("AddRequire:", v)
+	}
+
+	mod.AddReplace("github.com/goplus/yap", "v0.7.2", "../", "")
+	if b, err := mod.File.Format(); err != nil {
+		t.Fatal("AddReplace & Format:", err)
+	} else if v := string(b); v != `module github.com/foo/bar
+
+go 1.18
+
+require (
+	github.com/goplus/yap v0.7.2 //gop:class
+	github.com/qiniu/x v0.1.0
+)
+
+replace github.com/goplus/yap v0.7.2 => ../
+` {
+		t.Fatal("AddReplace:", v)
+	}
+
+	b, _ := json.Marshal(mod.DepMods())
+	if runtime.GOOS != "windows" {
+		if v := string(b); v != `{"github.com/goplus/yap":{"Path":"/foo"},"github.com/qiniu/x":{"Path":"github.com/qiniu/x","Version":"v0.1.0"}}` {
+			t.Fatal("mod.DepMods:", v)
+		}
 	}
 }
