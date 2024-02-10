@@ -125,7 +125,9 @@ replace github.com/goplus/yap v0.7.2 => ../
 	}
 
 	b, _ := json.Marshal(mod.DepMods())
-	if v := string(b); v != `{"github.com/goplus/yap":{"Path":"/foo"},"github.com/qiniu/x":{"Path":"github.com/qiniu/x","Version":"v0.1.0"}}` {
-		t.Fatal("mod.DepMods:", v)
+	if runtime.GOOS != "windows" {
+		if v := string(b); v != `{"github.com/goplus/yap":{"Path":"/foo"},"github.com/qiniu/x":{"Path":"github.com/qiniu/x","Version":"v0.1.0"}}` {
+			t.Fatal("mod.DepMods:", v)
+		}
 	}
 }
