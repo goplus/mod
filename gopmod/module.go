@@ -173,7 +173,7 @@ func LoadFrom(gomod, gopmod string) (*Module, error) {
 // If we only want to load a Go modfile, pass env parameter as nil.
 func LoadMod(mod module.Version) (p *Module, err error) {
 	p, err = loadModFrom(mod)
-	if err != syscall.ENOENT {
+	if errors.Unwrap(err) != syscall.ENOENT {
 		return
 	}
 	mod, err = modfetch.Get(mod.String())

@@ -101,7 +101,7 @@ func (p *Module) importMod(modPath string, imcls func(c *Project)) (err error) {
 		return syscall.ENOENT
 	}
 	err = p.importClassFrom(mod, imcls)
-	if err != syscall.ENOENT {
+	if errors.Unwrap(err) != syscall.ENOENT {
 		return
 	}
 	mod, err = modfetch.Get(mod.String())
