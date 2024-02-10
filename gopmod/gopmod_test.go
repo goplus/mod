@@ -89,6 +89,9 @@ func TestClassfile(t *testing.T) {
 
 func TestClassfile2(t *testing.T) {
 	mod := New(modtest.GopCommunity(t))
+	if _, ok := mod.ClassKind("foo_yap.gox"); ok {
+		t.Fatal("mod.ClassKind foo_yap.gox: ok?")
+	}
 	if err := mod.ImportClasses(func(c *Project) {}); err != nil {
 		t.Fatal("mod.ImportClasses:", err)
 	}
@@ -96,6 +99,6 @@ func TestClassfile2(t *testing.T) {
 		t.Fatal("mod.ClassKind foo_yap.gox:", isProj, ok)
 	}
 	if _, ok := mod.ClassKind("foo.gox"); ok {
-		t.Fatal("mod.ClassKind foo.gox:", ok)
+		t.Fatal("mod.ClassKind foo.gox: ok?")
 	}
 }
