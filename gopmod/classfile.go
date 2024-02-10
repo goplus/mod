@@ -17,13 +17,13 @@
 package gopmod
 
 import (
-	"errors"
 	"syscall"
 
 	"github.com/goplus/mod/modcache"
 	"github.com/goplus/mod/modfetch"
 	"github.com/goplus/mod/modfile"
 	"github.com/goplus/mod/modload"
+	"github.com/qiniu/x/errors"
 	"golang.org/x/mod/module"
 )
 
@@ -101,7 +101,7 @@ func (p *Module) importMod(modPath string, imcls func(c *Project)) (err error) {
 		return syscall.ENOENT
 	}
 	err = p.importClassFrom(mod, imcls)
-	if errors.Unwrap(err) != syscall.ENOENT {
+	if errors.Err(err) != syscall.ENOENT {
 		return
 	}
 	mod, err = modfetch.Get(mod.String())
