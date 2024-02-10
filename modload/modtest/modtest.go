@@ -44,7 +44,7 @@ func Load(t *testing.T, gomodText, gopmodText string, errMsg string) modload.Mod
 	return mod
 }
 
-func GopClass(t *testing.T) {
+func GopClass(t *testing.T) modload.Module {
 	const gomodText = `
 module github.com/goplus/community
 
@@ -60,9 +60,10 @@ require (
 	if n := len(mod.Opt.ClassMods); n != 2 {
 		t.Fatal("len(mod.Opt.Import):", n)
 	}
+	return mod
 }
 
-func Import(t *testing.T) {
+func Import(t *testing.T) modload.Module {
 	const gomodText = `
 module github.com/goplus/yap
 
@@ -82,4 +83,5 @@ import yauth github.com/goplus/yap/ytest/auth
 	if n := len(mod.Opt.Projects); n != 2 {
 		t.Fatal("len(mod.Opt.Projects):", n)
 	}
+	return mod
 }
