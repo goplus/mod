@@ -21,7 +21,6 @@ import (
 	"log"
 	"path/filepath"
 	"runtime"
-	"sort"
 	"strings"
 	"syscall"
 
@@ -34,15 +33,19 @@ import (
 
 // -----------------------------------------------------------------------------
 
-type depmodInfo struct {
-	path string
-	real module.Version
-}
-
 type Module struct {
 	modload.Module
 	projects map[string]*Project // ext -> project
-	depmods  []depmodInfo
+	depmods_ map[string]module.Version
+}
+
+// DepMods returns all depended modules.
+// If a depended module path is replace to be a local path, it will be canonical to an absolute path.
+func (p *Module) DepMods() map[string]module.Version {
+	if p.depmods_ == nil {
+		p.depmods_ = p.Module.DepMods()
+	}
+	return p.depmods_
 }
 
 // PkgType specifies a package type.
@@ -119,12 +122,12 @@ func (p *Module) Lookup(pkgPath string) (pkg *Package, err error) {
 // lookupExternPkg lookups a external package from depended modules.
 // If modVer.Path is replace to be a local path, it will be canonical to an absolute path.
 func (p *Module) lookupExternPkg(pkgPath string) (pkg *Package, err error) {
-	for _, m := range p.depmods {
-		if isPkgInMod(pkgPath, m.path) {
-			if modDir, e := modcache.Path(m.real); e == nil {
-				modPath := m.path
+	for path, real := range p.DepMods() {
+		if isPkgInMod(pkgPath, path) {
+			if modDir, e := modcache.Path(real); e == nil {
+				modPath := path
 				dir := modDir + pkgPath[len(modPath):]
-				pkg = &Package{Type: PkgtExtern, Real: m.real, ModPath: modPath, ModDir: modDir, Dir: dir}
+				pkg = &Package{Type: PkgtExtern, Real: real, ModPath: modPath, ModDir: modDir, Dir: dir}
 			} else {
 				err = e
 			}
@@ -138,45 +141,15 @@ func (p *Module) lookupExternPkg(pkgPath string) (pkg *Package, err error) {
 // LookupDepMod lookups a depended module.
 // If modVer.Path is replace to be a local path, it will be canonical to an absolute path.
 func (p *Module) LookupDepMod(modPath string) (modVer module.Version, ok bool) {
-	for _, m := range p.depmods {
-		if m.path == modPath {
-			modVer, ok = m.real, true
-			break
-		}
-	}
+	deps := p.DepMods()
+	modVer, ok = deps[modPath]
 	return
-}
-
-// IsGopMod returns if this module is a Go+ module or not.
-func (p *Module) IsGopMod() bool {
-	const gopPkgPath = "github.com/goplus/gop"
-	_, file := filepath.Split(p.Modfile())
-	if file == "gop.mod" {
-		return true
-	}
-	if _, ok := p.LookupDepMod(gopPkgPath); ok {
-		return true
-	}
-	return p.Path() == gopPkgPath
-}
-
-func getDepMods(mod modload.Module) []depmodInfo {
-	depmods := mod.DepMods()
-	ret := make([]depmodInfo, 0, len(depmods))
-	for path, m := range depmods {
-		ret = append(ret, depmodInfo{path: path, real: m})
-	}
-	sort.Slice(ret, func(i, j int) bool {
-		return ret[i].path > ret[j].path
-	})
-	return ret
 }
 
 // New creates a module from a modload.Module instance.
 func New(mod modload.Module) *Module {
 	projects := make(map[string]*Project)
-	depmods := getDepMods(mod)
-	return &Module{projects: projects, depmods: depmods, Module: mod}
+	return &Module{projects: projects, Module: mod}
 }
 
 // Load loads a module from a local directory.
