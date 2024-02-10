@@ -55,7 +55,7 @@ var (
 // If it is, then it checks the fname is a project file or not.
 func (p *Module) ClassKind(fname string) (isProj, ok bool) {
 	ext := modfile.ClassExt(fname)
-	if c, ok := p.projects[ext]; ok {
+	if c, ok := p.projs[ext]; ok {
 		return c.IsProj(ext, fname), true
 	}
 	return
@@ -63,13 +63,13 @@ func (p *Module) ClassKind(fname string) (isProj, ok bool) {
 
 // IsClass checks ext is a known classfile or not.
 func (p *Module) IsClass(ext string) (ok bool) {
-	_, ok = p.projects[ext]
+	_, ok = p.projs[ext]
 	return
 }
 
 // LookupClass lookups a classfile by ext.
 func (p *Module) LookupClass(ext string) (c *Project, ok bool) {
-	c, ok = p.projects[ext]
+	c, ok = p.projs[ext]
 	return
 }
 
@@ -79,9 +79,10 @@ func (p *Module) ImportClasses(importClass ...func(c *Project)) (err error) {
 	if importClass != nil {
 		impcls = importClass[0]
 	}
+	p.projs = make(map[string]*Project)
 	p.importClass(TestProject, impcls)
 	p.importClass(SpxProject, impcls)
-	p.projects[".gmx"] = SpxProject // old style
+	p.projs[".gmx"] = SpxProject // old style
 	opt := p.Opt
 	for _, c := range opt.Projects {
 		p.importClass(c, impcls)
@@ -130,9 +131,9 @@ func (p *Module) importClassFrom(modVer module.Version, impcls func(c *Project))
 }
 
 func (p *Module) importClass(c *Project, impcls func(c *Project)) {
-	p.projects[c.Ext] = c
+	p.projs[c.Ext] = c
 	for _, w := range c.Works {
-		p.projects[w.Ext] = c
+		p.projs[w.Ext] = c
 	}
 	if impcls != nil {
 		impcls(c)

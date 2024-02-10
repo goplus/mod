@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/goplus/mod/modload/modtest"
+	"golang.org/x/mod/module"
 )
 
 func TestLookup(t *testing.T) {
@@ -66,5 +67,35 @@ func TestPkgType(t *testing.T) {
 	}
 	if pt := mod.PkgType("github.com/goplus/community/foo"); pt != PkgtModule {
 		t.Fatal("mod.PkgType github.com/goplus/community/foo:", pt)
+	}
+}
+
+func TestClassfile(t *testing.T) {
+	modVer := module.Version{Path: "github.com/goplus/yap", Version: "v0.5.0"}
+	mod, err := LoadMod(modVer)
+	if err != nil {
+		t.Fatal("LoadMod:", err)
+	}
+	if err = mod.ImportClasses(); err != nil {
+		t.Fatal("mod.ImportClasses:", err)
+	}
+	if c, ok := mod.LookupClass("_yap.gox"); !ok || c.Class != "App" {
+		t.Fatal("mod.LookupClass _yap.gox:", c.Class)
+	}
+	if !mod.IsClass("_yap.gox") {
+		t.Fatal("mod.IsClass _yap.gox: not ok?")
+	}
+}
+
+func TestClassfile2(t *testing.T) {
+	mod := New(modtest.GopCommunity(t))
+	if err := mod.ImportClasses(func(c *Project) {}); err != nil {
+		t.Fatal("mod.ImportClasses:", err)
+	}
+	if isProj, ok := mod.ClassKind("foo_yap.gox"); !ok || !isProj {
+		t.Fatal("mod.ClassKind foo_yap.gox:", isProj, ok)
+	}
+	if _, ok := mod.ClassKind("foo.gox"); ok {
+		t.Fatal("mod.ClassKind foo.gox:", ok)
 	}
 }
