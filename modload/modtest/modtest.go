@@ -44,6 +44,19 @@ func Load(t *testing.T, gomodText, gopmodText string, errMsg string) modload.Mod
 	return mod
 }
 
+func GopCommunity(t *testing.T) modload.Module {
+	const gomodText = `
+module github.com/goplus/community
+
+go 1.18
+
+require (
+	github.com/goplus/yap v0.5.0 //gop:class
+)
+`
+	return Load(t, gomodText, ``, ``)
+}
+
 func GopClass(t *testing.T) modload.Module {
 	const gomodText = `
 module github.com/goplus/community

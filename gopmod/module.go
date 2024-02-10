@@ -35,7 +35,7 @@ import (
 
 type Module struct {
 	modload.Module
-	projects map[string]*Project // ext -> project
+	projs    map[string]*Project // ext -> project
 	depmods_ map[string]module.Version
 }
 
@@ -148,8 +148,7 @@ func (p *Module) LookupDepMod(modPath string) (modVer module.Version, ok bool) {
 
 // New creates a module from a modload.Module instance.
 func New(mod modload.Module) *Module {
-	projects := make(map[string]*Project)
-	return &Module{projects: projects, Module: mod}
+	return &Module{Module: mod}
 }
 
 // Load loads a module from a local directory.
@@ -174,7 +173,7 @@ func LoadFrom(gomod, gopmod string) (*Module, error) {
 // If we only want to load a Go modfile, pass env parameter as nil.
 func LoadMod(mod module.Version) (p *Module, err error) {
 	p, err = loadModFrom(mod)
-	if err != syscall.ENOENT {
+	if errors.Err(err) != syscall.ENOENT {
 		return
 	}
 	mod, err = modfetch.Get(mod.String())
