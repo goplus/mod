@@ -85,6 +85,11 @@ func TestClassfile(t *testing.T) {
 	if !mod.IsClass("_yap.gox") {
 		t.Fatal("mod.IsClass _yap.gox: not ok?")
 	}
+
+	modVer = module.Version{Path: "github.com/unknown-repo/x", Version: "v0.5.0"}
+	if _, err = LoadMod(modVer); !IsNotFound(err) {
+		log.Fatal("LoadMod github.com/unknown-repo/x:", err)
+	}
 }
 
 func TestClassfile2(t *testing.T) {

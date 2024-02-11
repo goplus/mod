@@ -17,8 +17,7 @@
 package gopmod
 
 import (
-	"syscall"
-
+	"github.com/goplus/mod"
 	"github.com/goplus/mod/modcache"
 	"github.com/goplus/mod/modfetch"
 	"github.com/goplus/mod/modfile"
@@ -46,8 +45,16 @@ var (
 )
 
 var (
+	ErrNotFound        = mod.ErrNotFound
 	ErrNotClassFileMod = errors.New("not a classfile module")
 )
+
+// IsNotFound returns a boolean indicating whether the error is known to
+// report that a module or package does not exist. It is satisfied by
+// ErrNotFound.
+func IsNotFound(err error) bool {
+	return errors.Err(err) == ErrNotFound
+}
 
 // -----------------------------------------------------------------------------
 
@@ -98,10 +105,10 @@ func (p *Module) ImportClasses(importClass ...func(c *Project)) (err error) {
 func (p *Module) importMod(modPath string, imcls func(c *Project)) (err error) {
 	mod, ok := p.LookupDepMod(modPath)
 	if !ok {
-		return syscall.ENOENT
+		return ErrNotFound
 	}
 	err = p.importClassFrom(mod, imcls)
-	if errors.Err(err) != syscall.ENOENT {
+	if !IsNotFound(err) {
 		return
 	}
 	mod, err = modfetch.Get(mod.String())
