@@ -205,6 +205,8 @@ require (
 	}
 	if v := string(b); v != `go 1.18
 
+use .
+
 replace github.com/goplus/gop v1.2.0 => /foo/bar/gop
 ` {
 		t.Fatal("workFile:", v)

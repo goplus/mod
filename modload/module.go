@@ -377,6 +377,7 @@ func (p Module) SaveWithGopMod(gop *env.Gop, flags int) (err error) {
 	if findReplaceGopMod(work) {
 		return
 	}
+	work.AddUse(".", p.Path())
 	work.AddReplace(gopMod, gopVer, gop.Root, "")
 	return os.WriteFile(workFile, gomodfile.Format(work.Syntax), 0666)
 }
