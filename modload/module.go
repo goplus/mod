@@ -204,15 +204,17 @@ func LoadFromEx(gomod, gopmod string, readFile func(string) ([]byte, error)) (p 
 	}
 
 	var opt *modfile.File
-	data, err = readFile(gopmod)
-	if err != nil {
-		opt = newGopMod(gopmod, defaultGopVer)
-	} else {
-		opt, err = modfile.ParseLax(gopmod, data, fix)
-		if err != nil {
-			err = errors.NewWith(err, `modfile.Parse(gopmod, data, fix)`, -2, "modfile.Parse", gopmod, data, fix)
-			return
+	if gopmod != "" {
+		if data, err = readFile(gopmod); err == nil {
+			opt, err = modfile.ParseLax(gopmod, data, fix)
+			if err != nil {
+				err = errors.NewWith(err, `modfile.Parse(gopmod, data, fix)`, -2, "modfile.Parse", gopmod, data, fix)
+				return
+			}
 		}
+	}
+	if opt == nil {
+		opt = newGopMod(gopmod, defaultGopVer)
 	}
 	importClassfileFromGoMod(opt, f)
 	return Module{f, opt}, nil
@@ -300,13 +302,46 @@ func (p Module) Save() (err error) {
 	return
 }
 
+func (p Module) checkGopDeps() (flags int) {
+	for _, r := range p.File.Require {
+		switch r.Mod.Path {
+		case gopMod:
+			flags |= FlagDepModGop
+		case xMod:
+			flags |= FlagDepModX
+		}
+	}
+	return
+}
+
+func findReplaceGopMod(work *gomodfile.WorkFile) bool {
+	for _, r := range work.Replace {
+		if r.Old.Path == gopMod {
+			return true
+		}
+	}
+	return false
+}
+
+const (
+	gopMod = "github.com/goplus/gop"
+	xMod   = "github.com/qiniu/x"
+)
+
+const (
+	FlagDepModGop = 1 << iota // depends module github.com/goplus/gop
+	FlagDepModX               // depends module github.com/qiniu/x
+)
+
 // SaveWithGopMod adds `require github.com/goplus/gop` and saves all
 // changes of this module.
 func (p Module) SaveWithGopMod(gop *env.Gop, flags int) (err error) {
 	gopVer := getGopVer(gop)
-	p.requireGop(gop, gopVer, flags)
-	if err = p.Save(); err != nil {
-		return
+	if old := p.checkGopDeps(); old != flags {
+		p.requireGop(gop, gopVer, old, flags)
+		if err = p.Save(); err != nil {
+			return
+		}
 	}
 
 	var work *gomodfile.WorkFile
@@ -324,14 +359,34 @@ func (p Module) SaveWithGopMod(gop *env.Gop, flags int) (err error) {
 	if work, err = gomodfile.ParseWork(workFile, b, fix); err != nil {
 		return
 	}
-	work.AddReplace("github.com/goplus/gop", gopVer, gop.Root, "")
+	if findReplaceGopMod(work) {
+		return
+	}
+	work.AddReplace(gopMod, gopVer, gop.Root, "")
 	return os.WriteFile(workFile, gomodfile.Format(work.Syntax), 0666)
 }
 
 // requireGop adds require for the github.com/goplus/gop module.
-func (p Module) requireGop(gop *env.Gop, gopVer string, flags int) {
-	p.File.AddRequire("github.com/goplus/gop", gopVer)
-	// TODO: AddRequire "github.com/qiniu/x" if necessary
+func (p Module) requireGop(gop *env.Gop, gopVer string, old, flags int) {
+	if (flags&FlagDepModGop) != 0 && (old&FlagDepModGop) == 0 {
+		p.File.AddRequire(gopMod, gopVer)
+	}
+	if (flags&FlagDepModX) != 0 && (old&FlagDepModX) == 0 { // depends module github.com/qiniu/x
+		if x, ok := getXVer(gop); ok {
+			p.File.AddRequire(x.Path, x.Version)
+		}
+	}
+}
+
+func getXVer(gop *env.Gop) (modVer module.Version, ok bool) {
+	if mod, err := LoadFrom(gop.Root+"/go.mod", ""); err == nil {
+		for _, r := range mod.File.Require {
+			if r.Mod.Path == xMod {
+				return r.Mod, true
+			}
+		}
+	}
+	return
 }
 
 func getGopVer(gop *env.Gop) string {
