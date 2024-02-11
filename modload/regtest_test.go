@@ -17,6 +17,7 @@
 package modload_test
 
 import (
+	"os"
 	"testing"
 
 	"github.com/goplus/mod/gopmod"
@@ -33,6 +34,7 @@ func TestImport(t *testing.T) {
 }
 
 func TestClassfile(t *testing.T) {
+	t.Log(os.Getwd())
 	modVer := module.Version{Path: "github.com/goplus/yap", Version: "v0.5.0"}
 	if _, err := gopmod.LoadMod(modVer); err != nil {
 		t.Fatal("gopmod.LoadMod:", err)
