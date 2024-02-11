@@ -26,6 +26,7 @@ import (
 	"github.com/goplus/mod/env"
 	"github.com/goplus/mod/modfile"
 	gomodfile "golang.org/x/mod/modfile"
+	"golang.org/x/mod/module"
 )
 
 func TestEmpty(t *testing.T) {
@@ -145,6 +146,24 @@ func TestSaveDefault(t *testing.T) {
 	if err := Default.Save(); err != ErrSaveDefault {
 		t.Fatal("Default.Save:", err)
 	}
+
+	gop := Module{
+		File: &gomodfile.File{
+			Module: &gomodfile.Module{
+				Mod: module.Version{
+					Path: "github.com/goplus/gop",
+				},
+			},
+			Go: &gomodfile.Go{Version: defaultGoVer},
+			Syntax: &gomodfile.FileSyntax{
+				Name: "/foo/bar/go.mod",
+			},
+		},
+		Opt: &modfile.File{
+			Gop: &modfile.Gop{Version: defaultGopVer},
+		},
+	}
+	gop.SaveWithGopMod(&env.Gop{Version: "v1.2.0 devel", Root: "/foo/bar/gop"}, FlagDepModGop)
 }
 
 func TestSave(t *testing.T) {

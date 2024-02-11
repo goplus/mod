@@ -347,6 +347,9 @@ const (
 func (p Module) SaveWithGopMod(gop *env.Gop, flags int) (err error) {
 	gopVer := getGopVer(gop)
 	if old := p.checkGopDeps(); old != flags {
+		if p.Path() == gopMod { // don't change Go+ itself
+			return
+		}
 		p.requireGop(gop, gopVer, old, flags)
 		if err = p.Save(); err != nil {
 			return
