@@ -18,10 +18,14 @@ package gopmod
 
 import (
 	"log"
+	"path/filepath"
 	"runtime"
 	"testing"
 
+	"github.com/goplus/mod"
+	"github.com/goplus/mod/modcache"
 	"github.com/goplus/mod/modload/modtest"
+	"github.com/qiniu/x/errors"
 	"golang.org/x/mod/module"
 )
 
@@ -70,6 +74,23 @@ func TestPkgType(t *testing.T) {
 	}
 }
 
+func loadModBy(mod module.Version) (p *Module, err error) {
+	dir, err := modcache.Path(mod)
+	if err != nil {
+		return
+	}
+	return loadFromDir(dir)
+}
+
+func loadFromDir(dir string) (p *Module, err error) {
+	dir, gomod, err := mod.FindGoMod(dir)
+	if err != nil {
+		err = errors.NewWith(err, `mod.FindGoMod(dir)`, -2, "mod.FindGoMod", dir)
+		return
+	}
+	return LoadFrom(gomod, filepath.Join(dir, "gop.mod"))
+}
+
 func TestClassfile(t *testing.T) {
 	modVer := module.Version{Path: "github.com/goplus/yap", Version: "v0.5.0"}
 	mod, err := LoadMod(modVer)
@@ -89,6 +110,11 @@ func TestClassfile(t *testing.T) {
 	modVer = module.Version{Path: "github.com/unknown-repo/x", Version: "v0.5.0"}
 	if _, err = LoadMod(modVer); !IsNotFound(err) {
 		log.Fatal("LoadMod github.com/unknown-repo/x:", err)
+	}
+
+	modVer = module.Version{Path: "github.com/goplus/yap", Version: "v0.5.0"}
+	if _, err = loadModBy(modVer); err != nil {
+		t.Fatal("loadModBy:", err)
 	}
 }
 
