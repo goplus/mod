@@ -18,6 +18,7 @@ package modload
 
 import (
 	"encoding/json"
+	"log"
 	"os"
 	"runtime"
 	"testing"
@@ -145,7 +146,7 @@ func TestSaveDefault(t *testing.T) {
 
 func TestSave(t *testing.T) {
 	dir := ".gop/_tempdir"
-	os.RemoveAll(dir)
+	os.RemoveAll(".gop")
 	os.MkdirAll(dir, 0777)
 	mod, err := Create(dir, "github.com/foo/bar", "", "")
 	if err != nil {
@@ -160,7 +161,7 @@ func TestSave(t *testing.T) {
 	if err != nil {
 		t.Fatal("Load:", err)
 	}
-	if err = mod.SaveWithGopMod(&env.Gop{Version: "v1.2.0 devel", Root: "/foo/bar/gop"}, 0); err != nil {
+	if err = mod.SaveWithGopMod(&env.Gop{Version: "v1.2.0 devel", Root: "/foo/bar/gop"}, FlagDepModGop); err != nil {
 		t.Fatal("mod.SaveWithGopMod:", err)
 	}
 	if b, err := mod.File.Format(); err != nil {
@@ -186,6 +187,43 @@ replace github.com/goplus/gop v1.2.0 => /foo/bar/gop
 ` {
 		t.Fatal("workFile:", v)
 	}
+
+	// SaveWithGopMod with FlagDepModX
+	os.WriteFile(".gop/go.mod", []byte(`
+module github.com/goplus/gop
+
+go 1.18
+
+require (
+	github.com/qiniu/x v1.13.0
+)
+`), 0666)
+	if err = mod.SaveWithGopMod(&env.Gop{Version: "v1.2.0 devel", Root: ".gop"}, FlagDepModGop|FlagDepModX); err != nil {
+		t.Fatal("mod.SaveWithGopMod 2:", err)
+	}
+	if b, err := mod.File.Format(); err != nil {
+		t.Fatal("Format:", err)
+	} else if v := string(b); v != `module github.com/foo/bar
+
+go 1.18
+
+require (
+	github.com/goplus/yap v0.5.0 //gop:class
+	github.com/goplus/gop v1.2.0
+	github.com/qiniu/x v1.13.0
+)
+` {
+		t.Fatal("SaveWithGopMod:", v)
+	}
+	if _, ok := getXVer(&env.Gop{Root: "/foo/bar"}); ok {
+		t.Fatal("getXVer: ok?")
+	}
+
+	// SaveWithGopMod again. noop.
+	if err = mod.SaveWithGopMod(&env.Gop{Version: "v1.2.0 devel", Root: ".gop"}, FlagDepModGop|FlagDepModX); err != nil {
+		log.Fatal("mod.SaveWithGopMod 3:", err)
+	}
+
 	mod.Opt.Projects = append(mod.Opt.Projects, spxProject)
 	mod.Save()
 	b, err = os.ReadFile(mod.Opt.Syntax.Name)
