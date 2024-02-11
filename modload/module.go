@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	"github.com/goplus/mod"
+	"github.com/goplus/mod/env"
 	"github.com/goplus/mod/modfile"
 	"github.com/qiniu/x/errors"
 	"golang.org/x/mod/module"
@@ -50,6 +51,14 @@ func (p Module) HasModfile() bool {
 func (p Module) Modfile() string {
 	if syn := p.Syntax; syn != nil {
 		return syn.Name
+	}
+	return ""
+}
+
+func (p Module) workFile() string {
+	if syn := p.Syntax; syn != nil {
+		dir, _ := filepath.Split(syn.Name)
+		return dir + "go.work"
 	}
 	return ""
 }
@@ -115,6 +124,12 @@ func Create(dir string, modPath, goVer, gopVer string) (p Module, err error) {
 		return Module{}, fmt.Errorf("gop: %s already exists", gopmod)
 	}
 
+	if goVer == "" {
+		goVer = defaultGoVer
+	}
+	if gopVer == "" {
+		gopVer = defaultGopVer
+	}
 	mod := newGoMod(gomod, modPath, goVer)
 	opt := newGopMod(gopmod, gopVer)
 	return Module{mod, opt}, nil
@@ -285,115 +300,47 @@ func (p Module) Save() (err error) {
 	return
 }
 
-/*
-const (
-	gopMod = "github.com/goplus/gop"
-)
-
-// UpdateGoMod updates the go.mod file.
-func (p Module) UpdateGoMod(env *env.Gop, checkChanged bool) error {
-	gopmod := p.Modfile()
-	dir, file := filepath.Split(gopmod)
-	if file == "go.mod" {
-		return nil
+// SaveWithGopMod adds `require github.com/goplus/gop` and saves all
+// changes of this module.
+func (p Module) SaveWithGopMod(gop *env.Gop, flags int) (err error) {
+	gopVer := getGopVer(gop)
+	p.requireGop(gop, gopVer, flags)
+	if err = p.Save(); err != nil {
+		return
 	}
-	gomod := dir + "go.mod"
-	if checkChanged && notChanged(gomod, gopmod) {
-		return nil
-	}
-	return p.saveGoMod(gomod, env)
-}
 
-func (p Module) saveGoMod(gomod string, env *env.Gop) error {
-	gof := p.convToGoMod(env)
-	data, err := gof.Format()
-	if err == nil {
-		err = os.WriteFile(gomod, data, 0644)
-	}
-	return err
-}
-
-func (p Module) convToGoMod(env *env.Gop) *gomodfile.File {
-	copy := p.File.File
-	copy.Syntax = cloneGoFileSyntax(copy.Syntax)
-	addRequireIfNotExist(&copy, gopMod, env.Version)
-	addReplaceIfNotExist(&copy, gopMod, "", env.Root, "")
-	return &copy
-}
-
-func addRequireIfNotExist(f *gomodfile.File, path, vers string) {
-	for _, r := range f.Require {
-		if r.Mod.Path == path {
+	var work *gomodfile.WorkFile
+	var workFile = p.workFile()
+	b, err := os.ReadFile(workFile)
+	if err != nil {
+		if os.IsNotExist(err) {
+			b = []byte(`go ` + p.Go.Version)
+		} else {
 			return
 		}
 	}
-	f.AddNewRequire(path, vers, false)
+	var fixed bool
+	fix := fixVersion(&fixed)
+	if work, err = gomodfile.ParseWork(workFile, b, fix); err != nil {
+		return
+	}
+	work.AddReplace("github.com/goplus/gop", gopVer, gop.Root, "")
+	return os.WriteFile(workFile, gomodfile.Format(work.Syntax), 0666)
 }
 
-func addReplaceIfNotExist(f *gomodfile.File, oldPath, oldVers, newPath, newVers string) {
-	for _, r := range f.Replace {
-		if r.Old.Path == oldPath && (oldVers == "" || r.Old.Version == oldVers) {
-			return
-		}
-	}
-	f.AddReplace(oldPath, oldVers, newPath, newVers)
+// requireGop adds require for the github.com/goplus/gop module.
+func (p Module) requireGop(gop *env.Gop, gopVer string, flags int) {
+	p.File.AddRequire("github.com/goplus/gop", gopVer)
+	// TODO: AddRequire "github.com/qiniu/x" if necessary
 }
 
-func notChanged(target, src string) bool {
-	fiTarget, err := os.Stat(target)
-	if err != nil {
-		return false
+func getGopVer(gop *env.Gop) string {
+	ver := gop.Version
+	if pos := strings.IndexByte(ver, ' '); pos > 0 { // v1.2.0 devel
+		ver = ver[:pos]
 	}
-	fiSrc, err := os.Stat(src)
-	if err != nil {
-		return false
-	}
-	return fiTarget.ModTime().After(fiSrc.ModTime())
+	return ver
 }
-
-// -----------------------------------------------------------------------------
-
-func cloneGoFileSyntax(syn *modfile.FileSyntax) *modfile.FileSyntax {
-	stmt := make([]modfile.Expr, 0, len(syn.Stmt))
-	for _, e := range syn.Stmt {
-		if isGopOrDeletedExpr(e) {
-			continue
-		}
-		stmt = append(stmt, cloneExpr(e))
-	}
-	return &modfile.FileSyntax{
-		Name:     syn.Name,
-		Comments: syn.Comments,
-		Stmt:     stmt,
-	}
-}
-
-func cloneExpr(e modfile.Expr) modfile.Expr {
-	if v, ok := e.(*modfile.LineBlock); ok {
-		copy := *v
-		return &copy
-	}
-	return e
-}
-
-func isGopOrDeletedExpr(e modfile.Expr) bool {
-	switch verb := getVerb(e); verb {
-	case "", "gop", "register", "project", "class":
-		return true
-	}
-	return false
-}
-
-func getVerb(e modfile.Expr) string {
-	if line, ok := e.(*modfile.Line); ok {
-		if token := line.Token; len(token) > 0 {
-			return token[0]
-		}
-		return "" // deleted line
-	}
-	return e.(*modfile.LineBlock).Token[0]
-}
-*/
 
 // -----------------------------------------------------------------------------
 

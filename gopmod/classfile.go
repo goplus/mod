@@ -33,7 +33,7 @@ var (
 	SpxProject = &Project{
 		Ext:      ".spx",
 		Class:    "Game",
-		Works:    []*Class{{Ext: ".spx", Class: "Sprite"}},
+		Works:    []*modfile.Class{{Ext: ".spx", Class: "Sprite"}},
 		PkgPaths: []string{"github.com/goplus/spx", "math"},
 	}
 	TestProject = &Project{
