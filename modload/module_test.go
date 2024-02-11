@@ -18,9 +18,11 @@ package modload
 
 import (
 	"encoding/json"
+	"os"
 	"runtime"
 	"testing"
 
+	"github.com/goplus/mod/env"
 	"github.com/goplus/mod/modfile"
 	gomodfile "golang.org/x/mod/modfile"
 )
@@ -131,3 +133,76 @@ replace github.com/goplus/yap v0.7.2 => ../
 		}
 	}
 }
+
+func TestSaveDefault(t *testing.T) {
+	if v := Default.workFile(); v != "" {
+		t.Fatal("Default.workFile:", v)
+	}
+	if err := Default.Save(); err != ErrSaveDefault {
+		t.Fatal("Default.Save:", err)
+	}
+}
+
+func TestSave(t *testing.T) {
+	dir := ".gop/_tempdir"
+	os.RemoveAll(dir)
+	os.MkdirAll(dir, 0777)
+	mod, err := Create(dir, "github.com/foo/bar", "", "")
+	if err != nil {
+		t.Fatal("Create:", err)
+	}
+	if err = mod.AddRequire("github.com/goplus/yap", "v0.5.0", true); err != nil {
+		t.Fatal("mod.AddRequire:", err)
+	}
+	mod.Save()
+
+	mod, err = Load(dir)
+	if err != nil {
+		t.Fatal("Load:", err)
+	}
+	if err = mod.SaveWithGopMod(&env.Gop{Version: "v1.2.0 devel", Root: "/foo/bar/gop"}, 0); err != nil {
+		t.Fatal("mod.SaveWithGopMod:", err)
+	}
+	if b, err := mod.File.Format(); err != nil {
+		t.Fatal("Format:", err)
+	} else if v := string(b); v != `module github.com/foo/bar
+
+go 1.18
+
+require (
+	github.com/goplus/yap v0.5.0 //gop:class
+	github.com/goplus/gop v1.2.0
+)
+` {
+		t.Fatal("SaveWithGopMod:", v)
+	}
+	b, err := os.ReadFile(mod.workFile())
+	if err != nil {
+		t.Fatal("read workFile:", err)
+	}
+	if v := string(b); v != `go 1.18
+
+replace github.com/goplus/gop v1.2.0 => /foo/bar/gop
+` {
+		t.Fatal("workFile:", v)
+	}
+	mod.Opt.Projects = append(mod.Opt.Projects, spxProject)
+	mod.Save()
+	b, err = os.ReadFile(mod.Opt.Syntax.Name)
+	if err != nil {
+		t.Fatal("read gop.mod:", err)
+	}
+	if v := string(b); v != `gop 1.2
+` {
+		t.Fatal("gop.mod:", v)
+	}
+}
+
+var (
+	spxProject = &modfile.Project{
+		Ext:      ".spx",
+		Class:    "Game",
+		Works:    []*modfile.Class{{Ext: ".spx", Class: "Sprite"}},
+		PkgPaths: []string{"github.com/goplus/spx", "math"},
+	}
+)
