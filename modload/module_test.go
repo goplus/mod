@@ -139,6 +139,9 @@ func TestSaveDefault(t *testing.T) {
 	if v := Default.workFile(); v != "" {
 		t.Fatal("Default.workFile:", v)
 	}
+	if v := Default.sumFile(); v != "" {
+		t.Fatal("Default.sumFile:", v)
+	}
 	if err := Default.Save(); err != ErrSaveDefault {
 		t.Fatal("Default.Save:", err)
 	}
@@ -215,13 +218,17 @@ require (
 ` {
 		t.Fatal("SaveWithGopMod:", v)
 	}
-	if _, ok := getXVer(&env.Gop{Root: "/foo/bar"}); ok {
+	if _, _, ok := getXVer(&env.Gop{Root: "/foo/bar"}); ok {
 		t.Fatal("getXVer: ok?")
 	}
 
 	// SaveWithGopMod again. noop.
 	if err = mod.SaveWithGopMod(&env.Gop{Version: "v1.2.0 devel", Root: ".gop"}, FlagDepModGop|FlagDepModX); err != nil {
 		log.Fatal("mod.SaveWithGopMod 3:", err)
+	}
+
+	if err = mod.SaveWithGopMod(&env.Gop{Version: "v1.2.0 devel", Root: ".gop"}, FlagDepModX); err != nil {
+		log.Fatal("mod.SaveWithGopMod 4:", err)
 	}
 
 	mod.Opt.Projects = append(mod.Opt.Projects, spxProject)
