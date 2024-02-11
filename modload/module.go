@@ -25,6 +25,7 @@ import (
 	"github.com/goplus/mod"
 	"github.com/goplus/mod/env"
 	"github.com/goplus/mod/modfile"
+	"github.com/goplus/mod/sumfile"
 	"github.com/qiniu/x/errors"
 	"golang.org/x/mod/module"
 
@@ -59,6 +60,14 @@ func (p Module) workFile() string {
 	if syn := p.Syntax; syn != nil {
 		dir, _ := filepath.Split(syn.Name)
 		return dir + "go.work"
+	}
+	return ""
+}
+
+func (p Module) sumFile() string {
+	if syn := p.Syntax; syn != nil {
+		dir, _ := filepath.Split(syn.Name)
+		return dir + "go.sum"
 	}
 	return ""
 }
@@ -343,6 +352,9 @@ func (p Module) SaveWithGopMod(gop *env.Gop, flags int) (err error) {
 			return
 		}
 	}
+	if (flags & FlagDepModGop) == 0 {
+		return
+	}
 
 	var work *gomodfile.WorkFile
 	var workFile = p.workFile()
@@ -372,17 +384,23 @@ func (p Module) requireGop(gop *env.Gop, gopVer string, old, flags int) {
 		p.File.AddRequire(gopMod, gopVer)
 	}
 	if (flags&FlagDepModX) != 0 && (old&FlagDepModX) == 0 { // depends module github.com/qiniu/x
-		if x, ok := getXVer(gop); ok {
+		if x, xsum, ok := getXVer(gop); ok {
 			p.File.AddRequire(x.Path, x.Version)
+			if sumf, err := sumfile.Load(p.sumFile()); err == nil && sumf.Lookup(xMod) == nil {
+				sumf.Add(xsum)
+				sumf.Save()
+			}
 		}
 	}
 }
 
-func getXVer(gop *env.Gop) (modVer module.Version, ok bool) {
+func getXVer(gop *env.Gop) (modVer module.Version, xsum []string, ok bool) {
 	if mod, err := LoadFrom(gop.Root+"/go.mod", ""); err == nil {
 		for _, r := range mod.File.Require {
 			if r.Mod.Path == xMod {
-				return r.Mod, true
+				if sumf, err := sumfile.Load(gop.Root + "/go.sum"); err == nil {
+					return r.Mod, sumf.Lookup(xMod), true
+				}
 			}
 		}
 	}

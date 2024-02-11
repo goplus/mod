@@ -215,7 +215,7 @@ require (
 ` {
 		t.Fatal("SaveWithGopMod:", v)
 	}
-	if _, ok := getXVer(&env.Gop{Root: "/foo/bar"}); ok {
+	if _, _, ok := getXVer(&env.Gop{Root: "/foo/bar"}); ok {
 		t.Fatal("getXVer: ok?")
 	}
 
