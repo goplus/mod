@@ -74,14 +74,6 @@ func TestPkgType(t *testing.T) {
 	}
 }
 
-func TestLoadFrom(t *testing.T) {
-	modVer := module.Version{Path: "github.com/goplus/yap", Version: "v0.5.0"}
-	_, err := loadModBy(modVer)
-	if err != nil {
-		t.Fatal("loadModBy:", err)
-	}
-}
-
 func loadModBy(mod module.Version) (p *Module, err error) {
 	dir, err := modcache.Path(mod)
 	if err != nil {
@@ -118,6 +110,11 @@ func TestClassfile(t *testing.T) {
 	modVer = module.Version{Path: "github.com/unknown-repo/x", Version: "v0.5.0"}
 	if _, err = LoadMod(modVer); !IsNotFound(err) {
 		log.Fatal("LoadMod github.com/unknown-repo/x:", err)
+	}
+
+	modVer = module.Version{Path: "github.com/goplus/yap", Version: "v0.5.0"}
+	if _, err = loadModBy(modVer); err != nil {
+		t.Fatal("loadModBy:", err)
 	}
 }
 
