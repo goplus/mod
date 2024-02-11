@@ -23,6 +23,10 @@ import (
 	"syscall"
 )
 
+var (
+	ErrNotFound = syscall.ENOENT
+)
+
 // -----------------------------------------------------------------------------
 
 func FindGoMod(dirFrom string) (dir, file string, err error) {
@@ -41,7 +45,7 @@ func FindGoMod(dirFrom string) (dir, file string, err error) {
 			break
 		}
 	}
-	err = syscall.ENOENT
+	err = ErrNotFound
 	return
 }
 

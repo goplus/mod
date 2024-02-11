@@ -22,7 +22,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
-	"syscall"
 
 	"github.com/goplus/mod/modcache"
 	"github.com/goplus/mod/modfetch"
@@ -173,7 +172,7 @@ func LoadFrom(gomod, gopmod string) (*Module, error) {
 // If we only want to load a Go modfile, pass env parameter as nil.
 func LoadMod(mod module.Version) (p *Module, err error) {
 	p, err = loadModFrom(mod)
-	if errors.Err(err) != syscall.ENOENT {
+	if !IsNotFound(err) {
 		return
 	}
 	mod, err = modfetch.Get(mod.String())

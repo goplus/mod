@@ -27,8 +27,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"syscall"
 
+	xmod "github.com/goplus/mod"
 	"github.com/goplus/mod/modcache"
 	"golang.org/x/mod/module"
 	"golang.org/x/mod/semver"
@@ -172,7 +172,7 @@ func Get(modPath string, noCache ...bool) (mod module.Version, err error) {
 	}
 	if noCache == nil || !noCache[0] {
 		mod, err = getFromCache(modPath)
-		if err != syscall.ENOENT {
+		if err != xmod.ErrNotFound {
 			return
 		}
 	}
@@ -190,7 +190,7 @@ func Get(modPath string, noCache ...bool) (mod module.Version, err error) {
 	cmd.Run()
 	if stderr.Len() > 0 {
 		mod, err = getResult(stderr.String())
-		if err != syscall.ENOENT {
+		if err != xmod.ErrNotFound {
 			if debugVerbose {
 				log.Println("modfetch.Get ret:", err)
 			}
@@ -212,7 +212,7 @@ func getResult(data string) (mod module.Version, err error) {
 		}
 		return getMod(data[len(downloading):], nil)
 	}
-	err = syscall.ENOENT
+	err = xmod.ErrNotFound
 	return
 }
 
@@ -227,7 +227,7 @@ func getMod(data string, next *string) (mod module.Version, err error) {
 			return
 		}
 	}
-	err = syscall.ENOENT
+	err = xmod.ErrNotFound
 	return
 }
 
@@ -252,7 +252,7 @@ func lookupFromCache(modPath string) (modRoot string, mod module.Version, err er
 	if pos > 0 { // has version
 		fi, e := os.Stat(modRoot)
 		if e != nil || !fi.IsDir() {
-			err = syscall.ENOENT
+			err = xmod.ErrNotFound
 		}
 		return
 	}
@@ -262,7 +262,7 @@ func lookupFromCache(modPath string) (modRoot string, mod module.Version, err er
 		err = errors.Unwrap(err)
 		return
 	}
-	err = syscall.ENOENT
+	err = xmod.ErrNotFound
 	for _, fi := range fis {
 		if fi.IsDir() {
 			if name := fi.Name(); strings.HasPrefix(name, fname) {
