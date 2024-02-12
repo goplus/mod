@@ -18,6 +18,7 @@ package gopmod
 
 import (
 	"log"
+	"os"
 	"path/filepath"
 	"runtime"
 	"testing"
@@ -28,6 +29,29 @@ import (
 	"github.com/qiniu/x/errors"
 	"golang.org/x/mod/module"
 )
+
+func TestPkgId(t *testing.T) {
+	mod := New(modtest.GopClass(t))
+	if id, err := mod.PkgId(""); err != ErrInvalidPkgPath || id != "" {
+		t.Fatal("mod.PkgId:", id, err)
+	}
+	if id, err := mod.PkgId("."); err != ErrInvalidPkgPath || id != "" {
+		t.Fatal("mod.PkgId:", id, err)
+	}
+	if id, err := mod.PkgId("fmt"); err != nil || id != "fmt" {
+		t.Fatal("mod.PkgId fmt:", id, err)
+	}
+	if id, err := mod.PkgId("github.com/goplus/community/bar"); err != nil || id != string(os.PathSeparator)+"foo/bar" {
+		t.Fatal("mod.PkgId github.com/goplus/community/bar:", id, err)
+	}
+	xpath, _ := modcache.Path(module.Version{Path: "github.com/qiniu/x", Version: "v1.13.2"})
+	if id, err := mod.PkgId("github.com/qiniu/x/mockhttp"); err != nil || id != xpath+"/mockhttp" {
+		t.Fatal("mod.PkgId github.com/qiniu/x/mockhttp:", err)
+	}
+	if _, err := mod.PkgId("github.com/qiniu/y/mockhttp"); err == nil {
+		t.Fatal("mod.PkgId github.com/qiniu/y/mockhttp: no error?")
+	}
+}
 
 func TestLookup(t *testing.T) {
 	mod := New(modtest.GopClass(t))
