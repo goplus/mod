@@ -30,6 +30,10 @@ import (
 	"golang.org/x/mod/module"
 )
 
+var (
+	ErrInvalidPkgPath = errors.New("invalid package path")
+)
+
 // -----------------------------------------------------------------------------
 
 type Module struct {
@@ -84,6 +88,32 @@ func (p *Module) PkgType(pkgPath string) PkgType {
 	return PkgtStandard
 }
 
+// PkgId returns an unique package id of specified package.
+func (p *Module) PkgId(pkgPath string) (string, error) {
+	if pkgPath == "" {
+		return "", ErrInvalidPkgPath
+	}
+	modPath := p.Path()
+	if isPkgInMod(pkgPath, modPath) {
+		return p.Root() + pkgPath[len(modPath):], nil
+	}
+	if pkgPath[0] == '.' { // local package: please convert it first
+		return "", ErrInvalidPkgPath
+	}
+	domain := pkgPath
+	if pos := strings.Index(pkgPath, "/"); pos > 0 {
+		domain = pkgPath[:pos]
+	}
+	if strings.Contains(domain, ".") {
+		pkg, err := p.lookupExternPkg(pkgPath)
+		if err != nil {
+			return "", err
+		}
+		return pkg.Dir, nil
+	}
+	return pkgPath, nil
+}
+
 func isPkgInMod(pkgPath, modPath string) bool {
 	if modPath != "" && strings.HasPrefix(pkgPath, modPath) {
 		suffix := pkgPath[len(modPath):]
@@ -103,7 +133,7 @@ type Package struct {
 func (p *Module) Lookup(pkgPath string) (pkg *Package, err error) {
 	switch pt := p.PkgType(pkgPath); pt {
 	case PkgtStandard:
-		modDir := runtime.GOROOT() + "/src"
+		modDir := goroot + "/src"
 		pkg = &Package{Type: PkgtStandard, ModDir: modDir, Dir: filepath.Join(modDir, pkgPath)}
 	case PkgtModule:
 		modPath := p.Path()
@@ -203,5 +233,7 @@ func (e *MissingError) Error() string {
 
 // Default represents the default gop.mod object.
 var Default = New(modload.Default)
+
+var goroot = runtime.GOROOT()
 
 // -----------------------------------------------------------------------------

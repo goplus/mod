@@ -29,6 +29,28 @@ import (
 	"golang.org/x/mod/module"
 )
 
+func TestPkgId(t *testing.T) {
+	mod := New(modtest.GopClass(t))
+	if id, err := mod.PkgId(""); err != ErrInvalidPkgPath || id != "" {
+		t.Fatal("mod.PkgId:", id, err)
+	}
+	if id, err := mod.PkgId("."); err != ErrInvalidPkgPath || id != "" {
+		t.Fatal("mod.PkgId:", id, err)
+	}
+	if id, err := mod.PkgId("fmt"); err != nil || id != "fmt" {
+		t.Fatal("mod.PkgId fmt:", id, err)
+	}
+	if id, err := mod.PkgId("github.com/goplus/community/bar"); err != nil || id != "/foo/bar" {
+		t.Fatal("mod.PkgId github.com/goplus/community/bar:", id, err)
+	}
+	if _, err := mod.PkgId("github.com/qiniu/x/mockhttp"); err != nil {
+		t.Fatal("mod.PkgId github.com/qiniu/x/mockhttp:", err)
+	}
+	if _, err := mod.PkgId("github.com/qiniu/y/mockhttp"); err == nil {
+		t.Fatal("mod.PkgId github.com/qiniu/y/mockhttp: no error?")
+	}
+}
+
 func TestLookup(t *testing.T) {
 	mod := New(modtest.GopClass(t))
 	if modv, ok := mod.LookupDepMod("github.com/qiniu/x"); !ok || modv.Version != "v1.13.2" {
