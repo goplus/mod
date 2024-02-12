@@ -18,6 +18,7 @@ package gopmod
 
 import (
 	"log"
+	"os"
 	"path/filepath"
 	"runtime"
 	"testing"
@@ -40,10 +41,11 @@ func TestPkgId(t *testing.T) {
 	if id, err := mod.PkgId("fmt"); err != nil || id != "fmt" {
 		t.Fatal("mod.PkgId fmt:", id, err)
 	}
-	if id, err := mod.PkgId("github.com/goplus/community/bar"); err != nil || id != "/foo/bar" {
+	if id, err := mod.PkgId("github.com/goplus/community/bar"); err != nil || id != string(os.PathSeparator)+"foo/bar" {
 		t.Fatal("mod.PkgId github.com/goplus/community/bar:", id, err)
 	}
-	if _, err := mod.PkgId("github.com/qiniu/x/mockhttp"); err != nil {
+	xpath, _ := modcache.Path(module.Version{Path: "github.com/qiniu/x", Version: "v1.13.2"})
+	if id, err := mod.PkgId("github.com/qiniu/x/mockhttp"); err != nil || id != xpath+"/mockhttp" {
 		t.Fatal("mod.PkgId github.com/qiniu/x/mockhttp:", err)
 	}
 	if _, err := mod.PkgId("github.com/qiniu/y/mockhttp"); err == nil {

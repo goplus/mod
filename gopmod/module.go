@@ -89,6 +89,8 @@ func (p *Module) PkgType(pkgPath string) PkgType {
 }
 
 // PkgId returns an unique package id of specified package.
+// PkgId of a Go standard package is its package path.
+// ie. PkgId("fmt") == "fmt"
 func (p *Module) PkgId(pkgPath string) (string, error) {
 	if pkgPath == "" {
 		return "", ErrInvalidPkgPath
