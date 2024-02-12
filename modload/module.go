@@ -345,20 +345,20 @@ const (
 // SaveWithGopMod adds `require github.com/goplus/gop` and saves all
 // changes of this module.
 func (p Module) SaveWithGopMod(gop *env.Gop, flags int) (err error) {
-	gopVer := getGopVer(gop)
-	if old := p.checkGopDeps(); old != flags {
-		if p.Path() == gopMod { // don't change Go+ itself
-			return
-		}
-		p.requireGop(gop, gopVer, old, flags)
-		if err = p.Save(); err != nil {
-			return
-		}
+	if p.Path() == gopMod { // don't change Go+ itself
+		return
 	}
-	if (flags & FlagDepModGop) == 0 {
+	old := p.checkGopDeps()
+	if (flags &^ old) == 0 { // nothing to do
 		return
 	}
 
+	gopVer := getGopVer(gop)
+	p.requireGop(gop, gopVer, old, flags)
+	return p.Save()
+}
+
+func (p Module) updateWorkfile(gop *env.Gop, gopVer string) (err error) {
 	var work *gomodfile.WorkFile
 	var workFile = p.workFile()
 	b, err := os.ReadFile(workFile)
@@ -386,6 +386,7 @@ func (p Module) SaveWithGopMod(gop *env.Gop, flags int) (err error) {
 func (p Module) requireGop(gop *env.Gop, gopVer string, old, flags int) {
 	if (flags&FlagDepModGop) != 0 && (old&FlagDepModGop) == 0 {
 		p.File.AddRequire(gopMod, gopVer)
+		p.updateWorkfile(gop, gopVer)
 	}
 	if (flags&FlagDepModX) != 0 && (old&FlagDepModX) == 0 { // depends module github.com/qiniu/x
 		if x, xsum, ok := getXVer(gop); ok {
