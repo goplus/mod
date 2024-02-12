@@ -248,8 +248,8 @@ require (
 		log.Fatal("mod.SaveWithGopMod 3:", err)
 	}
 
-	if err = mod.SaveWithGopMod(&env.Gop{Version: "v1.2.0 devel", Root: ".gop"}, FlagDepModX); err != nil {
-		log.Fatal("mod.SaveWithGopMod 4:", err)
+	if err = mod.updateWorkfile(&env.Gop{Version: "v1.2.0 devel", Root: ".gop"}, ""); err != nil {
+		log.Fatal("updateWorkfile:", err)
 	}
 
 	mod.Opt.Projects = append(mod.Opt.Projects, spxProject)
