@@ -33,14 +33,19 @@ var (
 	SpxProject = &Project{
 		Ext:      ".spx",
 		Class:    "Game",
-		Works:    []*modfile.Class{{Ext: ".spx", Class: "Sprite"}},
 		PkgPaths: []string{"github.com/goplus/spx", "math"},
+		Works:    []*modfile.Class{{Ext: ".spx", Class: "Sprite"}},
+	}
+	GshProject = &Project{
+		Ext:      ".gsh",
+		Class:    "App",
+		PkgPaths: []string{"github.com/qiniu/x/gsh", "math"},
 	}
 	TestProject = &Project{
 		Ext:      "_test.gox",
 		Class:    "App",
-		Works:    []*modfile.Class{{Ext: "_test.gox", Class: "Case"}},
 		PkgPaths: []string{"github.com/goplus/gop/test", "testing"},
+		Works:    []*modfile.Class{{Ext: "_test.gox", Class: "Case"}},
 	}
 )
 
