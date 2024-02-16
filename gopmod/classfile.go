@@ -93,6 +93,7 @@ func (p *Module) ImportClasses(importClass ...func(c *Project)) (err error) {
 	}
 	p.projs = make(map[string]*Project)
 	p.importClass(TestProject, impcls)
+	p.importClass(GshProject, impcls)
 	p.importClass(SpxProject, impcls)
 	p.projs[".gmx"] = SpxProject // old style
 	opt := p.Opt
