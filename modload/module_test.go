@@ -23,11 +23,25 @@ import (
 	"runtime"
 	"testing"
 
+	"github.com/goplus/mod"
 	"github.com/goplus/mod/env"
 	"github.com/goplus/mod/modfile"
+	"github.com/qiniu/x/errors"
 	gomodfile "golang.org/x/mod/modfile"
 	"golang.org/x/mod/module"
 )
+
+func TestCheckGopDeps(t *testing.T) {
+	mod := Default
+	file := *mod.File
+	mod.File = &file
+	mod.File.Module = &gomodfile.Module{Mod: module.Version{
+		Path: "github.com/qiniu/x",
+	}}
+	if mod.checkGopDeps() != FlagDepModX {
+		t.Fatal("checkGopDeps")
+	}
+}
 
 func TestEmpty(t *testing.T) {
 	mod := &Module{File: new(gomodfile.File), Opt: new(modfile.File)}
@@ -48,6 +62,12 @@ func TestEmpty(t *testing.T) {
 	}
 	if v := len(mod.Opt.ClassMods); v != 0 {
 		t.Fatal("len(mod.Opt.ClassMods):", v)
+	}
+}
+
+func TestLoad(t *testing.T) {
+	if _, e := Load("/path/not-found"); errors.Err(e) != mod.ErrNotFound {
+		t.Fatal("TestLoad:", e)
 	}
 }
 
