@@ -312,6 +312,12 @@ func (p Module) Save() (err error) {
 }
 
 func (p Module) checkGopDeps() (flags int) {
+	switch p.Path() {
+	case gopMod:
+		return FlagDepModGop | FlagDepModX
+	case xMod:
+		return FlagDepModX
+	}
 	for _, r := range p.File.Require {
 		switch r.Mod.Path {
 		case gopMod:
@@ -345,9 +351,6 @@ const (
 // SaveWithGopMod adds `require github.com/goplus/gop` and saves all
 // changes of this module.
 func (p Module) SaveWithGopMod(gop *env.Gop, flags int) (err error) {
-	if p.Path() == gopMod { // don't change Go+ itself
-		return
-	}
 	old := p.checkGopDeps()
 	if (flags &^ old) == 0 { // nothing to do
 		return

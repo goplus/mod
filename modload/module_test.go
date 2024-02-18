@@ -29,6 +29,18 @@ import (
 	"golang.org/x/mod/module"
 )
 
+func TestCheckGopDeps(t *testing.T) {
+	mod := Default
+	file := *mod.File
+	mod.File = &file
+	mod.File.Module = &gomodfile.Module{Mod: module.Version{
+		Path: "github.com/qiniu/x",
+	}}
+	if mod.checkGopDeps() != FlagDepModX {
+		t.Fatal("checkGopDeps")
+	}
+}
+
 func TestEmpty(t *testing.T) {
 	mod := &Module{File: new(gomodfile.File), Opt: new(modfile.File)}
 	if mod.HasModfile() {
