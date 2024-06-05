@@ -1,6 +1,6 @@
 module github.com/goplus/mod
 
-go 1.16
+go 1.18
 
 require (
 	github.com/qiniu/x v1.13.8
