@@ -31,7 +31,8 @@ import (
 type File struct {
 	Gop       *Gop
 	Projects  []*Project
-	ClassMods []string // calc by require statements in go.mod (not gop.mod).
+	ClassMods []string // calc by require statements in go.mod (not gop.mod)
+	LLGoVer   string   // llgo version in go.mod (not gop.mod)
 
 	Syntax *FileSyntax
 }
