@@ -71,6 +71,33 @@ func TestLoad(t *testing.T) {
 	}
 }
 
+func TestCreateWithGoCompiler(t *testing.T) {
+	mod, err := Create("/foo/bar", "github.com/foo/bar", "1.20", defaultGopVer)
+	if err != nil {
+		t.Fatal("Create failed:", err)
+	}
+	mod.AddCompiler("llgo", "0.9")
+	if b, err := mod.File.Format(); err != nil {
+		t.Fatal("AddCompiler & Format:", err)
+	} else if v := string(b); v != `module github.com/foo/bar
+
+go 1.20 // llgo 0.9
+` {
+		t.Fatal("AddCompiler:", v)
+	}
+
+	mod.File.DropGoStmt()
+	mod.AddCompiler("tinygo", "0.32")
+	if b, err := mod.File.Format(); err != nil {
+		t.Fatal("AddCompiler & Format:", err)
+	} else if v := string(b); v != `module github.com/foo/bar
+
+go 1.18 // tinygo 0.32
+` {
+		t.Fatal("AddCompiler:", v)
+	}
+}
+
 func TestCreate(t *testing.T) {
 	mod, err := Create("/foo/bar", "github.com/foo/bar", defaultGoVer, defaultGopVer)
 	if err != nil {
