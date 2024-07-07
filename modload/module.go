@@ -232,6 +232,7 @@ func LoadFromEx(gomod, gopmod string, readFile func(string) ([]byte, error)) (p 
 	return Module{f, opt}, nil
 }
 
+// AddCompiler adds a custom Go compiler to this module.
 func (p Module) AddCompiler(compiler, ver string) {
 	f := p.File
 	if f.Go == nil {
@@ -251,6 +252,7 @@ func addCompiler(opt *modfile.File, r *gomodfile.Go, compiler, ver string) {
 	}
 }
 
+// AddRequire adds a require package to this module.
 func (p Module) AddRequire(path, vers string, hasProj bool) error {
 	f := p.File
 	f.AddRequire(path, vers)
