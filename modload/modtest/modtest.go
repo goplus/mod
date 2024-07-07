@@ -76,15 +76,28 @@ require (
 	return mod
 }
 
-func LLGoVer(t *testing.T) modload.Module {
+func LLGoCompiler(t *testing.T) modload.Module {
 	const gomodText = `
 module github.com/goplus/llgo
 
 go 1.18 // llgo 0.9
 `
 	mod := Load(t, gomodText, ``, ``)
-	if ver := mod.Opt.LLGoVer; ver != "0.9" {
-		t.Fatal("mod.Opt.LLGoVer:", ver)
+	if cl := mod.Opt.Compiler; cl == nil || cl.Name != "llgo" || cl.Version != "0.9" {
+		t.Fatal("mod.Opt.Compiler:", cl)
+	}
+	return mod
+}
+
+func TinyGoCompiler(t *testing.T) modload.Module {
+	const gomodText = `
+module github.com/tinygo-org/tinygo
+
+go 1.18 // tinygo 0.32
+`
+	mod := Load(t, gomodText, ``, ``)
+	if cl := mod.Opt.Compiler; cl == nil || cl.Name != "tinygo" || cl.Version != "0.32" {
+		t.Fatal("mod.Opt.Compiler:", cl)
 	}
 	return mod
 }

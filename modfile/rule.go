@@ -27,12 +27,17 @@ import (
 	"golang.org/x/mod/modfile"
 )
 
+type Compiler struct {
+	Name    string
+	Version string
+}
+
 // A File is the parsed, interpreted form of a gop.mod file.
 type File struct {
 	Gop       *Gop
+	Compiler  *Compiler // the underlying go compiler in go.mod (not gop.mod)
 	Projects  []*Project
 	ClassMods []string // calc by require statements in go.mod (not gop.mod)
-	LLGoVer   string   // llgo version in go.mod (not gop.mod)
 
 	Syntax *FileSyntax
 }
