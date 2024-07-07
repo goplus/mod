@@ -76,6 +76,19 @@ require (
 	return mod
 }
 
+func LLGoVer(t *testing.T) modload.Module {
+	const gomodText = `
+module github.com/goplus/llgo
+
+go 1.18 // llgo 0.9
+`
+	mod := Load(t, gomodText, ``, ``)
+	if ver := mod.Opt.LLGoVer; ver != "0.9" {
+		t.Fatal("mod.Opt.LLGoVer:", ver)
+	}
+	return mod
+}
+
 func Import(t *testing.T) modload.Module {
 	const gomodText = `
 module github.com/goplus/yap

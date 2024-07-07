@@ -226,6 +226,9 @@ func LoadFromEx(gomod, gopmod string, readFile func(string) ([]byte, error)) (p 
 		opt = newGopMod(gopmod, defaultGopVer)
 	}
 	importClassfileFromGoMod(opt, f)
+	if ver := getLLGoVersion(f); ver != "" {
+		opt.LLGoVer = ver
+	}
 	return Module{f, opt}, nil
 }
 
@@ -273,6 +276,25 @@ func isClass(r *gomodfile.Require) bool {
 		}
 	}
 	return false
+}
+
+/*
+* go.mod:
+
+go 1.18 // llgo 0.9
+*/
+func getLLGoVersion(f *gomodfile.File) string {
+	if gostmt := f.Go; gostmt != nil {
+		if line := gostmt.Syntax; line != nil {
+			for _, c := range line.Suffix {
+				text := strings.TrimLeft(c.Token[2:], " \t")
+				if strings.HasPrefix(text, "llgo ") {
+					return strings.TrimSpace(text[5:])
+				}
+			}
+		}
+	}
+	return ""
 }
 
 // -----------------------------------------------------------------------------
