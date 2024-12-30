@@ -73,6 +73,7 @@ gop 1.1
 project .gmx Game github.com/goplus/spx math
 class .spx Sprite
 class .spx2 *Sprite2
+class .spx3 Sprite GameBase
 
 require (
 	github.com/ajstarks/svgo v0.0.0-20210927141636-6d70534b1098
@@ -84,7 +85,7 @@ func TestGoModCompat1(t *testing.T) {
 		gopmod = gopmodSpx1
 	)
 	f, err := modfile.ParseLax("go.mod", []byte(gopmod), nil)
-	if err != nil || len(f.Syntax.Stmt) != 7 {
+	if err != nil || len(f.Syntax.Stmt) != 8 {
 		t.Fatal("modfile.ParseLax failed:", f, err)
 	}
 
@@ -93,7 +94,7 @@ func TestGoModCompat1(t *testing.T) {
 		t.Fatal("modfile.ParseLax gop:", gop)
 	}
 
-	require := f.Syntax.Stmt[6].(*modfile.LineBlock)
+	require := f.Syntax.Stmt[7].(*modfile.LineBlock)
 	if len(require.Token) != 1 || require.Token[0] != "require" {
 		t.Fatal("modfile.ParseLax require:", require)
 	}
@@ -134,8 +135,8 @@ func TestParse1(t *testing.T) {
 		t.Errorf("project path expected be math, but %s got", f.proj().PkgPaths[1])
 	}
 
-	if len(f.proj().Works) != 2 {
-		t.Errorf("project workclass length expected be 2, but %d got", len(f.proj().Works))
+	if len(f.proj().Works) != 3 {
+		t.Errorf("project workclass length expected be 3, but %d got", len(f.proj().Works))
 	}
 	if f.proj().Works[0].Ext != ".spx" {
 		t.Errorf("project class[0] exts expected be .spx, but %s got", f.proj().Works[0].Ext)
@@ -148,6 +149,9 @@ func TestParse1(t *testing.T) {
 	}
 	if f.proj().Works[1].Class != "*Sprite2" {
 		t.Errorf("project class[1] class expected be Sprite, but %s got", f.proj().Works[1].Class)
+	}
+	if f.proj().Works[2].Project != "GameBase" {
+		t.Errorf("project class[2] projclass expected be GameBase, but %s got", f.proj().Works[2].Project)
 	}
 }
 
@@ -292,7 +296,7 @@ project "\?"
 	doTestParseErr(t, `gop.mod:2: work class must declare after a project definition`, `
 class .spx Sprite
 `)
-	doTestParseErr(t, `gop.mod:3: usage: class .workExt WorkClass`, `
+	doTestParseErr(t, `gop.mod:3: usage: class .workExt WorkClass [ProjClass]`, `
 project github.com/goplus/spx math
 class .spx
 `)
@@ -307,6 +311,10 @@ class .spx S"prite
 	doTestParseErr(t, `gop.mod:3: ext ."spx invalid: unquoted string cannot contain quote`, `
 project github.com/goplus/spx math
 class ."spx Sprite
+`)
+	doTestParseErr(t, `gop.mod:3: symbol .abc invalid: invalid Go export symbol format`, `
+project github.com/goplus/spx math
+class .spx Sprite .abc
 `)
 	doTestParseErr(t, `gop.mod:3: symbol sprite invalid: invalid Go export symbol format`, `
 project github.com/goplus/spx math
