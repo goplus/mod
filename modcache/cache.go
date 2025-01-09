@@ -17,10 +17,7 @@
 package modcache
 
 import (
-	"bytes"
 	"errors"
-	"log"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -32,18 +29,6 @@ import (
 var (
 	GOMODCACHE = getGOMODCACHE()
 )
-
-func getGOMODCACHE() string {
-	var buf bytes.Buffer
-	var stderr bytes.Buffer
-	cmd := exec.Command("go", "env", "GOMODCACHE")
-	cmd.Stdout = &buf
-	cmd.Stderr = &stderr
-	if err := cmd.Run(); err != nil {
-		log.Panicln("GOMODCACHE not found:", err)
-	}
-	return strings.TrimRight(buf.String(), "\n")
-}
 
 // -----------------------------------------------------------------------------
 
