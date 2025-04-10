@@ -59,10 +59,10 @@ type Gop = modfile.Go
 
 // A Class is the work class statement.
 type Class struct {
-	Ext     string // can be "_[class].gox" or ".[class]", eg. "_yap.gox" or ".spx"
-	Class   string // "Sprite"
-	Project string // maybe empty
-	Syntax  *Line
+	Ext    string // can be "_[class].gox" or ".[class]", eg. "_yap.gox" or ".spx"
+	Class  string // "Sprite"
+	Proto  string // prototype of the worker class (optional)
+	Syntax *Line
 }
 
 // A Import is the import statement.
@@ -255,19 +255,19 @@ func (f *File) parseVerb(errs *ErrorList, verb string, line *Line, args []string
 			wrapError(err)
 			return
 		}
-		projClass := ""
+		protoClass := ""
 		if len(args) > 2 {
-			projClass, err = parseSymbol(&args[2])
+			protoClass, err = parseSymbol(&args[2])
 			if err != nil {
 				wrapError(err)
 				return
 			}
 		}
 		proj.Works = append(proj.Works, &Class{
-			Ext:     workExt,
-			Class:   class,
-			Project: projClass,
-			Syntax:  line,
+			Ext:    workExt,
+			Class:  class,
+			Proto:  protoClass,
+			Syntax: line,
 		})
 	case "import":
 		proj := f.proj()
