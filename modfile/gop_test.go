@@ -73,7 +73,7 @@ gop 1.1
 project .gmx Game github.com/goplus/spx math
 class .spx Sprite
 class .spx2 *Sprite2
-class .spx3 Sprite GameBase
+class .spx3 Sprite SpriteProto
 
 require (
 	github.com/ajstarks/svgo v0.0.0-20210927141636-6d70534b1098
@@ -150,8 +150,8 @@ func TestParse1(t *testing.T) {
 	if f.proj().Works[1].Class != "*Sprite2" {
 		t.Errorf("project class[1] class expected be Sprite, but %s got", f.proj().Works[1].Class)
 	}
-	if f.proj().Works[2].Project != "GameBase" {
-		t.Errorf("project class[2] projclass expected be GameBase, but %s got", f.proj().Works[2].Project)
+	if f.proj().Works[2].Proto != "SpriteProto" {
+		t.Errorf("project class[2] protoClass expected be SpriteProto, but %s got", f.proj().Works[2].Proto)
 	}
 }
 
