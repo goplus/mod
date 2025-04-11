@@ -61,7 +61,7 @@ type Gop = modfile.Go
 type Class struct {
 	Ext    string // can be "_[class].gox" or ".[class]", eg. "_yap.gox" or ".spx"
 	Class  string // "Sprite"
-	Proto  string // prototype of the worker class (optional)
+	Proto  string // prototype of the work class (not empty if multiple work classes)
 	Syntax *Line
 }
 
