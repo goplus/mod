@@ -269,10 +269,10 @@ gop 1.1 1.2
 	doTestParseErr(t, `gop.mod:2: invalid gop version '1.x': must match format 1.23`, `
 gop 1.x
 `)
-	doTestParseErr(t, `gop.mod:2: usage: project [.projExt ProjClass] classFilePkgPath ...`, `
+	doTestParseErr(t, `gop.mod:2: usage: project [*.projExt ProjClass] classFilePkgPath ...`, `
 project
 `)
-	doTestParseErr(t, `gop.mod:2: usage: project [.projExt ProjClass] classFilePkgPath ...`, `
+	doTestParseErr(t, `gop.mod:2: usage: project [*.projExt ProjClass] classFilePkgPath ...`, `
 project .gmx Game
 `)
 	doTestParseErr(t, `gop.mod:2: ext ." invalid: unquoted string cannot contain quote`, `

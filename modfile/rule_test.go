@@ -26,25 +26,57 @@ var addParseExtTests = []struct {
 	desc    string
 	ext     string
 	want    string
+	wantF   string
 	wantErr string
+	isProj  bool
 }{
 	{
 		"spx ok",
 		".spx",
 		".spx",
+		".spx",
 		"",
+		false,
 	},
 	{
 		"yap ok",
 		"_yap.gox",
 		"_yap.gox",
+		"_yap.gox",
 		"",
+		false,
+	},
+	{
+		"yap ok",
+		"*_yap.gox",
+		"_yap.gox",
+		"*_yap.gox",
+		"",
+		false,
+	},
+	{
+		"yap ok",
+		"main_yap.gox",
+		"_yap.gox",
+		"main_yap.gox",
+		"",
+		true,
+	},
+	{
+		"yap ok",
+		"main_yap.gox",
+		"",
+		"",
+		"ext main_yap.gox invalid: invalid ext format",
+		false,
 	},
 	{
 		"not a ext",
 		"gmx",
 		"",
+		"",
 		"ext gmx invalid: invalid ext format",
+		false,
 	},
 }
 
@@ -57,14 +89,14 @@ func TestParseExt(t *testing.T) {
 	}
 	for _, tt := range addParseExtTests {
 		t.Run(tt.desc, func(t *testing.T) {
-			ext, err := parseExt(&tt.ext)
+			ext, extF, err := parseExt(&tt.ext, tt.isProj)
 			if err != nil {
 				if err.Error() != tt.wantErr {
 					t.Fatalf("wanterr: %s, but got: %s", tt.wantErr, err)
 				}
 			}
-			if ext != tt.want {
-				t.Fatalf("want: %s, but got: %s", tt.want, ext)
+			if ext != tt.want || extF != tt.wantF {
+				t.Fatalf("want: %s %s, but got: %s %s", tt.want, tt.wantF, ext, extF)
 			}
 		})
 	}

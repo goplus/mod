@@ -59,10 +59,12 @@ type Gop = modfile.Go
 
 // A Class is the work class statement.
 type Class struct {
-	Ext    string // can be "_[class].gox" or ".[class]", eg. "_yap.gox" or ".spx"
-	Class  string // "Sprite"
-	Proto  string // prototype of the work class (not empty if multiple work classes)
-	Syntax *Line
+	Ext      string // can be "_[class].gox" or ".[class]", eg. "_yap.gox" or ".spx"
+	FullExt  string // can be "*_[class].gox", "_[class].gox", "*.[class]" or ".[class]"
+	Class    string // "Sprite"
+	Proto    string // prototype of the work class (not empty if multiple work classes)
+	Embedded bool   // if true, the class instance will be embedded in the project
+	Syntax   *Line
 }
 
 // A Import is the import statement.
@@ -75,6 +77,7 @@ type Import struct {
 // A Project is the project statement.
 type Project struct {
 	Ext      string    // can be "_[class].gox" or ".[class]", eg. "_yap.gox" or ".gmx"
+	FullExt  string    // can be "main_[class].gox", "*_[class].gox", "_[class].gox", "main.[class]", "*.[class]" or ".[class]"
 	Class    string    // "Game"
 	Works    []*Class  // work class of classfile
 	PkgPaths []string  // package paths of classfile and optional inline-imported packages.
@@ -199,15 +202,15 @@ func (f *File) parseVerb(errs *ErrorList, verb string, line *Line, args []string
 		f.Gop.Version = args[0]
 	case "project":
 		if len(args) < 1 {
-			errorf("usage: project [.projExt ProjClass] classFilePkgPath ...")
+			errorf("usage: project [*.projExt ProjClass] classFilePkgPath ...")
 			return
 		}
-		if isExt(args[0]) {
+		if isExt(args[0], true) {
 			if len(args) < 3 || strings.Contains(args[1], "/") {
-				errorf("usage: project [.projExt ProjClass] classFilePkgPath ...")
+				errorf("usage: project [*.projExt ProjClass] classFilePkgPath ...")
 				return
 			}
-			ext, err := parseExt(&args[0])
+			ext, fullExt, err := parseExt(&args[0], true)
 			if err != nil {
 				wrapError(err)
 				return
@@ -223,7 +226,7 @@ func (f *File) parseVerb(errs *ErrorList, verb string, line *Line, args []string
 				return
 			}
 			f.addProj(&Project{
-				Ext: ext, Class: class, PkgPaths: pkgPaths, Syntax: line,
+				Ext: ext, FullExt: fullExt, Class: class, PkgPaths: pkgPaths, Syntax: line,
 			})
 			return
 		}
@@ -245,7 +248,7 @@ func (f *File) parseVerb(errs *ErrorList, verb string, line *Line, args []string
 			errorf("usage: class .workExt WorkClass [ProjClass]")
 			return
 		}
-		workExt, err := parseExt(&args[0])
+		workExt, fullExt, err := parseExt(&args[0], false)
 		if err != nil {
 			wrapError(err)
 			return
@@ -264,10 +267,11 @@ func (f *File) parseVerb(errs *ErrorList, verb string, line *Line, args []string
 			}
 		}
 		proj.Works = append(proj.Works, &Class{
-			Ext:    workExt,
-			Class:  class,
-			Proto:  protoClass,
-			Syntax: line,
+			Ext:     workExt,
+			FullExt: fullExt,
+			Class:   class,
+			Proto:   protoClass,
+			Syntax:  line,
 		})
 	case "import":
 		proj := f.proj()
@@ -329,7 +333,7 @@ func AutoQuote(s string) string {
 }
 
 var (
-	symbolRE = regexp.MustCompile("\\*?[A-Z]\\w*")
+	symbolRE = regexp.MustCompile(`\*?[A-Z]\w*`)
 )
 
 // TODO: to be optimized
