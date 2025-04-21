@@ -71,7 +71,7 @@ go 1.17
 gop 1.1
 
 project .gmx Game github.com/goplus/spx math
-class .spx Sprite
+class -embed .spx Sprite
 class .spx2 *Sprite2
 class .spx3 Sprite SpriteProto
 
@@ -137,6 +137,9 @@ func TestParse1(t *testing.T) {
 
 	if len(f.proj().Works) != 3 {
 		t.Errorf("project workclass length expected be 3, but %d got", len(f.proj().Works))
+	}
+	if !f.proj().Works[0].Embedded {
+		t.Error("project class[0].Embedded expected be true")
 	}
 	if f.proj().Works[0].Ext != ".spx" {
 		t.Errorf("project class[0] exts expected be .spx, but %s got", f.proj().Works[0].Ext)
@@ -269,10 +272,10 @@ gop 1.1 1.2
 	doTestParseErr(t, `gop.mod:2: invalid gop version '1.x': must match format 1.23`, `
 gop 1.x
 `)
-	doTestParseErr(t, `gop.mod:2: usage: project [*.projExt ProjClass] classFilePkgPath ...`, `
+	doTestParseErr(t, `gop.mod:2: usage: project [*.projExt ProjectClass] classFilePkgPath ...`, `
 project
 `)
-	doTestParseErr(t, `gop.mod:2: usage: project [*.projExt ProjClass] classFilePkgPath ...`, `
+	doTestParseErr(t, `gop.mod:2: usage: project [*.projExt ProjectClass] classFilePkgPath ...`, `
 project .gmx Game
 `)
 	doTestParseErr(t, `gop.mod:2: ext ." invalid: unquoted string cannot contain quote`, `
@@ -296,7 +299,7 @@ project "\?"
 	doTestParseErr(t, `gop.mod:2: work class must declare after a project definition`, `
 class .spx Sprite
 `)
-	doTestParseErr(t, `gop.mod:3: usage: class .workExt WorkClass [ProjClass]`, `
+	doTestParseErr(t, `gop.mod:3: usage: class [-embed] *.workExt WorkClass [WorkPrototype]`, `
 project github.com/goplus/spx math
 class .spx
 `)

@@ -202,12 +202,12 @@ func (f *File) parseVerb(errs *ErrorList, verb string, line *Line, args []string
 		f.Gop.Version = args[0]
 	case "project":
 		if len(args) < 1 {
-			errorf("usage: project [*.projExt ProjClass] classFilePkgPath ...")
+			errorf("usage: project [*.projExt ProjectClass] classFilePkgPath ...")
 			return
 		}
 		if isExt(args[0], true) {
 			if len(args) < 3 || strings.Contains(args[1], "/") {
-				errorf("usage: project [*.projExt ProjClass] classFilePkgPath ...")
+				errorf("usage: project [*.projExt ProjectClass] classFilePkgPath ...")
 				return
 			}
 			ext, fullExt, err := parseExt(&args[0], true)
@@ -244,8 +244,13 @@ func (f *File) parseVerb(errs *ErrorList, verb string, line *Line, args []string
 			errorf("work class must declare after a project definition")
 			return
 		}
+		embedded := false
+		if len(args) > 0 && args[0] == "-embed" {
+			args = args[1:]
+			embedded = true
+		}
 		if len(args) < 2 {
-			errorf("usage: class .workExt WorkClass [ProjClass]")
+			errorf("usage: class [-embed] *.workExt WorkClass [WorkPrototype]")
 			return
 		}
 		workExt, fullExt, err := parseExt(&args[0], false)
@@ -267,11 +272,12 @@ func (f *File) parseVerb(errs *ErrorList, verb string, line *Line, args []string
 			}
 		}
 		proj.Works = append(proj.Works, &Class{
-			Ext:     workExt,
-			FullExt: fullExt,
-			Class:   class,
-			Proto:   protoClass,
-			Syntax:  line,
+			Ext:      workExt,
+			FullExt:  fullExt,
+			Class:    class,
+			Proto:    protoClass,
+			Embedded: embedded,
+			Syntax:   line,
 		})
 	case "import":
 		proj := f.proj()
@@ -336,7 +342,7 @@ var (
 	symbolRE = regexp.MustCompile(`\*?[A-Z]\w*`)
 )
 
-// TODO: to be optimized
+// TODO(xsw): to be optimized
 func parseSymbol(s *string) (t string, err error) {
 	t, err = parseString(s)
 	if err != nil {
