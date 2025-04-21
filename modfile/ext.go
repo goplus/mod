@@ -24,22 +24,34 @@ import (
 	"github.com/qiniu/x/errors"
 )
 
-// can be "_[class].gox" or ".[class]"
-func isExt(s string) bool {
-	return len(s) > 1 && (s[0] == '_' || s[0] == '.')
+// can be "_[class].gox", "*_[class].gox", ".[class]" or "*.[class]"
+// can be "main_[class].gox", "main.[class]" if isProj is true
+func isExt(s string, isProj bool) bool {
+	return len(s) > 1 && (s[0] == '*' || s[0] == '_' || s[0] == '.') ||
+		isProj && len(s) > 4 && s[:4] == "main" && (s[4] == '_' || s[4] == '.')
 }
 
-func parseExt(s *string) (t string, err error) {
-	t, err = parseString(s)
+func getExt(s string) string {
+	if len(s) > 1 && s[0] == '*' {
+		return s[1:]
+	}
+	if len(s) > 4 && s[:4] == "main" {
+		return s[4:]
+	}
+	return s
+}
+
+func parseExt(s *string, isProj bool) (ext, fullExt string, err error) {
+	t, err := parseString(s)
 	if err != nil {
 		goto failed
 	}
-	if isExt(t) {
-		return
+	if isExt(t, isProj) {
+		return getExt(t), t, nil
 	}
 	err = errors.New("invalid ext format")
 failed:
-	return "", &InvalidExtError{
+	return "", "", &InvalidExtError{
 		Ext: *s,
 		Err: err,
 	}
