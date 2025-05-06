@@ -63,6 +63,7 @@ type Class struct {
 	FullExt  string // can be "*_[class].gox", "_[class].gox", "*.[class]" or ".[class]"
 	Class    string // "Sprite"
 	Proto    string // prototype of the work class (not empty if multiple work classes)
+	Prefix   string // prefix of the work class
 	Embedded bool   // if true, the class instance will be embedded in the project
 	Syntax   *Line
 }
@@ -244,13 +245,23 @@ func (f *File) parseVerb(errs *ErrorList, verb string, line *Line, args []string
 			errorf("work class must declare after a project definition")
 			return
 		}
+		prefix := ""
 		embedded := false
-		if len(args) > 0 && args[0] == "-embed" {
+		for len(args) > 0 && strings.HasPrefix(args[0], "-") {
+			sw := args[0][1:]
+			if sw == "embed" {
+				embedded = true
+			} else if strings.HasPrefix(sw, "prefix=") {
+				prefix = sw[7:]
+			} else {
+				errorf(`unknown flag: -%s
+usage: class [-embed -prefix=Prefix] *.workExt WorkClass [WorkPrototype]`, sw)
+				return
+			}
 			args = args[1:]
-			embedded = true
 		}
 		if len(args) < 2 {
-			errorf("usage: class [-embed] *.workExt WorkClass [WorkPrototype]")
+			errorf("usage: class [-embed -prefix=Prefix] *.workExt WorkClass [WorkPrototype]")
 			return
 		}
 		workExt, fullExt, err := parseExt(&args[0], false)
@@ -276,6 +287,7 @@ func (f *File) parseVerb(errs *ErrorList, verb string, line *Line, args []string
 			FullExt:  fullExt,
 			Class:    class,
 			Proto:    protoClass,
+			Prefix:   prefix,
 			Embedded: embedded,
 			Syntax:   line,
 		})

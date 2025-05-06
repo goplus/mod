@@ -71,7 +71,7 @@ go 1.17
 gop 1.1
 
 project .gmx Game github.com/goplus/spx math
-class -embed .spx Sprite
+class -prefix=T -embed .spx Sprite
 class .spx2 *Sprite2
 class .spx3 Sprite SpriteProto
 
@@ -140,6 +140,9 @@ func TestParse1(t *testing.T) {
 	}
 	if !f.proj().Works[0].Embedded {
 		t.Error("project class[0].Embedded expected be true")
+	}
+	if f.proj().Works[0].Prefix != "T" {
+		t.Error("project class[0].Prefix expected be T")
 	}
 	if f.proj().Works[0].Ext != ".spx" {
 		t.Errorf("project class[0] exts expected be .spx, but %s got", f.proj().Works[0].Ext)
@@ -299,9 +302,14 @@ project "\?"
 	doTestParseErr(t, `gop.mod:2: work class must declare after a project definition`, `
 class .spx Sprite
 `)
-	doTestParseErr(t, `gop.mod:3: usage: class [-embed] *.workExt WorkClass [WorkPrototype]`, `
+	doTestParseErr(t, `gop.mod:3: usage: class [-embed -prefix=Prefix] *.workExt WorkClass [WorkPrototype]`, `
 project github.com/goplus/spx math
 class .spx
+`)
+	doTestParseErr(t, `gop.mod:3: unknown flag: -a
+usage: class [-embed -prefix=Prefix] *.workExt WorkClass [WorkPrototype]`, `
+project github.com/goplus/spx math
+class -a .spx
 `)
 	doTestParseErr(t, `gop.mod:3: ext . invalid: invalid ext format`, `
 project github.com/goplus/spx math
