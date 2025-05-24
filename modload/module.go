@@ -216,7 +216,7 @@ func LoadFromEx(gomod, goxmod string, readFile func(string) ([]byte, error)) (p 
 	if goxmod != "" {
 		data, err = readFile(goxmod)
 		if err != nil {
-			const goxmodSuffix = "gox.mod" // fall back to gop.mod
+			const goxmodSuffix = "gox.mod" // fallback to gop.mod
 			if strings.HasSuffix(goxmod, goxmodSuffix) {
 				goxmod = goxmod[:len(goxmod)-len(goxmodSuffix)] + "gop.mod"
 				data, err = readFile(goxmod)
@@ -369,17 +369,17 @@ func (p Module) Save() (err error) {
 	return
 }
 
-func (p Module) checkGopDeps() (flags int) {
+func (p Module) checkXgoDeps() (flags int) {
 	switch p.Path() {
-	case gopMod:
-		return FlagDepModGop | FlagDepModX
+	case xgoMod:
+		return FlagDepModXGo | FlagDepModX
 	case xMod:
 		return FlagDepModX
 	}
 	for _, r := range p.File.Require {
 		switch r.Mod.Path {
-		case gopMod:
-			flags |= FlagDepModGop
+		case xgoMod:
+			flags |= FlagDepModXGo
 		case xMod:
 			flags |= FlagDepModX
 		}
@@ -389,7 +389,7 @@ func (p Module) checkGopDeps() (flags int) {
 
 func findReplaceGopMod(work *gomodfile.WorkFile) bool {
 	for _, r := range work.Replace {
-		if r.Old.Path == gopMod {
+		if r.Old.Path == xgoMod {
 			return true
 		}
 	}
@@ -397,29 +397,29 @@ func findReplaceGopMod(work *gomodfile.WorkFile) bool {
 }
 
 const (
-	gopMod = "github.com/goplus/gop"
+	xgoMod = "github.com/goplus/gop"
 	xMod   = "github.com/qiniu/x"
 )
 
 const (
-	FlagDepModGop = 1 << iota // depends module github.com/goplus/gop
+	FlagDepModXGo = 1 << iota // depends module github.com/goplus/gop
 	FlagDepModX               // depends module github.com/qiniu/x
 )
 
-// SaveWithGopMod adds `require github.com/goplus/gop` and saves all
+// SaveWithXGoMod adds `require github.com/goplus/gop` and saves all
 // changes of this module.
-func (p Module) SaveWithGopMod(gop *env.Gop, flags int) (err error) {
-	old := p.checkGopDeps()
+func (p Module) SaveWithXGoMod(xgo *env.XGo, flags int) (err error) {
+	old := p.checkXgoDeps()
 	if (flags &^ old) == 0 { // nothing to do
 		return
 	}
 
-	gopVer := getGopVer(gop)
-	p.requireGop(gop, gopVer, old, flags)
+	xgoVer := getXgoVer(xgo)
+	p.requireXgo(xgo, xgoVer, old, flags)
 	return p.Save()
 }
 
-func (p Module) updateWorkfile(gop *env.Gop, gopVer string) (err error) {
+func (p Module) updateWorkfile(xgo *env.XGo, xgoVer string) (err error) {
 	var work *gomodfile.WorkFile
 	var workFile = p.workFile()
 	b, err := os.ReadFile(workFile)
@@ -439,18 +439,18 @@ func (p Module) updateWorkfile(gop *env.Gop, gopVer string) (err error) {
 		return
 	}
 	work.AddUse(".", p.Path())
-	work.AddReplace(gopMod, gopVer, gop.Root, "")
+	work.AddReplace(xgoMod, xgoVer, xgo.Root, "")
 	return os.WriteFile(workFile, gomodfile.Format(work.Syntax), 0666)
 }
 
-// requireGop adds require for the github.com/goplus/gop module.
-func (p Module) requireGop(gop *env.Gop, gopVer string, old, flags int) {
-	if (flags&FlagDepModGop) != 0 && (old&FlagDepModGop) == 0 {
-		p.File.AddRequire(gopMod, gopVer)
-		p.updateWorkfile(gop, gopVer)
+// requireXgo adds require for the github.com/goplus/gop module.
+func (p Module) requireXgo(xgo *env.XGo, xgoVer string, old, flags int) {
+	if (flags&FlagDepModXGo) != 0 && (old&FlagDepModXGo) == 0 {
+		p.File.AddRequire(xgoMod, xgoVer)
+		p.updateWorkfile(xgo, xgoVer)
 	}
 	if (flags&FlagDepModX) != 0 && (old&FlagDepModX) == 0 { // depends module github.com/qiniu/x
-		if x, xsum, ok := getXVer(gop); ok {
+		if x, xsum, ok := getXVer(xgo); ok {
 			p.File.AddRequire(x.Path, x.Version)
 			if sumf, err := sumfile.Load(p.sumFile()); err == nil && sumf.Lookup(xMod) == nil {
 				sumf.Add(xsum)
@@ -460,11 +460,11 @@ func (p Module) requireGop(gop *env.Gop, gopVer string, old, flags int) {
 	}
 }
 
-func getXVer(gop *env.Gop) (modVer module.Version, xsum []string, ok bool) {
-	if mod, err := LoadFrom(gop.Root+"/go.mod", ""); err == nil {
+func getXVer(xgo *env.XGo) (modVer module.Version, xsum []string, ok bool) {
+	if mod, err := LoadFrom(xgo.Root+"/go.mod", ""); err == nil {
 		for _, r := range mod.File.Require {
 			if r.Mod.Path == xMod {
-				if sumf, err := sumfile.Load(gop.Root + "/go.sum"); err == nil {
+				if sumf, err := sumfile.Load(xgo.Root + "/go.sum"); err == nil {
 					return r.Mod, sumf.Lookup(xMod), true
 				}
 			}
@@ -473,7 +473,7 @@ func getXVer(gop *env.Gop) (modVer module.Version, xsum []string, ok bool) {
 	return
 }
 
-func getGopVer(gop *env.Gop) string {
+func getXgoVer(gop *env.XGo) string {
 	ver := gop.Version
 	if pos := strings.IndexByte(ver, ' '); pos > 0 { // v1.2.0 devel
 		ver = ver[:pos]

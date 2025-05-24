@@ -16,8 +16,8 @@
 
 package env
 
-type Gop struct {
+type XGo struct {
 	Version   string
 	BuildDate string
-	Root      string // GOPROOT
+	Root      string // XGOROOT
 }
