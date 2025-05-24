@@ -66,9 +66,4 @@ func GOXMOD(dirFrom string) (file string, err error) {
 	return filepath.Join(dir, "gop.mod"), nil
 }
 
-// Deprecated: use GOXMOD instead
-func GOPMOD(dirFrom string) (file string, err error) {
-	return GOXMOD(dirFrom)
-}
-
 // -----------------------------------------------------------------------------

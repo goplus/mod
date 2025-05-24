@@ -180,12 +180,12 @@ func Load(dir string) (p Module, err error) {
 	return LoadFrom(gomod, filepath.Join(dir, "gox.mod"))
 }
 
-// LoadFrom loads a module from specified go.mod file and an optional gop.mod file.
+// LoadFrom loads a module from specified go.mod file and an optional gox.mod file.
 func LoadFrom(gomod, goxmod string) (p Module, err error) {
 	return LoadFromEx(gomod, goxmod, os.ReadFile)
 }
 
-// LoadFromEx loads a module from specified go.mod file and an optional gop.mod file.
+// LoadFromEx loads a module from specified go.mod file and an optional gox.mod file.
 // It can specify a customized `readFile` to read file content.
 func LoadFromEx(gomod, goxmod string, readFile func(string) ([]byte, error)) (p Module, err error) {
 	data, err := readFile(gomod)
@@ -488,7 +488,7 @@ const (
 	defaultXgoVer = "1.5"
 )
 
-// Default represents the default gop.mod object.
+// Default represents the default gox.mod object.
 var Default = Module{
 	File: &gomodfile.File{
 		Module: &gomodfile.Module{},
