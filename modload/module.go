@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021 The GoPlus Authors (goplus.org). All rights reserved.
+ * Copyright (c) 2021 The XGo Authors (xgo.dev). All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -117,7 +117,7 @@ func (p Module) DepMods() map[string]module.Version {
 
 // Create creates a new module in `dir`.
 // You should call `Save` manually to save this module.
-func Create(dir string, modPath, goVer, gopVer string) (p Module, err error) {
+func Create(dir string, modPath, goVer, xgoVer string) (p Module, err error) {
 	dir, err = filepath.Abs(dir)
 	if err != nil {
 		return
@@ -125,22 +125,22 @@ func Create(dir string, modPath, goVer, gopVer string) (p Module, err error) {
 
 	gomod := filepath.Join(dir, "go.mod")
 	if _, err := os.Stat(gomod); err == nil {
-		return Module{}, fmt.Errorf("gop: %s already exists", gomod)
+		return Module{}, fmt.Errorf("xgo: %s already exists", gomod)
 	}
 
-	gopmod := filepath.Join(dir, "gop.mod")
-	if _, err := os.Stat(gopmod); err == nil {
-		return Module{}, fmt.Errorf("gop: %s already exists", gopmod)
+	goxmod := filepath.Join(dir, "gox.mod")
+	if _, err := os.Stat(goxmod); err == nil {
+		return Module{}, fmt.Errorf("xgo: %s already exists", goxmod)
 	}
 
 	if goVer == "" {
 		goVer = defaultGoVer
 	}
-	if gopVer == "" {
-		gopVer = defaultGopVer
+	if xgoVer == "" {
+		xgoVer = defaultXgoVer
 	}
 	mod := newGoMod(gomod, modPath, goVer)
-	opt := newGopMod(gopmod, gopVer)
+	opt := newGoxMod(goxmod, xgoVer)
 	return Module{mod, opt}, nil
 }
 
@@ -152,8 +152,8 @@ func newGoMod(gomod, modPath, goVer string) *gomodfile.File {
 	return mod
 }
 
-func newGopMod(gopmod, gopVer string) *modfile.File {
-	return modfile.New(gopmod, gopVer)
+func newGoxMod(goxmod, xgoVer string) *modfile.File {
+	return modfile.New(goxmod, xgoVer)
 }
 
 // fixVersion returns a modfile.VersionFixer implemented using the Query function.
@@ -177,17 +177,17 @@ func Load(dir string) (p Module, err error) {
 		err = errors.NewWith(err, `mod.FindGoMod(dir)`, -2, "mod.FindGoMod", dir)
 		return
 	}
-	return LoadFrom(gomod, filepath.Join(dir, "gop.mod"))
+	return LoadFrom(gomod, filepath.Join(dir, "gox.mod"))
 }
 
 // LoadFrom loads a module from specified go.mod file and an optional gop.mod file.
-func LoadFrom(gomod, gopmod string) (p Module, err error) {
-	return LoadFromEx(gomod, gopmod, os.ReadFile)
+func LoadFrom(gomod, goxmod string) (p Module, err error) {
+	return LoadFromEx(gomod, goxmod, os.ReadFile)
 }
 
 // LoadFromEx loads a module from specified go.mod file and an optional gop.mod file.
 // It can specify a customized `readFile` to read file content.
-func LoadFromEx(gomod, gopmod string, readFile func(string) ([]byte, error)) (p Module, err error) {
+func LoadFromEx(gomod, goxmod string, readFile func(string) ([]byte, error)) (p Module, err error) {
 	data, err := readFile(gomod)
 	if err != nil {
 		err = errors.NewWith(err, `readFile(gomod)`, -2, "readFile", gomod)
@@ -213,17 +213,25 @@ func LoadFromEx(gomod, gopmod string, readFile func(string) ([]byte, error)) (p 
 	}
 
 	var opt *modfile.File
-	if gopmod != "" {
-		if data, err = readFile(gopmod); err == nil {
-			opt, err = modfile.ParseLax(gopmod, data, fix)
+	if goxmod != "" {
+		data, err = readFile(goxmod)
+		if err != nil {
+			const goxmodSuffix = "gox.mod" // fall back to gop.mod
+			if strings.HasSuffix(goxmod, goxmodSuffix) {
+				goxmod = goxmod[:len(goxmod)-len(goxmodSuffix)] + "gop.mod"
+				data, err = readFile(goxmod)
+			}
+		}
+		if err == nil {
+			opt, err = modfile.ParseLax(goxmod, data, fix)
 			if err != nil {
-				err = errors.NewWith(err, `modfile.Parse(gopmod, data, fix)`, -2, "modfile.Parse", gopmod, data, fix)
+				err = errors.NewWith(err, `modfile.Parse(goxmod, data, fix)`, -2, "modfile.Parse", goxmod, data, fix)
 				return
 			}
 		}
 	}
 	if opt == nil {
-		opt = newGopMod(gopmod, defaultGopVer)
+		opt = newGoxMod(goxmod, defaultXgoVer)
 	}
 	importClassfileFromGoMod(opt, f)
 	if cl := getGoCompiler(f); cl != nil {
@@ -280,7 +288,7 @@ func importClassfileFromGoMod(opt *modfile.File, f *gomodfile.File) {
 func addClass(opt *modfile.File, r *gomodfile.Require) {
 	if line := r.Syntax; line != nil {
 		line.Suffix = append(line.Suffix, modfile.Comment{
-			Token:  "//gop:class", // without trailing newline
+			Token:  "//xgo:class", // without trailing newline
 			Suffix: true,          // an end of line (not whole line) comment
 		})
 		opt.ClassMods = append(opt.ClassMods, r.Mod.Path)
@@ -291,7 +299,7 @@ func isClass(r *gomodfile.Require) bool {
 	if line := r.Syntax; line != nil {
 		for _, c := range line.Suffix {
 			text := strings.TrimLeft(c.Token[2:], " \t")
-			if strings.HasPrefix(text, "gop:class") {
+			if strings.HasPrefix(text, "xgo:class") || strings.HasPrefix(text, "gop:class") {
 				return true
 			}
 		}
@@ -477,7 +485,7 @@ func getGopVer(gop *env.Gop) string {
 
 const (
 	defaultGoVer  = "1.18"
-	defaultGopVer = "1.2"
+	defaultXgoVer = "1.5"
 )
 
 // Default represents the default gop.mod object.
@@ -487,7 +495,7 @@ var Default = Module{
 		Go:     &gomodfile.Go{Version: defaultGoVer},
 	},
 	Opt: &modfile.File{
-		Gop: &modfile.Gop{Version: defaultGopVer},
+		XGo: &modfile.XGo{Version: defaultXgoVer},
 	},
 }
 

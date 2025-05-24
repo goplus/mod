@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021 The GoPlus Authors (goplus.org). All rights reserved.
+ * Copyright (c) 2021 The XGo Authors (xgo.dev). All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -191,11 +191,11 @@ func Load(dir string) (*Module, error) {
 	return New(mod), nil
 }
 
-// LoadFrom loads a module from specified go.mod file and an optional gop.mod file.
-func LoadFrom(gomod, gopmod string) (*Module, error) {
-	mod, err := modload.LoadFrom(gomod, gopmod)
+// LoadFrom loads a module from specified go.mod file and an optional gox.mod file.
+func LoadFrom(gomod, goxmod string) (*Module, error) {
+	mod, err := modload.LoadFrom(gomod, goxmod)
 	if err != nil {
-		return nil, errors.NewWith(err, `modload.LoadFrom(gomod, gopmod)`, -2, "modload.LoadFrom", gomod, gopmod)
+		return nil, errors.NewWith(err, `modload.LoadFrom(gomod, gopmod)`, -2, "modload.LoadFrom", gomod, goxmod)
 	}
 	return New(mod), nil
 }
@@ -228,12 +228,12 @@ type MissingError struct {
 
 func (e *MissingError) Error() string {
 	return fmt.Sprintf(`no required module provides package %v; to add it:
-	gop get %v`, e.Path, e.Path)
+	xgo get %v`, e.Path, e.Path)
 }
 
 // -----------------------------------------------------------------------------
 
-// Default represents the default gop.mod object.
+// Default represents the default gox.mod object.
 var Default = New(modload.Default)
 
 var goroot = runtime.GOROOT()

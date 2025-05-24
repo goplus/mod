@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021 The GoPlus Authors (goplus.org). All rights reserved.
+ * Copyright (c) 2021 The XGo Authors (xgo.dev). All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -111,7 +111,7 @@ func lookupListFromCache(pkgPath string, ver string) (modVer module.Version, rel
 			encPath, _ := module.EscapePath(modVer.Path)
 			modRoot := filepath.Join(modcache.GOMODCACHE, encPath+"@"+modVer.Version, filepath.Join(list[i:]...))
 			if _, e := os.Stat(modRoot); e != nil {
-				err = fmt.Errorf("gop: module %v found, but does not contain package %v", modVer.Path, pkgPath)
+				err = fmt.Errorf("xgo: module %v found, but does not contain package %v", modVer.Path, pkgPath)
 				return
 			}
 			relPath = strings.Join(list[i:], "/")
@@ -208,7 +208,7 @@ func getResult(data string) (mod module.Version, err error) {
 	const downloading = "go: downloading "
 	if strings.HasPrefix(data, downloading) {
 		if pos := strings.IndexByte(data, '\n'); pos > 0 {
-			fmt.Fprintln(os.Stderr, "gop:", data[4:pos])
+			fmt.Fprintln(os.Stderr, "xgo:", data[4:pos])
 		}
 		return getMod(data[len(downloading):], nil)
 	}

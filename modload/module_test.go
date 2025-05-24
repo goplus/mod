@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024 The GoPlus Authors (goplus.org). All rights reserved.
+ * Copyright (c) 2024 The XGo Authors (xgo.dev). All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -72,7 +72,7 @@ func TestLoad(t *testing.T) {
 }
 
 func TestCreateWithGoCompiler(t *testing.T) {
-	mod, err := Create("/foo/bar", "github.com/foo/bar", "1.20", defaultGopVer)
+	mod, err := Create("/foo/bar", "github.com/foo/bar", "1.20", defaultXgoVer)
 	if err != nil {
 		t.Fatal("Create failed:", err)
 	}
@@ -99,7 +99,7 @@ go 1.18 // tinygo 0.32
 }
 
 func TestCreate(t *testing.T) {
-	mod, err := Create("/foo/bar", "github.com/foo/bar", defaultGoVer, defaultGopVer)
+	mod, err := Create("/foo/bar", "github.com/foo/bar", defaultGoVer, defaultXgoVer)
 	if err != nil {
 		t.Fatal("Create failed:", err)
 	}
@@ -110,7 +110,7 @@ func TestCreate(t *testing.T) {
 
 go 1.18
 
-require github.com/goplus/yap v0.7.2 //gop:class
+require github.com/goplus/yap v0.7.2 //xgo:class
 ` {
 		t.Fatal("AddRequire:", v)
 	}
@@ -151,7 +151,7 @@ require github.com/goplus/yap v0.7.2 //gop:class
 go 1.18
 
 require (
-	github.com/goplus/yap v0.7.2 //gop:class
+	github.com/goplus/yap v0.7.2 //xgo:class
 	github.com/qiniu/x v0.1.0
 )
 ` {
@@ -166,7 +166,7 @@ require (
 go 1.18
 
 require (
-	github.com/goplus/yap v0.7.2 //gop:class
+	github.com/goplus/yap v0.7.2 //xgo:class
 	github.com/qiniu/x v0.1.0
 )
 
@@ -194,11 +194,11 @@ func TestSaveDefault(t *testing.T) {
 		t.Fatal("Default.Save:", err)
 	}
 
-	gop := Module{
+	xgo := Module{
 		File: &gomodfile.File{
 			Module: &gomodfile.Module{
 				Mod: module.Version{
-					Path: "github.com/goplus/gop",
+					Path: "github.com/goplus/xgo",
 				},
 			},
 			Go: &gomodfile.Go{Version: defaultGoVer},
@@ -207,15 +207,15 @@ func TestSaveDefault(t *testing.T) {
 			},
 		},
 		Opt: &modfile.File{
-			Gop: &modfile.Gop{Version: defaultGopVer},
+			XGo: &modfile.XGo{Version: defaultXgoVer},
 		},
 	}
-	gop.SaveWithGopMod(&env.Gop{Version: "v1.2.0 devel", Root: "/foo/bar/gop"}, FlagDepModGop)
+	xgo.SaveWithGopMod(&env.Gop{Version: "v1.2.0 devel", Root: "/foo/bar/gop"}, FlagDepModGop)
 }
 
 func TestSave(t *testing.T) {
-	dir := ".gop/_tempdir"
-	os.RemoveAll(".gop")
+	dir := ".xgo/_tempdir"
+	os.RemoveAll(".xgo")
 	os.MkdirAll(dir, 0777)
 	mod, err := Create(dir, "github.com/foo/bar", "", "")
 	if err != nil {
@@ -240,7 +240,7 @@ func TestSave(t *testing.T) {
 go 1.18
 
 require (
-	github.com/goplus/yap v0.5.0 //gop:class
+	github.com/goplus/yap v0.5.0 //xgo:class
 	github.com/goplus/gop v1.2.0
 )
 ` {
@@ -260,7 +260,7 @@ replace github.com/goplus/gop v1.2.0 => /foo/bar/gop
 	}
 
 	// SaveWithGopMod with FlagDepModX
-	os.WriteFile(".gop/go.mod", []byte(`
+	os.WriteFile(".xgo/go.mod", []byte(`
 module github.com/goplus/gop
 
 go 1.18
@@ -269,7 +269,7 @@ require (
 	github.com/qiniu/x v1.13.0
 )
 `), 0666)
-	if err = mod.SaveWithGopMod(&env.Gop{Version: "v1.2.0 devel", Root: ".gop"}, FlagDepModGop|FlagDepModX); err != nil {
+	if err = mod.SaveWithGopMod(&env.Gop{Version: "v1.2.0 devel", Root: ".xgo"}, FlagDepModGop|FlagDepModX); err != nil {
 		t.Fatal("mod.SaveWithGopMod 2:", err)
 	}
 	if b, err := mod.File.Format(); err != nil {
@@ -279,7 +279,7 @@ require (
 go 1.18
 
 require (
-	github.com/goplus/yap v0.5.0 //gop:class
+	github.com/goplus/yap v0.5.0 //xgo:class
 	github.com/goplus/gop v1.2.0
 	github.com/qiniu/x v1.13.0
 )
@@ -291,11 +291,11 @@ require (
 	}
 
 	// SaveWithGopMod again. noop.
-	if err = mod.SaveWithGopMod(&env.Gop{Version: "v1.2.0 devel", Root: ".gop"}, FlagDepModGop|FlagDepModX); err != nil {
+	if err = mod.SaveWithGopMod(&env.Gop{Version: "v1.2.0 devel", Root: ".xgo"}, FlagDepModGop|FlagDepModX); err != nil {
 		log.Fatal("mod.SaveWithGopMod 3:", err)
 	}
 
-	if err = mod.updateWorkfile(&env.Gop{Version: "v1.2.0 devel", Root: ".gop"}, ""); err != nil {
+	if err = mod.updateWorkfile(&env.Gop{Version: "v1.2.0 devel", Root: ".xgo"}, ""); err != nil {
 		log.Fatal("updateWorkfile:", err)
 	}
 
@@ -303,11 +303,11 @@ require (
 	mod.Save()
 	b, err = os.ReadFile(mod.Opt.Syntax.Name)
 	if err != nil {
-		t.Fatal("read gop.mod:", err)
+		t.Fatal("read gox.mod:", err)
 	}
-	if v := string(b); v != `gop 1.2
+	if v := string(b); v != `xgo 1.2
 ` {
-		t.Fatal("gop.mod:", v)
+		t.Fatal("gox.mod:", v)
 	}
 }
 

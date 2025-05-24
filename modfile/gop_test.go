@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021 The GoPlus Authors (goplus.org). All rights reserved.
+ * Copyright (c) 2021 The XGo Authors (xgo.dev). All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -52,19 +52,19 @@ func lookupClass(ext string) (c *Project, ok bool) {
 		return &Project{
 			Ext: ".gmx", Class: "*MyGame",
 			Works:    []*Class{{Ext: ".spx", Class: "Sprite"}},
-			PkgPaths: []string{"github.com/goplus/gop/cl/internal/spx", "math"}}, true
+			PkgPaths: []string{"github.com/goplus/xgo/cl/internal/spx", "math"}}, true
 	case "_spx.gox":
 		return &Project{
 			Ext: "_spx.gox", Class: "Game",
 			Works:    []*Class{{Ext: "_spx.gox", Class: "Sprite"}},
-			PkgPaths: []string{"github.com/goplus/gop/cl/internal/spx3", "math"}}, true
+			PkgPaths: []string{"github.com/goplus/xgo/cl/internal/spx3", "math"}}, true
 	}
 	return
 }
 
 // -----------------------------------------------------------------------------
 
-const gopmodSpx1 = `
+const goxmodSpx1 = `
 module spx
 
 go 1.17
@@ -82,7 +82,7 @@ require (
 
 func TestGoModCompat1(t *testing.T) {
 	const (
-		gopmod = gopmodSpx1
+		gopmod = goxmodSpx1
 	)
 	f, err := modfile.ParseLax("go.mod", []byte(gopmod), nil)
 	if err != nil || len(f.Syntax.Stmt) != 8 {
@@ -107,15 +107,15 @@ func TestGoModCompat1(t *testing.T) {
 
 func TestParse1(t *testing.T) {
 	const (
-		gopmod = gopmodSpx1
+		goxmod = goxmodSpx1
 	)
-	f, err := ParseLax("github.com/goplus/gop/gop.mod", []byte(gopmod), nil)
+	f, err := ParseLax("github.com/goplus/xgo/gox.mod", []byte(goxmod), nil)
 	if err != nil {
 		t.Error(err)
 		return
 	}
-	if f.Gop.Version != "1.1" {
-		t.Errorf("gop version expected be 1.1, but %s got", f.Gop.Version)
+	if f.XGo.Version != "1.1" {
+		t.Errorf("xgo version expected be 1.1, but %s got", f.XGo.Version)
 	}
 	if f.proj().Ext != ".gmx" {
 		t.Errorf("project exts expected be .gmx, but %s got", f.proj().Ext)
@@ -163,11 +163,11 @@ func TestParse1(t *testing.T) {
 
 // -----------------------------------------------------------------------------
 
-const gopmodSpx2 = `
+const goxmodSpx2 = `
 module spx
 
 go 1.17
-gop 1.1
+xgo 1.1
 
 project github.com/goplus/spx math
 class .spx Sprite
@@ -179,16 +179,16 @@ require (
 
 func TestGoModCompat2(t *testing.T) {
 	const (
-		gopmod = gopmodSpx2
+		gopmod = goxmodSpx2
 	)
 	f, err := modfile.ParseLax("go.mod", []byte(gopmod), nil)
 	if err != nil || len(f.Syntax.Stmt) != 6 {
 		t.Fatal("modfile.ParseLax failed:", f, err)
 	}
 
-	gop := f.Syntax.Stmt[2].(*modfile.Line)
-	if len(gop.Token) != 2 || gop.Token[0] != "gop" || gop.Token[1] != "1.1" {
-		t.Fatal("modfile.ParseLax gop:", gop)
+	xgo := f.Syntax.Stmt[2].(*modfile.Line)
+	if len(xgo.Token) != 2 || xgo.Token[0] != "xgo" || xgo.Token[1] != "1.1" {
+		t.Fatal("modfile.ParseLax xgo:", xgo)
 	}
 
 	require := f.Syntax.Stmt[5].(*modfile.LineBlock)
@@ -219,15 +219,15 @@ func TestGoModStd(t *testing.T) {
 
 func TestParse2(t *testing.T) {
 	const (
-		gopmod = gopmodSpx2
+		goxmod = goxmodSpx2
 	)
-	f, err := ParseLax("github.com/goplus/gop/gop.mod", []byte(gopmod), nil)
+	f, err := ParseLax("github.com/goplus/xgo/gox.mod", []byte(goxmod), nil)
 	if err != nil {
 		t.Error(err)
 		return
 	}
-	if f.Gop.Version != "1.1" {
-		t.Errorf("gop version expected be 1.1, but %s got", f.Gop.Version)
+	if f.XGo.Version != "1.1" {
+		t.Errorf("xgo version expected be 1.1, but %s got", f.XGo.Version)
 	}
 	if f.proj().Ext != "" {
 		t.Errorf("project exts expected be .gmx, but %s got", f.proj().Ext)
@@ -265,15 +265,15 @@ module foo
 	doTestParseErr(t, `gop.mod:2:9: unexpected newline in string`, `
 foo "foo
 `)
-	doTestParseErr(t, `gop.mod:3: repeated gop statement`, `
-gop 1.1
-gop 1.2
+	doTestParseErr(t, `gop.mod:3: repeated xgo statement`, `
+xgo 1.1
+xgo 1.2
 `)
-	doTestParseErr(t, `gop.mod:2: gop directive expects exactly one argument`, `
-gop 1.1 1.2
+	doTestParseErr(t, `gop.mod:2: xgo directive expects exactly one argument`, `
+xgo 1.1 1.2
 `)
-	doTestParseErr(t, `gop.mod:2: invalid gop version '1.x': must match format 1.23`, `
-gop 1.x
+	doTestParseErr(t, `gop.mod:2: invalid xgo version '1.x': must match format 1.23`, `
+xgo 1.x
 `)
 	doTestParseErr(t, `gop.mod:2: usage: project [*.projExt ProjectClass] classFilePkgPath ...`, `
 project
@@ -351,10 +351,10 @@ unknown .spx
 `)
 }
 
-func doTestParseErr(t *testing.T, errMsg string, gopmod string) {
+func doTestParseErr(t *testing.T, errMsg string, goxmod string) {
 	t.Helper()
 	// t.Run(errMsg, func(t *testing.T) {
-	_, err := Parse("gop.mod", []byte(gopmod), nil)
+	_, err := Parse("gop.mod", []byte(goxmod), nil)
 	if err == nil || err.Error() == "" {
 		t.Fatal("Parse: no error?")
 		return

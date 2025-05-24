@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021 The GoPlus Authors (goplus.org). All rights reserved.
+ * Copyright (c) 2021 The XGo Authors (xgo.dev). All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,12 +32,12 @@ type Compiler struct {
 	Version string
 }
 
-// A File is the parsed, interpreted form of a gop.mod file.
+// A File is the parsed, interpreted form of a gox.mod file.
 type File struct {
-	Gop       *Gop
-	Compiler  *Compiler // the underlying go compiler in go.mod (not gop.mod)
+	XGo       *XGo
+	Compiler  *Compiler // the underlying go compiler in go.mod (not gox.mod)
 	Projects  []*Project
-	ClassMods []string // calc by require statements in go.mod (not gop.mod)
+	ClassMods []string // calc by require statements in go.mod (not gox.mod)
 
 	Syntax *FileSyntax
 }
@@ -54,8 +54,8 @@ func (p *File) proj() *Project { // current project
 	return p.Projects[n-1]
 }
 
-// A Gop is the gop statement.
-type Gop = modfile.Go
+// A XGo is the xgo statement.
+type XGo = modfile.Go
 
 // A Class is the work class statement.
 type Class struct {
@@ -99,25 +99,25 @@ func (p *Project) IsProj(ext, fname string) bool {
 	return true
 }
 
-func New(gopmod, gopVer string) *File {
-	gop := &Line{
-		Token: []string{"gop", gopVer},
+func New(goxmod, xgoVer string) *File {
+	xgo := &Line{
+		Token: []string{"xgo", xgoVer},
 	}
 	return &File{
-		Gop: &Gop{
-			Version: gopVer,
-			Syntax:  gop,
+		XGo: &XGo{
+			Version: xgoVer,
+			Syntax:  xgo,
 		},
 		Syntax: &FileSyntax{
-			Name: gopmod,
-			Stmt: []Expr{gop},
+			Name: goxmod,
+			Stmt: []Expr{xgo},
 		},
 	}
 }
 
 type VersionFixer = modfile.VersionFixer
 
-// Parse parses and returns a gop.mod file.
+// Parse parses and returns a gox.mod file.
 //
 // file is the name of the file, used in positions and errors.
 //
@@ -131,11 +131,11 @@ func Parse(file string, data []byte, fix VersionFixer) (*File, error) {
 }
 
 // ParseLax is like Parse but ignores unknown statements.
-// It is used when parsing gop.mod files other than the main module,
+// It is used when parsing gox.mod files other than the main module,
 // under the theory that most statement types we add in the future will
 // only apply in the main module, like exclude and replace,
 // and so we get better gradual deployments if old go commands
-// simply ignore those statements when found in gop.mod files
+// simply ignore those statements when found in gox.mod files
 // in dependencies.
 func ParseLax(file string, data []byte, fix VersionFixer) (*File, error) {
 	return parseToFile(file, data, fix, false)
@@ -187,20 +187,20 @@ func (f *File) parseVerb(errs *ErrorList, verb string, line *Line, args []string
 		wrapError1(e)
 	}
 	switch verb {
-	case "gop":
-		if f.Gop != nil {
-			errorf("repeated gop statement")
+	case "xgo", "gop":
+		if f.XGo != nil {
+			errorf("repeated xgo statement")
 			return
 		}
 		if len(args) != 1 {
-			errorf("gop directive expects exactly one argument")
+			errorf("xgo directive expects exactly one argument")
 			return
 		} else if !modfile.GoVersionRE.MatchString(args[0]) {
-			errorf("invalid gop version '%s': must match format 1.23", args[0])
+			errorf("invalid xgo version '%s': must match format 1.23", args[0])
 			return
 		}
-		f.Gop = &Gop{Syntax: line}
-		f.Gop.Version = args[0]
+		f.XGo = &XGo{Syntax: line}
+		f.XGo.Version = args[0]
 	case "project":
 		if len(args) < 1 {
 			errorf("usage: project [*.projExt ProjectClass] classFilePkgPath ...")
@@ -339,12 +339,12 @@ func IsDirectoryPath(ns string) bool {
 }
 
 // MustQuote reports whether s must be quoted in order to appear as
-// a single token in a gop.mod line.
+// a single token in a gox.mod line.
 func MustQuote(s string) bool {
 	return modfile.MustQuote(s)
 }
 
-// AutoQuote returns s or, if quoting is required for s to appear in a gop.mod,
+// AutoQuote returns s or, if quoting is required for s to appear in a gox.mod,
 // the quotation of s.
 func AutoQuote(s string) string {
 	return modfile.AutoQuote(s)
