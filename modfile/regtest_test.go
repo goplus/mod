@@ -19,12 +19,12 @@ package modfile_test
 import (
 	"testing"
 
-	"github.com/goplus/mod/gopmod"
 	"github.com/goplus/mod/modload/modtest"
+	"github.com/goplus/mod/xgomod"
 )
 
 func TestGopMod(t *testing.T) {
-	mod := gopmod.Default
+	mod := xgomod.Default
 	if mod.HasModfile() {
 		t.Fatal("gopmod.Default HasModfile?")
 	}
@@ -37,7 +37,7 @@ func TestGopMod(t *testing.T) {
 	if path := mod.Root(); path != "" {
 		t.Fatal("gopmod.Default.Root?", path)
 	}
-	if pt := mod.PkgType("foo"); pt != gopmod.PkgtStandard {
+	if pt := mod.PkgType("foo"); pt != xgomod.PkgtStandard {
 		t.Fatal("PkgType foo:", pt)
 	}
 }
