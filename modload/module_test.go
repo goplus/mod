@@ -305,7 +305,7 @@ require (
 	if err != nil {
 		t.Fatal("read gox.mod:", err)
 	}
-	if v := string(b); v != `xgo 1.2
+	if v := string(b); v != `xgo 1.5
 ` {
 		t.Fatal("gox.mod:", v)
 	}
