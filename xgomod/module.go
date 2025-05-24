@@ -55,7 +55,7 @@ func (p *Module) DepMods() map[string]module.Version {
 type PkgType int
 
 const (
-	PkgtStandard PkgType = iota // a standard Go/Go+ package
+	PkgtStandard PkgType = iota // a standard Go/XGo package
 	PkgtModule                  // a package in this module (in standard form)
 	PkgtLocal                   // a package in this module (in relative path form)
 	PkgtExtern                  // an extarnal package
