@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024 The GoPlus Authors (goplus.org). All rights reserved.
+ * Copyright (c) 2024 The XGo Authors (xgo.dev). All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,8 +34,8 @@ func LoadFrom(gomod, gopmod string, gomodText, gopmodText string) (mod modload.M
 	})
 }
 
-func Load(t *testing.T, gomodText, gopmodText string, errMsg string) modload.Module {
-	mod, err := LoadFrom("/foo/go.mod", "/foo/gop.mod", gomodText, gopmodText)
+func Load(t *testing.T, gomodText, goxmodText string, errMsg string) modload.Module {
+	mod, err := LoadFrom("/foo/go.mod", "/foo/gox.mod", gomodText, goxmodText)
 	if err != nil {
 		if err.Error() != errMsg {
 			t.Fatal("LoadFrom:", err)
@@ -51,7 +51,7 @@ module github.com/goplus/community
 go 1.18
 
 require (
-	github.com/goplus/yap v0.5.0 //gop:class
+	github.com/goplus/yap v0.5.0 //xgo:class
 )
 `
 	return Load(t, gomodText, ``, ``)
@@ -64,9 +64,9 @@ module github.com/goplus/community
 go 1.18
 
 require (
-	github.com/goplus/yap v0.5.0 //gop:class
+	github.com/goplus/yap v0.5.0 //xgo:class
 	github.com/qiniu/a v0.1.0
-	github.com/qiniu/x v1.13.2 // gop:class
+	github.com/qiniu/x v1.13.2 // xgo:class
 )
 `
 	mod := Load(t, gomodText, ``, ``)
@@ -108,8 +108,8 @@ module github.com/goplus/yap
 
 go 1.18
 `
-	const gopmodText = `
-gop 1.2
+	const goxmodText = `
+xgo 1.2
 
 project _yap.gox App github.com/goplus/yap
 
@@ -118,7 +118,7 @@ class _ytest.gox Case
 import github.com/goplus/yap/ytest/auth/jwt
 import yauth github.com/goplus/yap/ytest/auth
 `
-	mod := Load(t, gomodText, gopmodText, ``)
+	mod := Load(t, gomodText, goxmodText, ``)
 	if n := len(mod.Opt.Projects); n != 2 {
 		t.Fatal("len(mod.Opt.Projects):", n)
 	}

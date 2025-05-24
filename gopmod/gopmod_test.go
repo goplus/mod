@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024 The GoPlus Authors (goplus.org). All rights reserved.
+ * Copyright (c) 2024 The XGo Authors (xgo.dev). All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -65,7 +65,7 @@ func TestLookup(t *testing.T) {
 		t.Fatal("mod.Lookup github.com/goplus/community/foo:", pkg.ModPath, pkg.ModDir, "err:", err)
 	}
 	if _, err := mod.Lookup("github.com/qiniu/y/mockhttp"); err == nil || err.Error() != `no required module provides package github.com/qiniu/y/mockhttp; to add it:
-	gop get github.com/qiniu/y/mockhttp` {
+	xgo get github.com/qiniu/y/mockhttp` {
 		t.Fatal("mod.Lookup github.com/qiniu/y/mockhttp:", err)
 	}
 	if pkg, err := mod.Lookup("github.com/qiniu/x/mockhttp"); err != nil || pkg.ModPath != "github.com/qiniu/x" {
@@ -112,7 +112,7 @@ func loadFromDir(dir string) (p *Module, err error) {
 		err = errors.NewWith(err, `mod.FindGoMod(dir)`, -2, "mod.FindGoMod", dir)
 		return
 	}
-	return LoadFrom(gomod, filepath.Join(dir, "gop.mod"))
+	return LoadFrom(gomod, filepath.Join(dir, "gox.mod"))
 }
 
 func TestClassfile(t *testing.T) {

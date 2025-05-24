@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021 The GoPlus Authors (goplus.org). All rights reserved.
+ * Copyright (c) 2021 The XGo Authors (xgo.dev). All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -54,12 +54,21 @@ func GOMOD(dirFrom string) (file string, err error) {
 	return
 }
 
-func GOPMOD(dirFrom string) (file string, err error) {
+func GOXMOD(dirFrom string) (file string, err error) {
 	dir, _, err := FindGoMod(dirFrom)
 	if err != nil {
 		return
 	}
+	file = filepath.Join(dir, "gox.mod")
+	if _, e := os.Lstat(file); e == nil { // gox.mod exists
+		return
+	}
 	return filepath.Join(dir, "gop.mod"), nil
+}
+
+// Deprecated: use GOXMOD instead
+func GOPMOD(dirFrom string) (file string, err error) {
+	return GOXMOD(dirFrom)
 }
 
 // -----------------------------------------------------------------------------

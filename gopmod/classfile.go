@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021 The GoPlus Authors (goplus.org). All rights reserved.
+ * Copyright (c) 2021 The XGo Authors (xgo.dev). All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -44,7 +44,7 @@ var (
 	TestProject = &Project{
 		Ext:      "_test.gox",
 		Class:    "App",
-		PkgPaths: []string{"github.com/goplus/gop/test", "testing"},
+		PkgPaths: []string{"github.com/goplus/xgo/test", "testing"},
 		Works:    []*modfile.Class{{Ext: "_test.gox", Class: "Case"}},
 	}
 )
@@ -85,7 +85,7 @@ func (p *Module) LookupClass(ext string) (c *Project, ok bool) {
 	return
 }
 
-// ImportClasses imports all classfiles found in this module (from go.mod/gop.mod).
+// ImportClasses imports all classfiles found in this module (from go.mod/gox.mod).
 func (p *Module) ImportClasses(importClass ...func(c *Project)) (err error) {
 	var impcls func(c *Project)
 	if importClass != nil {

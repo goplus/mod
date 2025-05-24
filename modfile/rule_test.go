@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021 The GoPlus Authors (goplus.org). All rights reserved.
+ * Copyright (c) 2021 The XGo Authors (xgo.dev). All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -115,8 +115,8 @@ func TestFormat(t *testing.T) {
 }
 
 func TestForma2t(t *testing.T) {
-	f := New("/foo/gop.mod", "1.2.0")
-	if b := string(Format(f.Syntax)); b != "gop 1.2.0\n" {
+	f := New("/foo/gox.mod", "1.2.0")
+	if b := string(Format(f.Syntax)); b != "xgo 1.2.0\n" {
 		t.Fatal("Format failed:", b)
 	}
 }
