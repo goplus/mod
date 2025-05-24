@@ -20,8 +20,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/goplus/mod/gopmod"
 	"github.com/goplus/mod/modload/modtest"
+	"github.com/goplus/mod/xgomod"
 	"golang.org/x/mod/module"
 )
 
@@ -41,7 +41,7 @@ func TestImport(t *testing.T) {
 func TestClassfile(t *testing.T) {
 	t.Log(os.Getwd())
 	modVer := module.Version{Path: "github.com/goplus/yap", Version: "v0.5.0"}
-	if _, err := gopmod.LoadMod(modVer); err != nil {
-		t.Fatal("gopmod.LoadMod:", err)
+	if _, err := xgomod.LoadMod(modVer); err != nil {
+		t.Fatal("xgomod.LoadMod:", err)
 	}
 }

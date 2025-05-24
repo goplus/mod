@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package gopmod
+package xgomod
 
 import (
 	"log"
