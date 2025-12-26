@@ -32,11 +32,19 @@ type Compiler struct {
 	Version string
 }
 
+// A Runner is the runner statement that specifies a custom runner for the project.
+// Example: runner github.com/goplus/spx/v2/cmd/spxrun
+type Runner struct {
+	Cmd    string // the command package path to run the project
+	Syntax *Line
+}
+
 // A File is the parsed, interpreted form of a gox.mod file.
 type File struct {
 	XGo       *XGo
 	Compiler  *Compiler // the underlying go compiler in go.mod (not gox.mod)
 	Projects  []*Project
+	Runner    *Runner  // custom runner command
 	ClassMods []string // calc by require statements in go.mod (not gox.mod)
 
 	Syntax *FileSyntax
@@ -319,6 +327,21 @@ usage: class [-embed -prefix=Prefix] *.workExt WorkClass [WorkPrototype]`, sw)
 			errorf("usage: import [name] pkgPath")
 			return
 		}
+	case "runner", "run": // "run" for backward compatibility
+		if f.Runner != nil {
+			errorf("repeated runner statement")
+			return
+		}
+		if len(args) != 1 {
+			errorf("usage: runner cmdPkgPath")
+			return
+		}
+		cmdPath, err := parsePkgPath(&args[0])
+		if err != nil {
+			wrapError(err)
+			return
+		}
+		f.Runner = &Runner{Cmd: cmdPath, Syntax: line}
 	default:
 		if strict {
 			errorf("unknown directive: %s", verb)
