@@ -171,6 +171,7 @@ xgo 1.1
 
 project github.com/goplus/spx math
 class .spx Sprite
+runner github.com/goplus/spx/v2/cmd/spxrun v2.0.1
 
 require (
 	github.com/ajstarks/svgo v0.0.0-20210927141636-6d70534b1098
@@ -182,7 +183,7 @@ func TestGoModCompat2(t *testing.T) {
 		gopmod = goxmodSpx2
 	)
 	f, err := modfile.ParseLax("go.mod", []byte(gopmod), nil)
-	if err != nil || len(f.Syntax.Stmt) != 6 {
+	if err != nil || len(f.Syntax.Stmt) != 7 {
 		t.Fatal("modfile.ParseLax failed:", f, err)
 	}
 
@@ -191,7 +192,7 @@ func TestGoModCompat2(t *testing.T) {
 		t.Fatal("modfile.ParseLax xgo:", xgo)
 	}
 
-	require := f.Syntax.Stmt[5].(*modfile.LineBlock)
+	require := f.Syntax.Stmt[6].(*modfile.LineBlock)
 	if len(require.Token) != 1 || require.Token[0] != "require" {
 		t.Fatal("modfile.ParseLax require:", require)
 	}
@@ -345,6 +346,26 @@ import "\?" math
 `)
 	doTestParseErr(t, `gop.mod:2: import must declare after a project definition`, `
 import math
+`)
+	doTestParseErr(t, `gop.mod:2: runner must declare after a project definition`, `
+runner github.com/goplus/spx/v2/cmd/spxrun
+`)
+	doTestParseErr(t, `gop.mod:3: usage: runner runnerPkgPath [version]`, `
+project github.com/goplus/spx math
+runner
+`)
+	doTestParseErr(t, `gop.mod:3: invalid quoted string: invalid syntax`, `
+project github.com/goplus/spx math
+runner "\?"
+`)
+	doTestParseErr(t, `gop.mod:3: invalid syntax`, `
+project github.com/goplus/spx math
+runner github.com/goplus/spx/v2/cmd/spxrun "\?"
+`)
+	doTestParseErr(t, `gop.mod:4: repeated runner statement`, `
+project github.com/goplus/spx math
+runner github.com/goplus/spx/v2/cmd/spxrun
+runner github.com/goplus/spx/v2/cmd/spxrun
 `)
 	doTestParseErr(t, `gop.mod:2: unknown directive: unknown`, `
 unknown .spx
