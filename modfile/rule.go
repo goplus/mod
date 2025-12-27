@@ -35,8 +35,9 @@ type Compiler struct {
 // A Runner is the runner statement that specifies a custom runner for the project.
 // Example: runner github.com/goplus/spx/v2/cmd/spxrun
 type Runner struct {
-	Cmd    string // the command package path to run the project
-	Syntax *Line
+	Path    string // package path of the runner
+	Version string // optional version of the runner
+	Syntax  *Line
 }
 
 // A File is the parsed, interpreted form of a gox.mod file.
@@ -44,7 +45,6 @@ type File struct {
 	XGo       *XGo
 	Compiler  *Compiler // the underlying go compiler in go.mod (not gox.mod)
 	Projects  []*Project
-	Runner    *Runner  // custom runner command
 	ClassMods []string // calc by require statements in go.mod (not gox.mod)
 
 	Syntax *FileSyntax
@@ -91,6 +91,7 @@ type Project struct {
 	Works    []*Class  // work class of classfile
 	PkgPaths []string  // package paths of classfile and optional inline-imported packages.
 	Import   []*Import // auto-imported packages
+	Runner   *Runner   // custom runner
 	Syntax   *Line
 }
 
@@ -327,21 +328,34 @@ usage: class [-embed -prefix=Prefix] *.workExt WorkClass [WorkPrototype]`, sw)
 			errorf("usage: import [name] pkgPath")
 			return
 		}
-	case "runner", "run": // "run" for backward compatibility
-		if f.Runner != nil {
+	case "runner":
+		proj := f.proj()
+		if proj == nil {
+			errorf("runner must declare after a project definition")
+			return
+		}
+		if proj.Runner != nil {
 			errorf("repeated runner statement")
 			return
 		}
-		if len(args) != 1 {
-			errorf("usage: runner cmdPkgPath")
+		if len(args) < 1 {
+			errorf("usage: runner runnerPkgPath [version]")
 			return
 		}
-		cmdPath, err := parsePkgPath(&args[0])
+		runnerPath, err := parsePkgPath(&args[0])
 		if err != nil {
 			wrapError(err)
 			return
 		}
-		f.Runner = &Runner{Cmd: cmdPath, Syntax: line}
+		runnerVer := ""
+		if len(args) > 1 {
+			runnerVer, err = parseString(&args[1])
+			if err != nil {
+				wrapError(err)
+				return
+			}
+		}
+		proj.Runner = &Runner{Path: runnerPath, Version: runnerVer, Syntax: line}
 	default:
 		if strict {
 			errorf("unknown directive: %s", verb)
