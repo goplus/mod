@@ -33,10 +33,7 @@ type Compiler struct {
 }
 
 // A Runner is the runner statement that specifies a custom runner for the project.
-// The runner directive must appear after a project statement and only one runner
-// per project is allowed.
 // Example: runner github.com/goplus/spx/v2/cmd/spxrun
-// Example with version: runner github.com/goplus/spx/v2/cmd/spxrun v2.0.1
 type Runner struct {
 	Path    string // package path of the runner
 	Version string // optional version of the runner
