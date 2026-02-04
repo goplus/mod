@@ -230,8 +230,8 @@ func TestSave(t *testing.T) {
 	if err != nil {
 		t.Fatal("Load:", err)
 	}
-	if err = mod.SaveWithXGoMod(&env.XGo{Version: "v1.2.0 devel", Root: "/foo/bar/gop"}, FlagDepModXGo); err != nil {
-		t.Fatal("mod.SaveWithGopMod:", err)
+	if err = mod.SaveWithXGoMod(&env.XGo{Version: "v1.2.0 devel", Root: "/foo/bar/xgo"}, FlagDepModXGo); err != nil {
+		t.Fatal("mod.SaveWithXGoMod:", err)
 	}
 	if b, err := mod.File.Format(); err != nil {
 		t.Fatal("Format:", err)
@@ -241,10 +241,10 @@ go 1.18
 
 require (
 	github.com/goplus/yap v0.5.0 //xgo:class
-	github.com/goplus/gop v1.2.0
+	github.com/goplus/xgo v1.2.0
 )
 ` {
-		t.Fatal("SaveWithGopMod:", v)
+		t.Fatal("SaveWithXGoMod:", v)
 	}
 	b, err := os.ReadFile(mod.workFile())
 	if err != nil {
@@ -254,14 +254,14 @@ require (
 
 use .
 
-replace github.com/goplus/gop v1.2.0 => /foo/bar/gop
+replace github.com/goplus/xgo v1.2.0 => /foo/bar/xgo
 ` {
 		t.Fatal("workFile:", v)
 	}
 
-	// SaveWithGopMod with FlagDepModX
+	// SaveWithXGoMod with FlagDepModX
 	os.WriteFile(".xgo/go.mod", []byte(`
-module github.com/goplus/gop
+module github.com/goplus/xgo
 
 go 1.18
 
@@ -270,7 +270,7 @@ require (
 )
 `), 0666)
 	if err = mod.SaveWithXGoMod(&env.XGo{Version: "v1.2.0 devel", Root: ".xgo"}, FlagDepModXGo|FlagDepModX); err != nil {
-		t.Fatal("mod.SaveWithGopMod 2:", err)
+		t.Fatal("mod.SaveWithXGoMod 2:", err)
 	}
 	if b, err := mod.File.Format(); err != nil {
 		t.Fatal("Format:", err)
@@ -280,19 +280,19 @@ go 1.18
 
 require (
 	github.com/goplus/yap v0.5.0 //xgo:class
-	github.com/goplus/gop v1.2.0
+	github.com/goplus/xgo v1.2.0
 	github.com/qiniu/x v1.13.0
 )
 ` {
-		t.Fatal("SaveWithGopMod:", v)
+		t.Fatal("SaveWithXGoMod:", v)
 	}
 	if _, _, ok := getXVer(&env.XGo{Root: "/foo/bar"}); ok {
 		t.Fatal("getXVer: ok?")
 	}
 
-	// SaveWithGopMod again. noop.
+	// SaveWithXGoMod again. noop.
 	if err = mod.SaveWithXGoMod(&env.XGo{Version: "v1.2.0 devel", Root: ".xgo"}, FlagDepModXGo|FlagDepModX); err != nil {
-		log.Fatal("mod.SaveWithGopMod 3:", err)
+		log.Fatal("mod.SaveWithXGoMod 3:", err)
 	}
 
 	if err = mod.updateWorkfile(&env.XGo{Version: "v1.2.0 devel", Root: ".xgo"}, ""); err != nil {

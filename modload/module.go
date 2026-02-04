@@ -397,16 +397,16 @@ func findReplaceGopMod(work *gomodfile.WorkFile) bool {
 }
 
 const (
-	xgoMod = "github.com/goplus/gop"
+	xgoMod = "github.com/goplus/xgo"
 	xMod   = "github.com/qiniu/x"
 )
 
 const (
-	FlagDepModXGo = 1 << iota // depends module github.com/goplus/gop
+	FlagDepModXGo = 1 << iota // depends module github.com/goplus/xgo
 	FlagDepModX               // depends module github.com/qiniu/x
 )
 
-// SaveWithXGoMod adds `require github.com/goplus/gop` and saves all
+// SaveWithXGoMod adds `require github.com/goplus/xgo` and saves all
 // changes of this module.
 func (p Module) SaveWithXGoMod(xgo *env.XGo, flags int) (err error) {
 	old := p.checkXgoDeps()
@@ -443,7 +443,7 @@ func (p Module) updateWorkfile(xgo *env.XGo, xgoVer string) (err error) {
 	return os.WriteFile(workFile, gomodfile.Format(work.Syntax), 0666)
 }
 
-// requireXgo adds require for the github.com/goplus/gop module.
+// requireXgo adds require for the github.com/goplus/xgo module.
 func (p Module) requireXgo(xgo *env.XGo, xgoVer string, old, flags int) {
 	if (flags&FlagDepModXGo) != 0 && (old&FlagDepModXGo) == 0 {
 		p.File.AddRequire(xgoMod, xgoVer)
