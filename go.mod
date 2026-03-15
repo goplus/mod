@@ -1,9 +1,9 @@
 module github.com/goplus/mod
 
-go 1.18
+go 1.24
 
 require (
-	github.com/qiniu/x v1.16.3
+	github.com/qiniu/x v1.16.5
 	golang.org/x/mod v0.20.0
 )
 
