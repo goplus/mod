@@ -51,8 +51,9 @@ type Module struct {
 	deps  []DepMod
 }
 
-// DepMods returns all depended modules. If a depended module path is replace to be a
-// local path, it will be canonical to an absolute path.
+// DepMods returns all depended modules, sorted by module path in descending
+// order (longest prefix first). If a depended module path is replaced by a
+// local path, it will be canonicalized to an absolute path.
 func (p *Module) DepMods() []DepMod {
 	if p.deps == nil {
 		vers := p.Module.DepMods()
