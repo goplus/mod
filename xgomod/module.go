@@ -191,10 +191,10 @@ func (p *Module) lookupExternPkg(pkgPath string) (pkg *Package, err error) {
 // LookupDepMod lookups a depended module. If modVer.Path is replace to be a local
 // path, it will be canonical to an absolute path.
 func (p *Module) LookupDepMod(modPath string) (modVer module.Version, ok bool) {
-	for _, dep := range p.DepMods() {
-		if dep.Path == modPath {
-			return dep.Real, true
-		}
+	deps := p.DepMods()
+	i := sort.Search(len(deps), func(i int) bool { return deps[i].Path <= modPath })
+	if i < len(deps) && deps[i].Path == modPath {
+		return deps[i].Real, true
 	}
 	return
 }
