@@ -21,6 +21,7 @@ import (
 	"log"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 
 	"github.com/goplus/mod/modcache"
@@ -36,19 +37,37 @@ var (
 
 // -----------------------------------------------------------------------------
 
-type Module struct {
-	modload.Module
-	projs    map[string]*Project // ext -> project
-	depmods_ map[string]module.Version
+// DepMod represents a depended module, which is used for loading external packages.
+type DepMod struct {
+	Path string // module path
+	Real module.Version
 }
 
-// DepMods returns all depended modules.
-// If a depended module path is replace to be a local path, it will be canonical to an absolute path.
-func (p *Module) DepMods() map[string]module.Version {
-	if p.depmods_ == nil {
-		p.depmods_ = p.Module.DepMods()
+// Module represents a XGo module, which is based on a Go module. It provides some
+// helper methods for loading XGo modules and packages.
+type Module struct {
+	modload.Module
+	projs map[string]*Project // ext -> project
+	deps  []DepMod
+}
+
+// DepMods returns all depended modules. If a depended module path is replace to be a
+// local path, it will be canonical to an absolute path.
+func (p *Module) DepMods() []DepMod {
+	if p.deps == nil {
+		vers := p.Module.DepMods()
+		deps := make([]DepMod, 0, len(vers))
+		for path, real := range vers {
+			deps = append(deps, DepMod{Path: path, Real: real})
+		}
+		sort.Slice(deps, func(i, j int) bool {
+			// sort by path in descending order, so that we can lookup a package from
+			// the longest path to the shortest one.
+			return deps[i].Path > deps[j].Path
+		})
+		p.deps = deps
 	}
-	return p.depmods_
+	return p.deps
 }
 
 // PkgType specifies a package type.
@@ -153,12 +172,12 @@ func (p *Module) Lookup(pkgPath string) (pkg *Package, err error) {
 // lookupExternPkg lookups a external package from depended modules.
 // If modVer.Path is replace to be a local path, it will be canonical to an absolute path.
 func (p *Module) lookupExternPkg(pkgPath string) (pkg *Package, err error) {
-	for path, real := range p.DepMods() {
-		if isPkgInMod(pkgPath, path) {
-			if modDir, e := modcache.Path(real); e == nil {
-				modPath := path
+	for _, dep := range p.DepMods() {
+		if isPkgInMod(pkgPath, dep.Path) {
+			if modDir, e := modcache.Path(dep.Real); e == nil {
+				modPath := dep.Path
 				dir := modDir + pkgPath[len(modPath):]
-				pkg = &Package{Type: PkgtExtern, Real: real, ModPath: modPath, ModDir: modDir, Dir: dir}
+				pkg = &Package{Type: PkgtExtern, Real: dep.Real, ModPath: modPath, ModDir: modDir, Dir: dir}
 			} else {
 				err = e
 			}
@@ -169,11 +188,14 @@ func (p *Module) lookupExternPkg(pkgPath string) (pkg *Package, err error) {
 	return
 }
 
-// LookupDepMod lookups a depended module.
-// If modVer.Path is replace to be a local path, it will be canonical to an absolute path.
+// LookupDepMod lookups a depended module. If modVer.Path is replace to be a local
+// path, it will be canonical to an absolute path.
 func (p *Module) LookupDepMod(modPath string) (modVer module.Version, ok bool) {
-	deps := p.DepMods()
-	modVer, ok = deps[modPath]
+	for _, dep := range p.DepMods() {
+		if dep.Path == modPath {
+			return dep.Real, true
+		}
+	}
 	return
 }
 
