@@ -32,6 +32,18 @@ type Compiler struct {
 	Version string
 }
 
+// A Runner is the runner statement that specifies a custom runner for the project.
+// The runner directive must appear after a project statement and only one runner
+// per project is allowed.
+// Example: runner github.com/goplus/spx/v2/cmd/spxrunner
+// Example with version: runner github.com/goplus/spx/v2/cmd/spxrunner v2.0.1
+// The optional version must be written as the second argument, not as path@version.
+type Runner struct {
+	Path    string // command package path of the runner
+	Version string // optional version of the runner command package
+	Syntax  *Line
+}
+
 // A File is the parsed, interpreted form of a gox.mod file.
 type File struct {
 	XGo       *XGo
@@ -83,6 +95,7 @@ type Project struct {
 	Works    []*Class  // work class of classfile
 	PkgPaths []string  // package paths of classfile and optional inline-imported packages.
 	Import   []*Import // auto-imported packages
+	Runner   *Runner   // custom runner
 	Syntax   *Line
 }
 
@@ -319,6 +332,34 @@ usage: class [-embed -prefix=Prefix] *.workExt WorkClass [WorkPrototype]`, sw)
 			errorf("usage: import [name] pkgPath")
 			return
 		}
+	case "runner":
+		proj := f.proj()
+		if proj == nil {
+			errorf("runner must declare after a project definition")
+			return
+		}
+		if proj.Runner != nil {
+			errorf("repeated runner statement")
+			return
+		}
+		if len(args) < 1 {
+			errorf("usage: runner runnerCmdPkgPath [version]")
+			return
+		}
+		runnerPath, err := parsePkgPath(&args[0])
+		if err != nil {
+			wrapError(err)
+			return
+		}
+		runnerVer := ""
+		if len(args) > 1 {
+			runnerVer, err = parseString(&args[1])
+			if err != nil {
+				wrapError(err)
+				return
+			}
+		}
+		proj.Runner = &Runner{Path: runnerPath, Version: runnerVer, Syntax: line}
 	default:
 		if strict {
 			errorf("unknown directive: %s", verb)
