@@ -3,7 +3,7 @@ module github.com/goplus/mod
 go 1.24
 
 require (
-	github.com/qiniu/x v1.16.5
+	github.com/qiniu/x v1.17.0
 	golang.org/x/mod v0.20.0
 )
 
