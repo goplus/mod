@@ -323,6 +323,14 @@ class .spx S"prite
 project github.com/goplus/spx math
 class ."spx Sprite
 `)
+	doTestParseErr(t, `gop.mod:3: unquoted string cannot contain quote`, `
+project github.com/goplus/spx math
+pack ."spx Sprite
+`)
+	doTestParseErr(t, `gop.mod:3: unquoted string cannot contain quote`, `
+project github.com/goplus/spx math
+pack "" ."spx
+`)
 	doTestParseErr(t, `gop.mod:3: symbol .abc invalid: invalid Go export symbol format`, `
 project github.com/goplus/spx math
 class .spx Sprite .abc

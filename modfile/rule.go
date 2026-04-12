@@ -346,8 +346,8 @@ usage: class [-embed -prefix=Prefix] *.workExt WorkClass [WorkPrototype]`, sw)
 			wrapError(err)
 			return
 		}
-		if strings.Contains(dir, "..") {
-			errorf(`".." is not allowed in pack directory`)
+		if strings.HasPrefix(dir, "/") || strings.HasPrefix(dir, "\\") || strings.Contains(dir, "..") {
+			errorf(`pack directory must be a relative path and ".." is not allowed`)
 			return
 		}
 		indexFile, err := parseString(&args[1])

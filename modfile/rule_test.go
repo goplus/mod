@@ -231,7 +231,7 @@ project github.com/goplus/spx math
 pack assets index.json extra
 `)
 	// ".." in directory
-	doTestParseErr(t, `gop.mod:3: ".." is not allowed in pack directory`, `
+	doTestParseErr(t, `gop.mod:3: pack directory must be a relative path and ".." is not allowed`, `
 project github.com/goplus/spx math
 pack ../assets index.json
 `)
