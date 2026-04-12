@@ -75,6 +75,13 @@ type Import struct {
 	Syntax *Line
 }
 
+// A Pack is the pack statement.
+type Pack struct {
+	Directory string // relative path to the project root, no ".." components
+	IndexFile string // plain file name (e.g. "index.json"), no path separators
+	Syntax    *Line
+}
+
 // A Project is the project statement.
 type Project struct {
 	Ext      string    // can be "_[class].gox" or ".[class]", eg. "_yap.gox" or ".gmx"
@@ -83,6 +90,7 @@ type Project struct {
 	Works    []*Class  // work class of classfile
 	PkgPaths []string  // package paths of classfile and optional inline-imported packages.
 	Import   []*Import // auto-imported packages
+	Pack     *Pack     // pack directive (at most one per project)
 	Syntax   *Line
 }
 
@@ -319,6 +327,39 @@ usage: class [-embed -prefix=Prefix] *.workExt WorkClass [WorkPrototype]`, sw)
 			errorf("usage: import [name] pkgPath")
 			return
 		}
+	case "pack":
+		proj := f.proj()
+		if proj == nil {
+			errorf("pack must declare after a project definition")
+			return
+		}
+		if proj.Pack != nil {
+			errorf("duplicate pack directive in the same project")
+			return
+		}
+		if len(args) != 2 {
+			errorf("usage: pack <directory> <indexfile>")
+			return
+		}
+		dir, err := parseString(&args[0])
+		if err != nil {
+			wrapError(err)
+			return
+		}
+		if strings.Contains(dir, "..") {
+			errorf(`".." is not allowed in pack directory`)
+			return
+		}
+		indexFile, err := parseString(&args[1])
+		if err != nil {
+			wrapError(err)
+			return
+		}
+		if strings.ContainsAny(indexFile, "/\\") {
+			errorf("pack indexfile must be a plain file name without path separators")
+			return
+		}
+		proj.Pack = &Pack{Directory: dir, IndexFile: indexFile, Syntax: line}
 	default:
 		if strict {
 			errorf("unknown directive: %s", verb)
