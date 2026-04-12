@@ -128,3 +128,123 @@ func TestMustQuote(t *testing.T) {
 }
 
 // -----------------------------------------------------------------------------
+
+const goxmodWithPack = `
+xgo 1.6
+
+project main.spx Game github.com/goplus/spx/v2 math
+class -embed *.spx SpriteImpl
+pack assets index.json
+`
+
+func TestParsePack(t *testing.T) {
+	f, err := ParseLax("gox.mod", []byte(goxmodWithPack), nil)
+	if err != nil {
+		t.Fatal("ParseLax failed:", err)
+	}
+	proj := f.proj()
+	if proj == nil {
+		t.Fatal("expected a project")
+	}
+	if proj.Pack == nil {
+		t.Fatal("expected pack directive")
+	}
+	if proj.Pack.Directory != "assets" {
+		t.Errorf("pack directory expected be assets, but %s got", proj.Pack.Directory)
+	}
+	if proj.Pack.IndexFile != "index.json" {
+		t.Errorf("pack indexfile expected be index.json, but %s got", proj.Pack.IndexFile)
+	}
+}
+
+const goxmodMultiProject = `
+xgo 1.6
+
+project main.spx Game github.com/goplus/spx/v2 math
+class -embed *.spx SpriteImpl
+pack assets index.json
+
+project .yap YapApp github.com/goplus/yap
+import "github.com/goplus/yap/test"
+`
+
+func TestParsePackMultiProject(t *testing.T) {
+	f, err := ParseLax("gox.mod", []byte(goxmodMultiProject), nil)
+	if err != nil {
+		t.Fatal("ParseLax failed:", err)
+	}
+	if len(f.Projects) != 2 {
+		t.Fatalf("expected 2 projects, got %d", len(f.Projects))
+	}
+	// First project has pack
+	if f.Projects[0].Pack == nil {
+		t.Fatal("expected pack directive in first project")
+	}
+	if f.Projects[0].Pack.Directory != "assets" {
+		t.Errorf("pack directory expected be assets, but %s got", f.Projects[0].Pack.Directory)
+	}
+	if f.Projects[0].Pack.IndexFile != "index.json" {
+		t.Errorf("pack indexfile expected be index.json, but %s got", f.Projects[0].Pack.IndexFile)
+	}
+	// Second project has no pack
+	if f.Projects[1].Pack != nil {
+		t.Error("expected no pack directive in second project")
+	}
+}
+
+const goxmodNoPack = `
+xgo 1.6
+
+project main.spx Game github.com/goplus/spx/v2 math
+class -embed *.spx SpriteImpl
+`
+
+func TestParseNoPack(t *testing.T) {
+	f, err := ParseLax("gox.mod", []byte(goxmodNoPack), nil)
+	if err != nil {
+		t.Fatal("ParseLax failed:", err)
+	}
+	if f.proj().Pack != nil {
+		t.Error("expected no pack directive")
+	}
+}
+
+func TestParsePackErr(t *testing.T) {
+	// pack before project
+	doTestParseErr(t, `gop.mod:2: pack must declare after a project definition`, `
+pack assets index.json
+`)
+	// duplicate pack in same project
+	doTestParseErr(t, `gop.mod:4: duplicate pack directive in the same project`, `
+project github.com/goplus/spx math
+pack assets index.json
+pack assets2 index.yaml
+`)
+	// too few arguments
+	doTestParseErr(t, `gop.mod:3: usage: pack <directory> <indexfile>`, `
+project github.com/goplus/spx math
+pack assets
+`)
+	// too many arguments
+	doTestParseErr(t, `gop.mod:3: usage: pack <directory> <indexfile>`, `
+project github.com/goplus/spx math
+pack assets index.json extra
+`)
+	// ".." in directory
+	doTestParseErr(t, `gop.mod:3: ".." is not allowed in pack directory`, `
+project github.com/goplus/spx math
+pack ../assets index.json
+`)
+	// path separator in indexfile
+	doTestParseErr(t, `gop.mod:3: pack indexfile must be a plain file name without path separators`, `
+project github.com/goplus/spx math
+pack assets sub/index.json
+`)
+	// backslash path separator in indexfile
+	doTestParseErr(t, `gop.mod:3: pack indexfile must be a plain file name without path separators`, `
+project github.com/goplus/spx math
+pack assets sub\index.json
+`)
+}
+
+// -----------------------------------------------------------------------------
