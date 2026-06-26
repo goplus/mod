@@ -33,6 +33,7 @@ func TestClassKind(t *testing.T) {
 		{"foo.spx", false},
 		{"foo_spx.gox", false},
 		{"main_spx.gox", true},
+		{"main.flat", true},
 	}
 	for _, c := range cases {
 		ext := ClassExt(c.fname)
@@ -57,6 +58,10 @@ func lookupClass(ext string) (c *Project, ok bool) {
 		return &Project{
 			Ext: "_spx.gox", Class: "Game",
 			Works:    []*Class{{Ext: "_spx.gox", Class: "Sprite"}},
+			PkgPaths: []string{"github.com/goplus/xgo/cl/internal/spx3", "math"}}, true
+	case ".flat":
+		return &Project{
+			Ext: ".flat", Class: "Game", Flat: true,
 			PkgPaths: []string{"github.com/goplus/xgo/cl/internal/spx3", "math"}}, true
 	}
 	return

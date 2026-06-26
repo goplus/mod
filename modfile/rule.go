@@ -97,6 +97,9 @@ type Project struct {
 
 // IsProj checks if a (ext, fname) pair is a project file or not.
 func (p *Project) IsProj(ext, fname string) bool {
+	if p.Flat {
+		return fname == "main"+ext
+	}
 	for _, w := range p.Works {
 		if w.Ext == ext {
 			if ext != p.Ext || fname != "main"+ext {
