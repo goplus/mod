@@ -217,6 +217,40 @@ func TestGoModStd(t *testing.T) {
 
 // -----------------------------------------------------------------------------
 
+const goxmodFlat = `
+module foo
+
+go 1.17
+xgo 1.2
+
+project -flat .gmx Game github.com/goplus/spx math
+`
+
+func TestParseFlat(t *testing.T) {
+	f, err := ParseLax("gox.mod", []byte(goxmodFlat), nil)
+	if err != nil {
+		t.Fatal("ParseLax failed:", err)
+	}
+	proj := f.proj()
+	if proj == nil {
+		t.Fatal("expected a project")
+	}
+	if !proj.Flat {
+		t.Error("expected Flat=true")
+	}
+	if proj.Ext != ".gmx" {
+		t.Errorf("project ext expected .gmx, but got %s", proj.Ext)
+	}
+	if proj.Class != "Game" {
+		t.Errorf("project class expected Game, but got %s", proj.Class)
+	}
+	if len(proj.Works) != 0 {
+		t.Errorf("flat project expected 0 works, but got %d", len(proj.Works))
+	}
+}
+
+// -----------------------------------------------------------------------------
+
 func TestParse2(t *testing.T) {
 	const (
 		goxmod = goxmodSpx2
@@ -275,10 +309,10 @@ xgo 1.1 1.2
 	doTestParseErr(t, `gop.mod:2: invalid xgo version '1.x': must match format 1.23`, `
 xgo 1.x
 `)
-	doTestParseErr(t, `gop.mod:2: usage: project [*.projExt ProjectClass] classFilePkgPath ...`, `
+	doTestParseErr(t, `gop.mod:2: usage: project [-flat] [*.projExt ProjectClass] classFilePkgPath ...`, `
 project
 `)
-	doTestParseErr(t, `gop.mod:2: usage: project [*.projExt ProjectClass] classFilePkgPath ...`, `
+	doTestParseErr(t, `gop.mod:2: usage: project [-flat] [*.projExt ProjectClass] classFilePkgPath ...`, `
 project .gmx Game
 `)
 	doTestParseErr(t, `gop.mod:2: ext ." invalid: unquoted string cannot contain quote`, `
@@ -356,6 +390,17 @@ import math
 `)
 	doTestParseErr(t, `gop.mod:2: unknown directive: unknown`, `
 unknown .spx
+`)
+	doTestParseErr(t, `gop.mod:2: unknown flag: -badFlag
+usage: project [-flat] [*.projExt ProjectClass] classFilePkgPath ...`, `
+project -badFlag .gmx Game math
+`)
+	doTestParseErr(t, `gop.mod:2: usage: project [-flat] [*.projExt ProjectClass] classFilePkgPath ...`, `
+project -flat
+`)
+	doTestParseErr(t, `gop.mod:3: class directive is not allowed in a flat mode project`, `
+project -flat .gmx Game github.com/goplus/spx
+class .spx Sprite
 `)
 }
 
