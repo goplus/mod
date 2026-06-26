@@ -91,6 +91,7 @@ type Project struct {
 	PkgPaths []string  // package paths of classfile and optional inline-imported packages.
 	Import   []*Import // auto-imported packages
 	Pack     *Pack     // pack directive (at most one per project)
+	Flat     bool      // if true, all matching files are fragments of the project class (no work classfiles)
 	Syntax   *Line
 }
 
@@ -211,12 +212,27 @@ func (f *File) parseVerb(errs *ErrorList, verb string, line *Line, args []string
 		f.XGo.Version = args[0]
 	case "project":
 		if len(args) < 1 {
-			errorf("usage: project [*.projExt ProjectClass] classFilePkgPath ...")
+			errorf("usage: project [-flat] [*.projExt ProjectClass] classFilePkgPath ...")
+			return
+		}
+		flat := false
+		for len(args) > 0 && strings.HasPrefix(args[0], "-") {
+			sw := args[0][1:]
+			if sw == "flat" {
+				flat = true
+			} else {
+				errorf("unknown flag: -%s\nusage: project [-flat] [*.projExt ProjectClass] classFilePkgPath ...", sw)
+				return
+			}
+			args = args[1:]
+		}
+		if len(args) < 1 {
+			errorf("usage: project [-flat] [*.projExt ProjectClass] classFilePkgPath ...")
 			return
 		}
 		if isExt(args[0], true) {
 			if len(args) < 3 || strings.Contains(args[1], "/") {
-				errorf("usage: project [*.projExt ProjectClass] classFilePkgPath ...")
+				errorf("usage: project [-flat] [*.projExt ProjectClass] classFilePkgPath ...")
 				return
 			}
 			ext, fullExt, err := parseExt(&args[0], true)
@@ -235,7 +251,7 @@ func (f *File) parseVerb(errs *ErrorList, verb string, line *Line, args []string
 				return
 			}
 			f.addProj(&Project{
-				Ext: ext, FullExt: fullExt, Class: class, PkgPaths: pkgPaths, Syntax: line,
+				Ext: ext, FullExt: fullExt, Class: class, PkgPaths: pkgPaths, Flat: flat, Syntax: line,
 			})
 			return
 		}
@@ -245,12 +261,16 @@ func (f *File) parseVerb(errs *ErrorList, verb string, line *Line, args []string
 			return
 		}
 		f.addProj(&Project{
-			PkgPaths: pkgPaths, Syntax: line,
+			PkgPaths: pkgPaths, Flat: flat, Syntax: line,
 		})
 	case "class":
 		proj := f.proj()
 		if proj == nil {
 			errorf("work class must declare after a project definition")
+			return
+		}
+		if proj.Flat {
+			errorf("class directive is not allowed in a flat mode project")
 			return
 		}
 		prefix := ""
