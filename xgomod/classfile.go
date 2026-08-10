@@ -62,10 +62,7 @@ func IsNotFound(err error) bool {
 //
 // Deprecated: use ClassInfo instead.
 func (p *Module) ClassKind(fname string) (isProj, ok bool) {
-	ext := modfile.ClassExt(fname)
-	if c, ok := p.projs[ext]; ok {
-		return c.IsProj(ext, fname), true
-	}
+	_, isProj, ok = p.ClassInfo(fname)
 	return
 }
 
