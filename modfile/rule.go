@@ -250,7 +250,7 @@ func (f *File) parseVerb(errs *ErrorList, verb string, line *Line, args []string
 				wrapError(err)
 				return
 			}
-			class, err := parseSymbol(&args[1])
+			class, err := parseType(&args[1])
 			if err != nil {
 				wrapError(err)
 				return
@@ -307,14 +307,14 @@ usage: class [-embed -prefix=Prefix] *.workExt WorkClass [WorkPrototype]`, sw)
 			wrapError(err)
 			return
 		}
-		class, err := parseSymbol(&args[1])
+		class, err := parseType(&args[1])
 		if err != nil {
 			wrapError(err)
 			return
 		}
 		protoClass := ""
 		if len(args) > 2 {
-			protoClass, err = parseSymbol(&args[2])
+			protoClass, err = parseType(&args[2])
 			if err != nil {
 				wrapError(err)
 				return
@@ -390,11 +390,74 @@ usage: class [-embed -prefix=Prefix] *.workExt WorkClass [WorkPrototype]`, sw)
 			return
 		}
 		proj.Pack = &Pack{Directory: dir, IndexFile: indexFile, Syntax: line}
+	case "autolambda":
+		proj := f.proj()
+		if proj == nil {
+			errorf("autolambda must declare after a project definition")
+			return
+		}
+		if len(args) == 0 {
+			errorf("usage: autolambda name(n), ...")
+			return
+		}
+		if proj.AutoLambdas == nil {
+			proj.AutoLambdas = make(map[string]int)
+		}
+		err := parseAutoLambdas(proj.AutoLambdas, args)
+		if err != nil {
+			wrapError(err)
+			return
+		}
 	default:
 		if strict {
 			errorf("unknown directive: %s", verb)
 		}
 	}
+}
+
+// parseAutoLambdas parses the argument tokens of an autolambda directive into a
+// list of `name(n)` entries. The gox.mod tokenizer splits parentheses and commas
+// into their own tokens, so a directive like:
+//
+//	autolambda times(1), forEver(0), onKey(1)
+//
+// arrives here as: [times ( 1 ) , forEver ( 0 ) , onKey ( 1 )].
+func parseAutoLambdas(ret map[string]int, args []string) error {
+	i, n := 0, len(args)
+	for i < n {
+		name, err := parseIdent(&args[i])
+		if err != nil {
+			return fmt.Errorf("autolambda: invalid command name %q", args[i])
+		}
+		i++
+		if i >= n || args[i] != "(" {
+			return fmt.Errorf("autolambda %s: expect '(' after command name", name)
+		}
+		i++
+		nArgs, e := strconv.Atoi(args[i])
+		if e != nil || nArgs < 0 {
+			return fmt.Errorf("autolambda %s: invalid number of arguments %q", name, args[i])
+		}
+		i++
+		if i >= n || args[i] != ")" {
+			return fmt.Errorf("autolambda %s: expect ')' after number of arguments", name)
+		}
+		i++
+		if _, ok := ret[name]; ok {
+			return fmt.Errorf("autolambda: duplicate command %q", name)
+		}
+		ret[name] = nArgs
+		if i < n {
+			if args[i] != "," {
+				return fmt.Errorf("autolambda: expect ',' between entries, got %q", args[i])
+			}
+			i++
+			if i >= n {
+				return fmt.Errorf("autolambda: trailing ',' without an entry")
+			}
+		}
+	}
+	return nil
 }
 
 func fileLine(n int) (file string, line int) {
@@ -422,19 +485,36 @@ func AutoQuote(s string) string {
 }
 
 var (
-	symbolRE = regexp.MustCompile(`\*?[A-Z]\w*`)
+	typeRE = regexp.MustCompile(`\*?[A-Z]\w*`)
+	idenRE = regexp.MustCompile(`\w+`)
 )
 
 // TODO(xsw): to be optimized
-func parseSymbol(s *string) (t string, err error) {
+func parseType(s *string) (t string, err error) {
 	t, err = parseString(s)
 	if err != nil {
 		goto failed
 	}
-	if symbolRE.MatchString(t) {
+	if typeRE.MatchString(t) {
 		return
 	}
-	err = errors.New("invalid Go export symbol format")
+	err = errors.New("invalid Go export type")
+failed:
+	return "", &InvalidSymbolError{
+		Sym: *s,
+		Err: err,
+	}
+}
+
+func parseIdent(s *string) (t string, err error) {
+	t, err = parseString(s)
+	if err != nil {
+		goto failed
+	}
+	if idenRE.MatchString(t) {
+		return
+	}
+	err = errors.New("invalid XGo identifier")
 failed:
 	return "", &InvalidSymbolError{
 		Sym: *s,

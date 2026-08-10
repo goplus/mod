@@ -248,3 +248,131 @@ pack assets sub\index.json
 }
 
 // -----------------------------------------------------------------------------
+
+const goxmodWithAutoLambda = `
+xgo 1.6
+
+project main.spx Game github.com/goplus/spx/v2 math
+class -embed *.spx SpriteImpl
+autolambda times(1), forEver(0), onKey(1)
+`
+
+func TestParseAutoLambda(t *testing.T) {
+	f, err := ParseLax("gox.mod", []byte(goxmodWithAutoLambda), nil)
+	if err != nil {
+		t.Fatal("ParseLax failed:", err)
+	}
+	proj := f.proj()
+	if proj == nil {
+		t.Fatal("expected a project")
+	}
+	want := map[string]int{"times": 1, "forEver": 0, "onKey": 1}
+	if len(proj.AutoLambdas) != len(want) {
+		t.Fatalf("expected %d autolambda entries, got %d: %v", len(want), len(proj.AutoLambdas), proj.AutoLambdas)
+	}
+	for name, n := range want {
+		if got, ok := proj.AutoLambdas[name]; !ok || got != n {
+			t.Errorf("autolambda[%s] expected %d, got %d (ok=%v)", name, n, got, ok)
+		}
+	}
+}
+
+const goxmodMultiAutoLambda = `
+xgo 1.6
+
+project main.spx Game github.com/goplus/spx/v2 math
+class -embed *.spx SpriteImpl
+autolambda times(1)
+autolambda forEver(0), onKey(1)
+`
+
+func TestParseMultiAutoLambda(t *testing.T) {
+	f, err := ParseLax("gox.mod", []byte(goxmodMultiAutoLambda), nil)
+	if err != nil {
+		t.Fatal("ParseLax failed:", err)
+	}
+	proj := f.proj()
+	if proj == nil {
+		t.Fatal("expected a project")
+	}
+	want := map[string]int{"times": 1, "forEver": 0, "onKey": 1}
+	if len(proj.AutoLambdas) != len(want) {
+		t.Fatalf("expected %d autolambda entries, got %d: %v", len(want), len(proj.AutoLambdas), proj.AutoLambdas)
+	}
+	for name, n := range want {
+		if got, ok := proj.AutoLambdas[name]; !ok || got != n {
+			t.Errorf("autolambda[%s] expected %d, got %d (ok=%v)", name, n, got, ok)
+		}
+	}
+}
+
+const goxmodNoAutoLambda = `
+xgo 1.6
+
+project main.spx Game github.com/goplus/spx/v2 math
+class -embed *.spx SpriteImpl
+`
+
+func TestParseNoAutoLambda(t *testing.T) {
+	f, err := ParseLax("gox.mod", []byte(goxmodNoAutoLambda), nil)
+	if err != nil {
+		t.Fatal("ParseLax failed:", err)
+	}
+	if f.proj().AutoLambdas != nil {
+		t.Error("expected no autolambda directive")
+	}
+}
+
+func TestParseAutoLambdaErr(t *testing.T) {
+	// autolambda before project
+	doTestParseErr(t, `gop.mod:2: autolambda must declare after a project definition`, `
+autolambda times(1)
+`)
+	// missing arguments
+	doTestParseErr(t, `gop.mod:3: usage: autolambda name(n), ...`, `
+project github.com/goplus/spx math
+autolambda
+`)
+	// missing '('
+	doTestParseErr(t, `gop.mod:3: autolambda times: expect '(' after command name`, `
+project github.com/goplus/spx math
+autolambda times 1)
+`)
+	// invalid number
+	doTestParseErr(t, `gop.mod:3: autolambda times: invalid number of arguments "x"`, `
+project github.com/goplus/spx math
+autolambda times(x)
+`)
+	// missing ')'
+	doTestParseErr(t, `gop.mod:3: autolambda times: expect ')' after number of arguments`, `
+project github.com/goplus/spx math
+autolambda times(1
+`)
+	// missing ',' between entries
+	doTestParseErr(t, `gop.mod:3: autolambda: expect ',' between entries, got "forEver"`, `
+project github.com/goplus/spx math
+autolambda times(1) forEver(0)
+`)
+	// trailing ','
+	doTestParseErr(t, `gop.mod:3: autolambda: trailing ',' without an entry`, `
+project github.com/goplus/spx math
+autolambda times(1),
+`)
+	// invalid command name
+	doTestParseErr(t, `gop.mod:3: autolambda: invalid command name "!"`, `
+project github.com/goplus/spx math
+autolambda !(0)
+`)
+	// invalid command name
+	doTestParseErr(t, `gop.mod:3: autolambda: invalid command name "'"`, `
+project github.com/goplus/spx math
+autolambda '
+`)
+	// duplicate command
+	doTestParseErr(t, `gop.mod:3: autolambda: duplicate command "times"`, `
+project github.com/goplus/spx math
+autolambda times(1), times(2)
+`)
+}
+
+// -----------------------------------------------------------------------------

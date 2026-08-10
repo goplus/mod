@@ -326,10 +326,10 @@ project ." Game math
 	doTestParseErr(t, `gop.mod:2: "." is not a valid package path`, `
 project . Game math
 `)
-	doTestParseErr(t, `gop.mod:2: symbol game invalid: invalid Go export symbol format`, `
+	doTestParseErr(t, `gop.mod:2: symbol game invalid: invalid Go export type`, `
 project .gmx game math
 `)
-	doTestParseErr(t, `gop.mod:2: symbol . invalid: invalid Go export symbol format`, `
+	doTestParseErr(t, `gop.mod:2: symbol . invalid: invalid Go export type`, `
 project .gmx . math
 `)
 	doTestParseErr(t, `gop.mod:2: invalid quoted string: invalid syntax`, `
@@ -370,11 +370,11 @@ pack ."spx Sprite
 project github.com/goplus/spx math
 pack "" ."spx
 `)
-	doTestParseErr(t, `gop.mod:3: symbol .abc invalid: invalid Go export symbol format`, `
+	doTestParseErr(t, `gop.mod:3: symbol .abc invalid: invalid Go export type`, `
 project github.com/goplus/spx math
 class .spx Sprite .abc
 `)
-	doTestParseErr(t, `gop.mod:3: symbol sprite invalid: invalid Go export symbol format`, `
+	doTestParseErr(t, `gop.mod:3: symbol sprite invalid: invalid Go export type`, `
 project github.com/goplus/spx math
 class .spx sprite
 `)
