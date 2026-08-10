@@ -59,10 +59,23 @@ func IsNotFound(err error) bool {
 
 // ClassKind checks a fname is a known classfile or not.
 // If it is, then it checks the fname is a project file or not.
+//
+// Deprecated: use ClassInfo instead.
 func (p *Module) ClassKind(fname string) (isProj, ok bool) {
 	ext := modfile.ClassExt(fname)
 	if c, ok := p.projs[ext]; ok {
 		return c.IsProj(ext, fname), true
+	}
+	return
+}
+
+// ClassInfo checks a fname is a known classfile or not.
+// If it is, it returns the auto-lambda map, whether it is a project file, and true.
+// See https://github.com/goplus/xgo/issues/2828 to learn about auto lambda.
+func (p *Module) ClassInfo(fname string) (autoLambdas map[string]int, isProj, ok bool) {
+	ext := modfile.ClassExt(fname)
+	if c, ok := p.projs[ext]; ok {
+		return c.AutoLambdas, c.IsProj(ext, fname), true
 	}
 	return
 }

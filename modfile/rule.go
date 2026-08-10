@@ -91,8 +91,15 @@ type Project struct {
 	PkgPaths []string  // package paths of classfile and optional inline-imported packages.
 	Import   []*Import // auto-imported packages
 	Pack     *Pack     // pack directive (at most one per project)
-	Flat     bool      // if true, all matching files are fragments of the project class (no work classfiles)
-	Syntax   *Line
+
+	// AutoLambdas maps command => number of parameters before auto lambda.
+	// See https://github.com/goplus/xgo/issues/2828.
+	AutoLambdas map[string]int
+
+	// if Flat is true, all matching files are fragments of the project class (no work classfiles).
+	Flat bool
+
+	Syntax *Line
 }
 
 // IsProj checks if a (ext, fname) pair is a project file or not.
