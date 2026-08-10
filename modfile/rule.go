@@ -250,7 +250,7 @@ func (f *File) parseVerb(errs *ErrorList, verb string, line *Line, args []string
 				wrapError(err)
 				return
 			}
-			class, err := parseSymbol(&args[1])
+			class, err := parseType(&args[1])
 			if err != nil {
 				wrapError(err)
 				return
@@ -307,14 +307,14 @@ usage: class [-embed -prefix=Prefix] *.workExt WorkClass [WorkPrototype]`, sw)
 			wrapError(err)
 			return
 		}
-		class, err := parseSymbol(&args[1])
+		class, err := parseType(&args[1])
 		if err != nil {
 			wrapError(err)
 			return
 		}
 		protoClass := ""
 		if len(args) > 2 {
-			protoClass, err = parseSymbol(&args[2])
+			protoClass, err = parseType(&args[2])
 			if err != nil {
 				wrapError(err)
 				return
@@ -400,28 +400,19 @@ usage: class [-embed -prefix=Prefix] *.workExt WorkClass [WorkPrototype]`, sw)
 			errorf("usage: autolambda name(n), ...")
 			return
 		}
-		entries, err := parseAutoLambdas(args)
+		if proj.AutoLambdas == nil {
+			proj.AutoLambdas = make(map[string]int)
+		}
+		err := parseAutoLambdas(proj.AutoLambdas, args)
 		if err != nil {
 			wrapError(err)
 			return
-		}
-		if proj.AutoLambdas == nil {
-			proj.AutoLambdas = make(map[string]int, len(entries))
-		}
-		for _, e := range entries {
-			proj.AutoLambdas[e.name] = e.nArgs
 		}
 	default:
 		if strict {
 			errorf("unknown directive: %s", verb)
 		}
 	}
-}
-
-// autoLambdaEntry is one parsed `name(n)` entry of an autolambda directive.
-type autoLambdaEntry struct {
-	name  string
-	nArgs int
 }
 
 // parseAutoLambdas parses the argument tokens of an autolambda directive into a
@@ -431,60 +422,42 @@ type autoLambdaEntry struct {
 //	autolambda times(1), forEver(0), onKey(1)
 //
 // arrives here as: [times ( 1 ) , forEver ( 0 ) , onKey ( 1 )].
-func parseAutoLambdas(args []string) (entries []autoLambdaEntry, err error) {
+func parseAutoLambdas(ret map[string]int, args []string) error {
 	i, n := 0, len(args)
 	for i < n {
-		name := args[i]
-		if !isIdent(name) {
-			return nil, fmt.Errorf("invalid autolambda command name %q", name)
+		name, err := parseIdent(&args[i])
+		if err != nil {
+			return fmt.Errorf("autolambda: invalid command name %q", args[i])
 		}
 		i++
 		if i >= n || args[i] != "(" {
-			return nil, fmt.Errorf("autolambda %s: expect '(' after command name", name)
+			return fmt.Errorf("autolambda %s: expect '(' after command name", name)
 		}
 		i++
-		if i >= n {
-			return nil, fmt.Errorf("autolambda %s: expect number of arguments", name)
-		}
 		nArgs, e := strconv.Atoi(args[i])
 		if e != nil || nArgs < 0 {
-			return nil, fmt.Errorf("autolambda %s: invalid number of arguments %q", name, args[i])
+			return fmt.Errorf("autolambda %s: invalid number of arguments %q", name, args[i])
 		}
 		i++
 		if i >= n || args[i] != ")" {
-			return nil, fmt.Errorf("autolambda %s: expect ')' after number of arguments", name)
+			return fmt.Errorf("autolambda %s: expect ')' after number of arguments", name)
 		}
 		i++
-		entries = append(entries, autoLambdaEntry{name: name, nArgs: nArgs})
+		if _, ok := ret[name]; ok {
+			return fmt.Errorf("autolambda: duplicate command %q", name)
+		}
+		ret[name] = nArgs
 		if i < n {
 			if args[i] != "," {
-				return nil, fmt.Errorf("autolambda: expect ',' between entries, got %q", args[i])
+				return fmt.Errorf("autolambda: expect ',' between entries, got %q", args[i])
 			}
 			i++
 			if i >= n {
-				return nil, fmt.Errorf("autolambda: trailing ',' without an entry")
+				return fmt.Errorf("autolambda: trailing ',' without an entry")
 			}
 		}
 	}
-	return
-}
-
-// isIdent reports whether s is a valid identifier (letter or '_' followed by
-// letters, digits or '_').
-func isIdent(s string) bool {
-	if s == "" {
-		return false
-	}
-	for i, r := range s {
-		if r == '_' || (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') {
-			continue
-		}
-		if i > 0 && r >= '0' && r <= '9' {
-			continue
-		}
-		return false
-	}
-	return true
+	return nil
 }
 
 func fileLine(n int) (file string, line int) {
@@ -512,19 +485,36 @@ func AutoQuote(s string) string {
 }
 
 var (
-	symbolRE = regexp.MustCompile(`\*?[A-Z]\w*`)
+	typeRE = regexp.MustCompile(`\*?[A-Z]\w*`)
+	idenRE = regexp.MustCompile(`\w+`)
 )
 
 // TODO(xsw): to be optimized
-func parseSymbol(s *string) (t string, err error) {
+func parseType(s *string) (t string, err error) {
 	t, err = parseString(s)
 	if err != nil {
 		goto failed
 	}
-	if symbolRE.MatchString(t) {
+	if typeRE.MatchString(t) {
 		return
 	}
-	err = errors.New("invalid Go export symbol format")
+	err = errors.New("invalid Go export type")
+failed:
+	return "", &InvalidSymbolError{
+		Sym: *s,
+		Err: err,
+	}
+}
+
+func parseIdent(s *string) (t string, err error) {
+	t, err = parseString(s)
+	if err != nil {
+		goto failed
+	}
+	if idenRE.MatchString(t) {
+		return
+	}
+	err = errors.New("invalid XGo identifier")
 failed:
 	return "", &InvalidSymbolError{
 		Sym: *s,

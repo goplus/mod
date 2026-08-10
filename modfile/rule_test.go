@@ -358,6 +358,21 @@ autolambda times(1) forEver(0)
 project github.com/goplus/spx math
 autolambda times(1),
 `)
+	// invalid command name
+	doTestParseErr(t, `gop.mod:3: autolambda: invalid command name "!"`, `
+project github.com/goplus/spx math
+autolambda !(0)
+`)
+	// invalid command name
+	doTestParseErr(t, `gop.mod:3: autolambda: invalid command name "'"`, `
+project github.com/goplus/spx math
+autolambda '
+`)
+	// duplicate command
+	doTestParseErr(t, `gop.mod:3: autolambda: duplicate command "times"`, `
+project github.com/goplus/spx math
+autolambda times(1), times(2)
+`)
 }
 
 // -----------------------------------------------------------------------------
