@@ -390,11 +390,101 @@ usage: class [-embed -prefix=Prefix] *.workExt WorkClass [WorkPrototype]`, sw)
 			return
 		}
 		proj.Pack = &Pack{Directory: dir, IndexFile: indexFile, Syntax: line}
+	case "autolambda":
+		proj := f.proj()
+		if proj == nil {
+			errorf("autolambda must declare after a project definition")
+			return
+		}
+		if len(args) == 0 {
+			errorf("usage: autolambda name(n), ...")
+			return
+		}
+		entries, err := parseAutoLambdas(args)
+		if err != nil {
+			wrapError(err)
+			return
+		}
+		if proj.AutoLambdas == nil {
+			proj.AutoLambdas = make(map[string]int, len(entries))
+		}
+		for _, e := range entries {
+			proj.AutoLambdas[e.name] = e.nArgs
+		}
 	default:
 		if strict {
 			errorf("unknown directive: %s", verb)
 		}
 	}
+}
+
+// autoLambdaEntry is one parsed `name(n)` entry of an autolambda directive.
+type autoLambdaEntry struct {
+	name  string
+	nArgs int
+}
+
+// parseAutoLambdas parses the argument tokens of an autolambda directive into a
+// list of `name(n)` entries. The gox.mod tokenizer splits parentheses and commas
+// into their own tokens, so a directive like:
+//
+//	autolambda times(1), forEver(0), onKey(1)
+//
+// arrives here as: [times ( 1 ) , forEver ( 0 ) , onKey ( 1 )].
+func parseAutoLambdas(args []string) (entries []autoLambdaEntry, err error) {
+	i, n := 0, len(args)
+	for i < n {
+		name := args[i]
+		if !isIdent(name) {
+			return nil, fmt.Errorf("invalid autolambda command name %q", name)
+		}
+		i++
+		if i >= n || args[i] != "(" {
+			return nil, fmt.Errorf("autolambda %s: expect '(' after command name", name)
+		}
+		i++
+		if i >= n {
+			return nil, fmt.Errorf("autolambda %s: expect number of arguments", name)
+		}
+		nArgs, e := strconv.Atoi(args[i])
+		if e != nil || nArgs < 0 {
+			return nil, fmt.Errorf("autolambda %s: invalid number of arguments %q", name, args[i])
+		}
+		i++
+		if i >= n || args[i] != ")" {
+			return nil, fmt.Errorf("autolambda %s: expect ')' after number of arguments", name)
+		}
+		i++
+		entries = append(entries, autoLambdaEntry{name: name, nArgs: nArgs})
+		if i < n {
+			if args[i] != "," {
+				return nil, fmt.Errorf("autolambda: expect ',' between entries, got %q", args[i])
+			}
+			i++
+			if i >= n {
+				return nil, fmt.Errorf("autolambda: trailing ',' without an entry")
+			}
+		}
+	}
+	return
+}
+
+// isIdent reports whether s is a valid identifier (letter or '_' followed by
+// letters, digits or '_').
+func isIdent(s string) bool {
+	if s == "" {
+		return false
+	}
+	for i, r := range s {
+		if r == '_' || (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') {
+			continue
+		}
+		if i > 0 && r >= '0' && r <= '9' {
+			continue
+		}
+		return false
+	}
+	return true
 }
 
 func fileLine(n int) (file string, line int) {
