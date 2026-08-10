@@ -151,7 +151,7 @@ func TestClassfile2(t *testing.T) {
 		t.Fatal("mod.ImportClasses:", err)
 	}
 	if _, isProj, ok := mod.ClassInfo("foo_yap.gox"); !ok || !isProj {
-		t.Fatal("mod.ClassKind foo_yap.gox:", isProj, ok)
+		t.Fatal("mod.ClassInfo foo_yap.gox:", isProj, ok)
 	}
 	if _, ok := mod.ClassKind("foo.gox"); ok {
 		t.Fatal("mod.ClassKind foo.gox: ok?")
