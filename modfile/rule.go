@@ -25,6 +25,7 @@ import (
 
 	"github.com/qiniu/x/errors"
 	"golang.org/x/mod/modfile"
+	"golang.org/x/mod/module"
 )
 
 type Compiler struct {
@@ -82,6 +83,16 @@ type Pack struct {
 	Syntax    *Line
 }
 
+// Runtime declares the runtime provider for a project.
+//
+// Protocol is the provider protocol generation (for example, "v1"). It is
+// deliberately independent from the provider package's module version.
+type Runtime struct {
+	Protocol string
+	Package  string
+	Syntax   *Line
+}
+
 // A Project is the project statement.
 type Project struct {
 	Ext      string    // can be "_[class].gox" or ".[class]", eg. "_yap.gox" or ".gmx"
@@ -91,6 +102,7 @@ type Project struct {
 	PkgPaths []string  // package paths of classfile and optional inline-imported packages.
 	Import   []*Import // auto-imported packages
 	Pack     *Pack     // pack directive (at most one per project)
+	Runtime  *Runtime  // runtime provider (at most one per project)
 
 	// AutoLambdas maps command => number of parameters before auto lambda.
 	// See https://github.com/goplus/xgo/issues/2828.
@@ -176,6 +188,10 @@ func parseToFile(file string, data []byte, fix VersionFixer, strict bool) (parse
 			parsed.parseVerb(&errs, x.Token[0], x, x.Token[1:], strict)
 		case *LineBlock:
 			verb := x.Token[0]
+			if verb == "runtime" && len(x.Line) == 0 {
+				parsed.parseVerb(&errs, verb, &Line{Comments: x.Comments, Start: x.Start, End: x.RParen.Pos, Token: x.Token, InBlock: true}, nil, strict)
+				continue
+			}
 			for _, line := range x.Line {
 				parsed.parseVerb(&errs, verb, line, line.Token, strict)
 			}
@@ -390,6 +406,43 @@ usage: class [-embed -prefix=Prefix] *.workExt WorkClass [WorkPrototype]`, sw)
 			return
 		}
 		proj.Pack = &Pack{Directory: dir, IndexFile: indexFile, Syntax: line}
+	case "runtime":
+		if line.InBlock {
+			errorf("runtime directive must not be a block")
+			return
+		}
+		proj := f.proj()
+		if proj == nil {
+			errorf("runtime must declare after a project definition")
+			return
+		}
+		if proj.Runtime != nil {
+			errorf("duplicate runtime directive in the same project")
+			return
+		}
+		if len(args) != 2 {
+			errorf("usage: runtime <protocol> <package>")
+			return
+		}
+		protocol, err := parseString(&args[0])
+		if err != nil {
+			wrapError(err)
+			return
+		}
+		if !runtimeProtocolRE.MatchString(protocol) {
+			errorf("runtime protocol must match v[1-9][0-9]*, got %q", protocol)
+			return
+		}
+		pkgPath, err := parseString(&args[1])
+		if err != nil {
+			wrapError(err)
+			return
+		}
+		if err := module.CheckImportPath(pkgPath); err != nil {
+			errorf("runtime package %q is not a valid import path: %v", pkgPath, err)
+			return
+		}
+		proj.Runtime = &Runtime{Protocol: protocol, Package: pkgPath, Syntax: line}
 	case "autolambda":
 		proj := f.proj()
 		if proj == nil {
@@ -485,8 +538,9 @@ func AutoQuote(s string) string {
 }
 
 var (
-	typeRE = regexp.MustCompile(`\*?[A-Z]\w*`)
-	idenRE = regexp.MustCompile(`\w+`)
+	typeRE            = regexp.MustCompile(`\*?[A-Z]\w*`)
+	idenRE            = regexp.MustCompile(`\w+`)
+	runtimeProtocolRE = regexp.MustCompile(`^v[1-9][0-9]*$`)
 )
 
 // TODO(xsw): to be optimized

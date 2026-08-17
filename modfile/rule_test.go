@@ -16,6 +16,7 @@
 package modfile
 
 import (
+	"strings"
 	"syscall"
 	"testing"
 )
@@ -154,6 +155,76 @@ func TestParsePack(t *testing.T) {
 	}
 	if proj.Pack.IndexFile != "index.json" {
 		t.Errorf("pack indexfile expected be index.json, but %s got", proj.Pack.IndexFile)
+	}
+}
+
+func TestParseRuntime(t *testing.T) {
+	const src = `
+xgo 1.6
+
+project main.foo Game example.com/framework math
+runtime v1 example.com/framework/cmd/runtime // provider
+`
+	f, err := ParseLax("gox.mod", []byte(src), nil)
+	if err != nil {
+		t.Fatal("ParseLax failed:", err)
+	}
+	proj := f.proj()
+	if proj == nil || proj.Runtime == nil {
+		t.Fatal("expected runtime")
+	}
+	if proj.Runtime.Protocol != "v1" || proj.Runtime.Package != "example.com/framework/cmd/runtime" {
+		t.Fatalf("runtime = %#v", proj.Runtime)
+	}
+	formatted := Format(f.Syntax)
+	f2, err := ParseLax("gox.mod", formatted, nil)
+	if err != nil {
+		t.Fatal("round-trip ParseLax failed:", err)
+	}
+	if got := f2.proj().Runtime; got == nil || got.Protocol != "v1" || got.Package != proj.Runtime.Package {
+		t.Fatalf("round-trip runtime = %#v", got)
+	}
+}
+
+func TestParseRuntimeErrors(t *testing.T) {
+	tests := []struct {
+		name string
+		want string
+		src  string
+	}{
+		{"before project", "runtime must declare after a project definition", "runtime v1 example.com/provider"},
+		{"wrong arity", "usage: runtime <protocol> <package>", "project example.com/app\nruntime v1"},
+		{"invalid protocol", "runtime protocol must match v[1-9][0-9]*", "project example.com/app\nruntime 1 example.com/provider"},
+		{"zero protocol", "runtime protocol must match v[1-9][0-9]*", "project example.com/app\nruntime v0 example.com/provider"},
+		{"invalid package", "runtime package", "project example.com/app\nruntime v1 ../provider"},
+		{"duplicate", "duplicate runtime directive in the same project", "project example.com/app\nruntime v1 example.com/provider\nruntime v1 example.com/provider"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			for _, parse := range []func(string, []byte) (*File, error){
+				func(name string, data []byte) (*File, error) { return Parse(name, data, nil) },
+				func(name string, data []byte) (*File, error) { return ParseLax(name, data, nil) },
+			} {
+				_, err := parse("gox.mod", []byte(tt.src))
+				if err == nil || !strings.Contains(err.Error(), tt.want) {
+					t.Fatalf("error = %v, want substring %q", err, tt.want)
+				}
+			}
+		})
+	}
+}
+
+func TestParseRuntimeIsNotABlockDirective(t *testing.T) {
+	_, err := ParseLax("gox.mod", []byte(`project example.com/app
+runtime (
+v1 example.com/provider
+)`), nil)
+	if err == nil || !strings.Contains(err.Error(), "runtime directive must not be a block") {
+		t.Fatalf("error = %v", err)
+	}
+	_, err = ParseLax("gox.mod", []byte("project example.com/app\nruntime (\n)\n"), nil)
+	if err == nil || !strings.Contains(err.Error(), "runtime directive must not be a block") {
+		t.Fatalf("empty block error = %v", err)
 	}
 }
 
