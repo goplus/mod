@@ -246,16 +246,7 @@ func validateSHA256(name, value string) error {
 }
 
 func validateGraphFlags(flags []string) error {
-	seen := make(map[string]struct{}, len(flags))
-	for _, flag := range flags {
-		name, value, ok := splitCanonicalFlag(flag)
-		if !ok {
-			return fmt.Errorf("runtimeprotocol: graph flag %q must use -name=value", flag)
-		}
-		if _, duplicate := seen[name]; duplicate {
-			return fmt.Errorf("runtimeprotocol: graph flag -%s may not be repeated", name)
-		}
-		seen[name] = struct{}{}
+	return validateFlags("graph", flags, func(name, value string) error {
 		switch name {
 		case "mod":
 			if value != "mod" && value != "readonly" && value != "vendor" {
@@ -268,21 +259,12 @@ func validateGraphFlags(flags []string) error {
 		default:
 			return fmt.Errorf("runtimeprotocol: graph flag -%s is not supported", name)
 		}
-	}
-	return nil
+		return nil
+	})
 }
 
 func validateBuildFlags(flags []string) error {
-	seen := make(map[string]struct{}, len(flags))
-	for _, flag := range flags {
-		name, value, ok := splitCanonicalFlag(flag)
-		if !ok {
-			return fmt.Errorf("runtimeprotocol: build flag %q must use -name=value", flag)
-		}
-		if _, duplicate := seen[name]; duplicate {
-			return fmt.Errorf("runtimeprotocol: build flag -%s may not be repeated", name)
-		}
-		seen[name] = struct{}{}
+	return validateFlags("build", flags, func(name, value string) error {
 		switch name {
 		case "v", "x", "work", "trimpath":
 			if value != "true" {
@@ -294,6 +276,24 @@ func validateBuildFlags(flags []string) error {
 			}
 		default:
 			return fmt.Errorf("runtimeprotocol: build flag -%s is not supported", name)
+		}
+		return nil
+	})
+}
+
+func validateFlags(kind string, flags []string, validateValue func(name, value string) error) error {
+	seen := make(map[string]struct{}, len(flags))
+	for _, flag := range flags {
+		name, value, ok := splitCanonicalFlag(flag)
+		if !ok {
+			return fmt.Errorf("runtimeprotocol: %s flag %q must use -name=value", kind, flag)
+		}
+		if _, duplicate := seen[name]; duplicate {
+			return fmt.Errorf("runtimeprotocol: %s flag -%s may not be repeated", kind, name)
+		}
+		seen[name] = struct{}{}
+		if err := validateValue(name, value); err != nil {
+			return err
 		}
 	}
 	return nil

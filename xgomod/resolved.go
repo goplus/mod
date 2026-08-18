@@ -99,15 +99,6 @@ type ProjectInfo struct {
 	RequiredXGo string
 }
 
-func cloneResolvedModule(m ResolvedModule) *ResolvedModule {
-	c := m
-	if m.Replace != nil {
-		r := *m.Replace
-		c.Replace = &r
-	}
-	return &c
-}
-
 func canonicalPath(path string, wantDir bool) (string, error) {
 	if path == "" || !filepath.IsAbs(path) {
 		return "", fmt.Errorf("path must be absolute: %q", path)
@@ -194,11 +185,15 @@ func validateSourceSyntax(ref ModuleRef, label string) error {
 		field string
 		value string
 	}{{"Dir", ref.Dir}, {"GoMod", ref.GoMod}} {
-		if !filepath.IsAbs(item.value) || filepath.Clean(item.value) != item.value || strings.IndexByte(item.value, 0) >= 0 {
+		if !isAbsoluteCleanPath(item.value) {
 			return fmt.Errorf("%s.%s must be an absolute clean path: %q", label, item.field, item.value)
 		}
 	}
 	return nil
+}
+
+func isAbsoluteCleanPath(value string) bool {
+	return filepath.IsAbs(value) && filepath.Clean(value) == value && strings.IndexByte(value, 0) < 0
 }
 
 func validateModuleCacheSplitSource(ref ModuleRef, dir, goMod string) error {
@@ -295,7 +290,7 @@ func validateResolvedModuleSyntax(m ResolvedModule) error {
 		return fmt.Errorf("replacement path is empty")
 	}
 	if m.Replace.Version == "" {
-		if !filepath.IsAbs(m.Replace.Path) || filepath.Clean(m.Replace.Path) != m.Replace.Path || strings.IndexByte(m.Replace.Path, 0) >= 0 {
+		if !isAbsoluteCleanPath(m.Replace.Path) {
 			return fmt.Errorf("local replacement.Path must be an absolute clean path: %q", m.Replace.Path)
 		}
 		if m.Replace.Dir != m.Replace.Path {
@@ -308,10 +303,8 @@ func validateResolvedModuleSyntax(m ResolvedModule) error {
 			return fmt.Errorf("replacement: %w", err)
 		}
 	}
-	if filepath.IsAbs(m.Replace.Path) {
-		if filepath.Clean(m.Replace.Path) != m.Replace.Path || strings.IndexByte(m.Replace.Path, 0) >= 0 {
-			return fmt.Errorf("replacement.Path must be an absolute clean path: %q", m.Replace.Path)
-		}
+	if filepath.IsAbs(m.Replace.Path) && !isAbsoluteCleanPath(m.Replace.Path) {
+		return fmt.Errorf("replacement.Path must be an absolute clean path: %q", m.Replace.Path)
 	}
 	if err := validateVersion(m.Replace.Path, m.Replace.Version); err != nil {
 		return fmt.Errorf("replacement: %w", err)
@@ -444,4 +437,13 @@ func importResolvedModule(ref ResolvedModule) ([]*ProjectInfo, error) {
 		infos = append(infos, &ProjectInfo{Project: project, Origin: origin, Declaration: declaration, RequiredXGo: required})
 	}
 	return infos, nil
+}
+
+func cloneResolvedModule(m ResolvedModule) *ResolvedModule {
+	c := m
+	if m.Replace != nil {
+		r := *m.Replace
+		c.Replace = &r
+	}
+	return &c
 }
