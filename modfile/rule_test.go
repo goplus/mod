@@ -196,7 +196,9 @@ func TestParseRuntimeErrors(t *testing.T) {
 		{"wrong arity", "usage: runtime <protocol> <package>", "project example.com/app\nruntime v1"},
 		{"invalid protocol", "runtime protocol must match v[1-9][0-9]*", "project example.com/app\nruntime 1 example.com/provider"},
 		{"zero protocol", "runtime protocol must match v[1-9][0-9]*", "project example.com/app\nruntime v0 example.com/provider"},
+		{"malformed protocol quote", "invalid syntax", "project example.com/app\nruntime \"bad\\q\" example.com/provider"},
 		{"invalid package", "runtime package", "project example.com/app\nruntime v1 ../provider"},
+		{"malformed package quote", "invalid syntax", "project example.com/app\nruntime v1 \"bad\\q\""},
 		{"duplicate", "duplicate runtime directive in the same project", "project example.com/app\nruntime v1 example.com/provider\nruntime v1 example.com/provider"},
 	}
 	for _, tt := range tests {

@@ -19,11 +19,14 @@ package xgomod
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
 
+	"github.com/goplus/mod/modfile"
 	"github.com/goplus/mod/modload"
 	"golang.org/x/mod/module"
 )
@@ -72,6 +75,16 @@ func graphIdentity(t *testing.T, path string) FileIdentity {
 	}
 	sum := sha256.Sum256(b)
 	return FileIdentity{Path: canonical, SHA256: hex.EncodeToString(sum[:])}
+}
+
+func makeSymlink(t *testing.T, oldname, newname string) {
+	t.Helper()
+	if err := os.Symlink(oldname, newname); err != nil {
+		if errors.Is(err, os.ErrPermission) || errors.Is(err, errors.ErrUnsupported) || errors.Is(err, syscall.Errno(1314)) {
+			t.Skipf("symlink unavailable: %v", err)
+		}
+		t.Fatal(err)
+	}
 }
 
 func writeModuleCacheSource(t *testing.T, cacheRoot, modPath, version, gox string) (dir, goMod string) {
@@ -661,5 +674,526 @@ func TestResolvedGraphRejectsClassModWithoutRecord(t *testing.T) {
 	graph := ResolvedClassGraph{Target: target, TargetModFile: graphIdentity(t, goMod)}
 	if err := graph.validate(); err == nil || !strings.Contains(err.Error(), "module count") {
 		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestLookupClassInfoLegacyFallbackAndRegistrationSafety(t *testing.T) {
+	legacy := &Project{Ext: ".legacy", Class: "Legacy"}
+	m := &Module{projs: map[string]*Project{legacy.Ext: legacy}}
+	info, ok := m.LookupClassInfo(legacy.Ext)
+	if !ok || info.Project != legacy || info.Origin != nil || info.RequiredXGo != "" {
+		t.Fatalf("legacy info = %#v, ok=%v", info, ok)
+	}
+	if _, ok := m.LookupClassInfo(".missing"); ok {
+		t.Fatal("missing class unexpectedly resolved")
+	}
+
+	if err := registerProject(nil, nil, nil); err == nil || !strings.Contains(err.Error(), "nil project") {
+		t.Fatalf("nil project error = %v", err)
+	}
+	runtimeProject := &Project{
+		Ext:     ".runtime",
+		Runtime: &modfile.Runtime{Protocol: "v1", Package: "example.com/provider"},
+	}
+	if err := registerProject(map[string]*Project{}, map[string]*ProjectInfo{}, &ProjectInfo{Project: runtimeProject}); err == nil || !strings.Contains(err.Error(), "no module provenance") {
+		t.Fatalf("orphan runtime error = %v", err)
+	}
+
+	same := &Project{Ext: ".same", Class: "Same"}
+	projects := map[string]*Project{same.Ext: same}
+	infos := map[string]*ProjectInfo{same.Ext: {Project: same}}
+	if err := registerProject(projects, infos, &ProjectInfo{Project: same}); err != nil {
+		t.Fatalf("same project registration failed: %v", err)
+	}
+}
+
+func TestImportClassesResolvedRejectsReceiverState(t *testing.T) {
+	var nilModule *Module
+	if err := nilModule.ImportClassesResolved(ResolvedClassGraph{}); err == nil || !strings.Contains(err.Error(), "no target module snapshot") {
+		t.Fatalf("nil receiver error = %v", err)
+	}
+	if err := (&Module{}).ImportClassesResolved(ResolvedClassGraph{}); err == nil || !strings.Contains(err.Error(), "no target module snapshot") {
+		t.Fatalf("empty receiver error = %v", err)
+	}
+
+	root := t.TempDir()
+	goMod := writeModule(t, root, "example.com/app", "xgo 1.9\n")
+	loaded, err := modload.LoadFrom(goMod, filepath.Join(root, "gox.mod"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := New(loaded)
+	target := graphModule("example.com/other", "", root, goMod, true)
+	graph := ResolvedClassGraph{Target: target, TargetModFile: graphIdentity(t, goMod)}
+	if err := m.ImportClassesResolved(graph); err == nil || !strings.Contains(err.Error(), "does not match graph target") {
+		t.Fatalf("target mismatch error = %v", err)
+	}
+}
+
+func TestImportClassesResolvedPreservesReceiverOnClassImportFailure(t *testing.T) {
+	root := t.TempDir()
+	goMod := writeModule(t, root, "example.com/app", "xgo 1.9\n")
+	if err := os.WriteFile(goMod, []byte("module example.com/app\n\ngo 1.25\n\nrequire example.com/dep v1.0.0 //xgo:class\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	depDir := filepath.Join(root, "dep")
+	depGoMod := writeModule(t, depDir, "example.com/dep", "")
+	loaded, err := modload.LoadFrom(goMod, filepath.Join(root, "gox.mod"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := New(loaded)
+	old := &Project{Ext: ".old", Class: "Old"}
+	m.projs = map[string]*Project{old.Ext: old}
+	m.infos = map[string]*ProjectInfo{old.Ext: {Project: old}}
+
+	target := graphModule("example.com/app", "", root, goMod, true)
+	dep := graphModule("example.com/dep", "v1.0.0", depDir, depGoMod, false)
+	graph := ResolvedClassGraph{
+		Target:        target,
+		ClassModules:  []ResolvedModule{dep},
+		TargetModFile: graphIdentity(t, goMod),
+	}
+	if err := m.ImportClassesResolved(graph); err == nil || !strings.Contains(err.Error(), "not a classfile module") {
+		t.Fatalf("class import error = %v", err)
+	}
+	if got, ok := m.LookupClassInfo(old.Ext); !ok || got.Project != old {
+		t.Fatalf("receiver changed after failed import: %#v, ok=%v", got, ok)
+	}
+}
+
+func TestImportClassesResolvedRejectsReceiverSnapshotMismatch(t *testing.T) {
+	t.Run("path", func(t *testing.T) {
+		root := t.TempDir()
+		goMod := writeModule(t, root, "example.com/app", "xgo 1.9\n")
+		copyPath := filepath.Join(root, "graph.go.mod")
+		data, err := os.ReadFile(goMod)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(copyPath, data, 0644); err != nil {
+			t.Fatal(err)
+		}
+		loaded, err := modload.LoadFrom(goMod, filepath.Join(root, "gox.mod"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		graph := ResolvedClassGraph{
+			Target:        graphModule("example.com/app", "", root, goMod, true),
+			TargetModFile: graphIdentity(t, copyPath),
+		}
+		if err := New(loaded).ImportClassesResolved(graph); err == nil || !strings.Contains(err.Error(), "snapshots differ") {
+			t.Fatalf("path mismatch error = %v", err)
+		}
+	})
+
+	t.Run("content", func(t *testing.T) {
+		root := t.TempDir()
+		goMod := writeModule(t, root, "example.com/app", "xgo 1.9\n")
+		loadedSnapshot := []byte("module example.com/app\n\ngo 1.25\n\n// loaded snapshot\n")
+		loaded, err := modload.LoadFromEx(goMod, filepath.Join(root, "gox.mod"), func(path string) ([]byte, error) {
+			if path == goMod {
+				return loadedSnapshot, nil
+			}
+			return os.ReadFile(path)
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		graph := ResolvedClassGraph{
+			Target:        graphModule("example.com/app", "", root, goMod, true),
+			TargetModFile: graphIdentity(t, goMod),
+		}
+		if err := New(loaded).ImportClassesResolved(graph); err == nil || !strings.Contains(err.Error(), "contents differ") {
+			t.Fatalf("content mismatch error = %v", err)
+		}
+	})
+}
+
+func TestReceiverGoxSnapshotRequiresLoadedMetadata(t *testing.T) {
+	t.Run("absent", func(t *testing.T) {
+		root := t.TempDir()
+		goMod := writeModule(t, root, "example.com/app", "")
+		loaded, err := modload.LoadFrom(goMod, "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		graph := ResolvedClassGraph{
+			Target:        graphModule("example.com/app", "", root, goMod, true),
+			TargetModFile: graphIdentity(t, goMod),
+		}
+		if err := New(loaded).ImportClassesResolved(graph); err != nil {
+			t.Fatalf("absent metadata should be accepted: %v", err)
+		}
+	})
+
+	t.Run("appeared", func(t *testing.T) {
+		root := t.TempDir()
+		goMod := writeModule(t, root, "example.com/app", "xgo 1.9\n")
+		goxMod := filepath.Join(root, "gox.mod")
+		loaded, err := modload.LoadFromEx(goMod, goxMod, func(path string) ([]byte, error) {
+			if path == goxMod {
+				return nil, os.ErrPermission
+			}
+			return os.ReadFile(path)
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		graph := ResolvedClassGraph{
+			Target:        graphModule("example.com/app", "", root, goMod, true),
+			TargetModFile: graphIdentity(t, goMod),
+		}
+		if err := New(loaded).ImportClassesResolved(graph); err == nil || !strings.Contains(err.Error(), "appeared without load snapshot") {
+			t.Fatalf("appeared metadata error = %v", err)
+		}
+	})
+}
+
+func TestResolvedModuleValidateRejectsFilesystemAndIdentityShapes(t *testing.T) {
+	root := t.TempDir()
+	goMod := writeModule(t, root, "example.com/app", "")
+	canonicalDir, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	canonicalGoMod, err := filepath.EvalSymlinks(goMod)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tests := []struct {
+		name     string
+		resolved ResolvedModule
+		want     string
+	}{
+		{
+			name: "directory used as go.mod",
+			resolved: ResolvedModule{Selected: ModuleRef{
+				Path: "example.com/app", Version: "v1.0.0", Dir: canonicalDir, GoMod: canonicalDir,
+			}},
+			want: "not a regular file",
+		},
+		{
+			name: "file used as module directory",
+			resolved: ResolvedModule{Selected: ModuleRef{
+				Path: "example.com/app", Version: "v1.0.0", Dir: canonicalGoMod, GoMod: canonicalGoMod,
+			}},
+			want: "not a directory",
+		},
+		{
+			name: "invalid module path",
+			resolved: ResolvedModule{Selected: ModuleRef{
+				Path: "../app", Version: "v1.0.0", Dir: canonicalDir, GoMod: canonicalGoMod,
+			}},
+			want: "invalid module path",
+		},
+		{
+			name: "non-canonical version",
+			resolved: ResolvedModule{Selected: ModuleRef{
+				Path: "example.com/app", Version: "v1", Dir: canonicalDir, GoMod: canonicalGoMod,
+			}},
+			want: "invalid non-canonical version",
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			err := test.resolved.Validate()
+			if err == nil || !strings.Contains(err.Error(), test.want) {
+				t.Fatalf("Validate() error = %v, want substring %q", err, test.want)
+			}
+		})
+	}
+}
+
+func TestReceiverGoxSnapshotRejectsUntrustedIdentity(t *testing.T) {
+	t.Run("relative path", func(t *testing.T) {
+		loaded, err := modload.LoadFromEx("relative/go.mod", "relative/gox.mod", func(path string) ([]byte, error) {
+			switch path {
+			case "relative/go.mod":
+				return []byte("module example.com/app\n\ngo 1.25\n"), nil
+			case "relative/gox.mod":
+				return []byte("xgo 1.9\n"), nil
+			default:
+				return nil, os.ErrNotExist
+			}
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, _, err := receiverGoxSnapshot(New(loaded), t.TempDir()); err == nil || !strings.Contains(err.Error(), "path must be absolute") {
+			t.Fatalf("relative identity error = %v", err)
+		}
+	})
+
+	t.Run("outside target source", func(t *testing.T) {
+		root := t.TempDir()
+		goMod := writeModule(t, root, "example.com/app", "")
+		outside := filepath.Join(t.TempDir(), "gox.mod")
+		if err := os.WriteFile(outside, []byte("xgo 1.9\n"), 0644); err != nil {
+			t.Fatal(err)
+		}
+		loaded, err := modload.LoadFrom(goMod, outside)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, _, err := receiverGoxSnapshot(New(loaded), root); err == nil || !strings.Contains(err.Error(), "outside graph target source") {
+			t.Fatalf("outside identity error = %v", err)
+		}
+	})
+
+	t.Run("projects without snapshot", func(t *testing.T) {
+		root := t.TempDir()
+		goMod := writeModule(t, root, "example.com/app", "")
+		loaded, err := modload.LoadFrom(goMod, "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		loaded.Opt.Projects = []*modfile.Project{{Ext: ".foo", Class: "Game"}}
+		if _, _, err := receiverGoxSnapshot(New(loaded), root); err == nil || !strings.Contains(err.Error(), "projects without") {
+			t.Fatalf("projects without snapshot error = %v", err)
+		}
+	})
+
+	t.Run("declaration disappeared", func(t *testing.T) {
+		root := t.TempDir()
+		goMod := writeModule(t, root, "example.com/app", "xgo 1.9\n")
+		goxMod := filepath.Join(root, "gox.mod")
+		loaded, err := modload.LoadFrom(goMod, goxMod)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Remove(goxMod); err != nil {
+			t.Fatal(err)
+		}
+		if _, _, err := receiverGoxSnapshot(New(loaded), root); err == nil || !strings.Contains(err.Error(), "receiver target gox.mod") {
+			t.Fatalf("disappeared declaration error = %v", err)
+		}
+	})
+}
+
+func TestImportClassesResolvedRejectsRelativeReceiverModfile(t *testing.T) {
+	root := t.TempDir()
+	graphGoMod := writeModule(t, root, "example.com/app", "")
+	loaded, err := modload.LoadFromEx("relative/go.mod", "", func(path string) ([]byte, error) {
+		if path == "relative/go.mod" {
+			return []byte("module example.com/app\n\ngo 1.25\n"), nil
+		}
+		return nil, os.ErrNotExist
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	target := graphModule("example.com/app", "", root, graphGoMod, true)
+	graph := ResolvedClassGraph{Target: target, TargetModFile: graphIdentity(t, graphGoMod)}
+	if err := New(loaded).ImportClassesResolved(graph); err == nil || !strings.Contains(err.Error(), "receiver target modfile") {
+		t.Fatalf("relative receiver modfile error = %v", err)
+	}
+}
+
+func TestResolvedGraphRejectsMalformedTargetAndMismatchedSource(t *testing.T) {
+	t.Run("malformed target modfile", func(t *testing.T) {
+		root := t.TempDir()
+		goMod := writeModule(t, root, "example.com/app", "")
+		if err := os.WriteFile(goMod, []byte("module example.com/app\n\nrequire (\n"), 0644); err != nil {
+			t.Fatal(err)
+		}
+		graph := ResolvedClassGraph{
+			Target:        graphModule("example.com/app", "", root, goMod, true),
+			TargetModFile: graphIdentity(t, goMod),
+		}
+		if err := graph.validate(); err == nil || !strings.Contains(err.Error(), "parse target modfile") {
+			t.Fatalf("malformed target error = %v", err)
+		}
+	})
+
+	t.Run("source declares another module", func(t *testing.T) {
+		root := t.TempDir()
+		targetGoMod := writeModule(t, root, "example.com/app", "")
+		if err := os.WriteFile(targetGoMod, []byte("module example.com/app\n\ngo 1.25\n\nrequire example.com/dep v1.0.0 //xgo:class\n"), 0644); err != nil {
+			t.Fatal(err)
+		}
+		depDir := filepath.Join(root, "dep")
+		depGoMod := writeModule(t, depDir, "example.com/wrong", "xgo 1.9\nproject .dep Dep example.com/wrong\n")
+		loaded, err := modload.LoadFrom(targetGoMod, "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		m := New(loaded)
+		old := &Project{Ext: ".old", Class: "Old"}
+		m.projs = map[string]*Project{old.Ext: old}
+		m.infos = map[string]*ProjectInfo{old.Ext: {Project: old}}
+		graph := ResolvedClassGraph{
+			Target:        graphModule("example.com/app", "", root, targetGoMod, true),
+			ClassModules:  []ResolvedModule{graphModule("example.com/dep", "v1.0.0", depDir, depGoMod, false)},
+			TargetModFile: graphIdentity(t, targetGoMod),
+		}
+		if err := m.ImportClassesResolved(graph); err == nil || !strings.Contains(err.Error(), "declares") {
+			t.Fatalf("source identity error = %v", err)
+		}
+		if got, ok := m.LookupClassInfo(old.Ext); !ok || got.Project != old {
+			t.Fatalf("receiver changed after source identity error: %#v, ok=%v", got, ok)
+		}
+	})
+}
+
+func TestResolvedModuleValidateRejectsReplacementAndCanonicalShapes(t *testing.T) {
+	root := t.TempDir()
+	goMod := writeModule(t, root, "example.com/app", "")
+	canonicalDir, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	canonicalGoMod, err := filepath.EvalSymlinks(goMod)
+	if err != nil {
+		t.Fatal(err)
+	}
+	validSource := func() ModuleRef {
+		return ModuleRef{Path: "example.com/app", Version: "v1.0.0", Dir: canonicalDir, GoMod: canonicalGoMod}
+	}
+	validSelected := func() ModuleRef {
+		return ModuleRef{Path: "example.com/app", Version: "v1.0.0"}
+	}
+	for _, test := range []struct {
+		name     string
+		resolved ResolvedModule
+		want     string
+	}{
+		{name: "empty selected path", resolved: ResolvedModule{Selected: ModuleRef{Version: "v1.0.0", Dir: canonicalDir, GoMod: canonicalGoMod}}, want: "module path is empty"},
+		{name: "invalid selected major", resolved: ResolvedModule{Selected: ModuleRef{Path: "example.com/app/v2", Version: "v1.0.0", Dir: canonicalDir, GoMod: canonicalGoMod}}, want: "invalid module version"},
+		{name: "missing source", resolved: ResolvedModule{Selected: ModuleRef{Path: "example.com/app", Version: "v1.0.0"}}, want: "must provide both"},
+		{name: "relative source", resolved: ResolvedModule{Selected: ModuleRef{Path: "example.com/app", Version: "v1.0.0", Dir: "relative", GoMod: canonicalGoMod}}, want: "absolute clean path"},
+		{name: "empty replacement path", resolved: ResolvedModule{Selected: validSelected(), Replace: &ModuleRef{Version: "v1.0.0", Dir: canonicalDir, GoMod: canonicalGoMod}}, want: "replacement path is empty"},
+		{name: "invalid replacement path", resolved: ResolvedModule{Selected: validSelected(), Replace: &ModuleRef{Path: "bad path", Version: "v1.0.0", Dir: canonicalDir, GoMod: canonicalGoMod}}, want: "invalid module path"},
+		{name: "invalid replacement version", resolved: ResolvedModule{Selected: validSelected(), Replace: &ModuleRef{Path: "example.com/fork", Version: "v1", Dir: canonicalDir, GoMod: canonicalGoMod}}, want: "invalid non-canonical version"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if err := test.resolved.Validate(); err == nil || !strings.Contains(err.Error(), test.want) {
+				t.Fatalf("Validate() error = %v, want substring %q", err, test.want)
+			}
+		})
+	}
+
+	t.Run("non-canonical directory", func(t *testing.T) {
+		alias := filepath.Join(filepath.Dir(canonicalDir), "xgomod-resolved-dir-alias")
+		makeSymlink(t, canonicalDir, alias)
+		defer os.Remove(alias)
+		ref := validSource()
+		ref.Dir = alias
+		if err := (ResolvedModule{Selected: ref}).Validate(); err == nil || !strings.Contains(err.Error(), "Dir must be canonical") {
+			t.Fatalf("non-canonical directory error = %v", err)
+		}
+	})
+
+	t.Run("non-canonical go.mod", func(t *testing.T) {
+		alias := filepath.Join(canonicalDir, "xgomod-resolved-go.mod-alias")
+		makeSymlink(t, canonicalGoMod, alias)
+		defer os.Remove(alias)
+		ref := validSource()
+		ref.GoMod = alias
+		if err := (ResolvedModule{Selected: ref}).Validate(); err == nil || !strings.Contains(err.Error(), "GoMod must be canonical") {
+			t.Fatalf("non-canonical go.mod error = %v", err)
+		}
+	})
+
+	t.Run("non-canonical local replacement path", func(t *testing.T) {
+		alias := filepath.Join(filepath.Dir(canonicalDir), "xgomod-replacement-dir-alias")
+		makeSymlink(t, canonicalDir, alias)
+		defer os.Remove(alias)
+		replacement := &ModuleRef{Path: alias, Dir: alias, GoMod: filepath.Join(alias, "go.mod")}
+		resolved := ResolvedModule{Selected: validSelected(), Replace: replacement}
+		if err := resolved.Validate(); err == nil || !strings.Contains(err.Error(), "replacement.Path must be canonical") {
+			t.Fatalf("non-canonical replacement path error = %v", err)
+		}
+	})
+}
+
+func TestValidateFileIdentityRejectsMalformedShapes(t *testing.T) {
+	root := t.TempDir()
+	goMod := writeModule(t, root, "example.com/app", "")
+	identity := graphIdentity(t, goMod)
+	for _, test := range []struct {
+		name     string
+		identity FileIdentity
+		want     string
+	}{
+		{name: "missing fields", identity: FileIdentity{}, want: "requires path and SHA-256"},
+		{name: "short digest", identity: FileIdentity{Path: goMod, SHA256: "abcd"}, want: "must be 64 hex characters"},
+		{name: "non-hex digest", identity: FileIdentity{Path: goMod, SHA256: strings.Repeat("g", 64)}, want: "invalid target modfile SHA-256"},
+		{name: "relative path", identity: FileIdentity{Path: "go.mod", SHA256: identity.SHA256}, want: "target modfile path"},
+		{name: "directory path", identity: FileIdentity{Path: root, SHA256: identity.SHA256}, want: "target modfile path"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if _, err := validateFileIdentity(test.identity); err == nil || !strings.Contains(err.Error(), test.want) {
+				t.Fatalf("validateFileIdentity() error = %v, want substring %q", err, test.want)
+			}
+		})
+	}
+
+	t.Run("symlink path", func(t *testing.T) {
+		alias := filepath.Join(root, "go.mod.alias")
+		makeSymlink(t, goMod, alias)
+		defer os.Remove(alias)
+		if _, err := validateFileIdentity(FileIdentity{Path: alias, SHA256: identity.SHA256}); err == nil || !strings.Contains(err.Error(), "path must be canonical") {
+			t.Fatalf("symlink identity error = %v", err)
+		}
+	})
+}
+
+func TestValidateModuleCacheSplitSourceRejectsMissingMetadata(t *testing.T) {
+	t.Run("missing download metadata", func(t *testing.T) {
+		path := "example.com/framework"
+		version := "v1.2.3"
+		dir, goMod := writeModuleCacheSource(t, filepath.Join(t.TempDir(), "modcache"), path, version, "")
+		dir, err := filepath.EvalSymlinks(dir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Remove(goMod); err != nil {
+			t.Fatal(err)
+		}
+		if err := validateModuleCacheSplitSource(ModuleRef{Path: path, Version: version}, dir, goMod); err == nil || !strings.Contains(err.Error(), "download-cache go.mod") {
+			t.Fatalf("missing metadata error = %v", err)
+		}
+	})
+
+	if err := validateModuleCacheSplitSource(ModuleRef{Path: "example.com/framework"}, "/", "/"); err == nil || !strings.Contains(err.Error(), "module has no version") {
+		t.Fatalf("missing version error = %v", err)
+	}
+}
+
+func TestCloneResolvedModuleCopiesReplacement(t *testing.T) {
+	original := ResolvedModule{
+		Selected: ModuleRef{Path: "example.com/framework", Version: "v1.2.3"},
+		Replace:  &ModuleRef{Path: "/workspace/framework", Dir: "/workspace/framework", GoMod: "/workspace/framework/go.mod"},
+	}
+	clone := cloneResolvedModule(original)
+	if clone == nil {
+		t.Fatal("clone is nil")
+	}
+	if clone.Replace == nil || clone.Replace == original.Replace {
+		t.Fatalf("clone replacement pointer = %p, original = %p", clone.Replace, original.Replace)
+	}
+	clone.Replace.Path = "/workspace/other"
+	if original.Replace.Path == clone.Replace.Path {
+		t.Fatal("mutating clone changed original replacement")
+	}
+}
+
+func TestImportClassesLegacyReportsMissingAndNonClassModules(t *testing.T) {
+	root := t.TempDir()
+	goMod := writeModule(t, root, "example.com/app", "")
+	loaded, err := modload.LoadFrom(goMod, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	loaded.Opt.ClassMods = []string{"example.com/missing"}
+	if err := New(loaded).ImportClasses(); err == nil || !IsNotFound(err) {
+		t.Fatalf("missing class module error = %v", err)
+	}
+
+	noClassDir := filepath.Join(root, "no-class")
+	writeModule(t, noClassDir, "example.com/no-class", "")
+	if err := (&Module{}).importClassFrom(module.Version{Path: noClassDir}, nil); err != ErrNotClassFileMod {
+		t.Fatalf("non-class module error = %v, want %v", err, ErrNotClassFileMod)
 	}
 }

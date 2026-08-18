@@ -17,6 +17,7 @@
 package runtimeprotocol
 
 import (
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -24,14 +25,22 @@ import (
 	"github.com/goplus/mod/xgomod"
 )
 
+func testPath(parts ...string) string {
+	path, err := filepath.Abs(filepath.Join(append([]string{"runtimeprotocol-fixture"}, parts...)...))
+	if err != nil {
+		panic(err)
+	}
+	return path
+}
+
 func testRequest() Request {
 	return Request{
 		Version: Version1,
 		Action:  ActionRun,
 		Project: Project{
-			Dir:           "/workspace/app/game",
-			File:          "/workspace/app/game/main.foo",
-			ModuleRoot:    "/workspace/app",
+			Dir:           testPath("workspace", "app", "game"),
+			File:          testPath("workspace", "app", "game", "main.foo"),
+			ModuleRoot:    testPath("workspace", "app"),
 			Extension:     ".foo",
 			FullExtension: "*.foo",
 			Pack:          &Pack{Directory: "payload", IndexFile: "index.data"},
@@ -39,10 +48,22 @@ func testRequest() Request {
 		ProviderPackage: "example.test/framework/cmd/provider",
 		ProviderOrigin: xgomod.ResolvedModule{
 			Selected: xgomod.ModuleRef{Path: "example.test/framework", Version: "v1.2.3"},
-			Replace:  &xgomod.ModuleRef{Path: "/workspace/framework", Dir: "/workspace/framework", GoMod: "/workspace/framework/go.mod"},
+			Replace: &xgomod.ModuleRef{
+				Path:  testPath("workspace", "framework"),
+				Dir:   testPath("workspace", "framework"),
+				GoMod: testPath("workspace", "framework", "go.mod"),
+			},
 		},
-		Declaration:     xgomod.FileIdentity{Path: "/workspace/framework/gox.mod", SHA256: strings.Repeat("a", 64)},
-		Graph:           Graph{GoCommand: "/usr/bin/go", WorkDir: "/workspace/app", GoWork: "off", Flags: []string{"-mod=readonly", "-modfile=/workspace/app/alt.mod"}},
+		Declaration: xgomod.FileIdentity{
+			Path:   testPath("workspace", "framework", "gox.mod"),
+			SHA256: strings.Repeat("a", 64),
+		},
+		Graph: Graph{
+			GoCommand: testPath("usr", "bin", "go"),
+			WorkDir:   testPath("workspace", "app"),
+			GoWork:    "off",
+			Flags:     []string{"-mod=readonly", "-modfile=" + testPath("workspace", "app", "alt.mod")},
+		},
 		BuildFlags:      []string{"-v=true", "-trimpath=true", "-buildvcs=false"},
 		ApplicationArgs: []string{"", "a b", "--"},
 	}
@@ -62,7 +83,7 @@ func TestRoundTripRunReplacement(t *testing.T) {
 		t.Fatalf("round trip = %#v, want %#v", got, want)
 	}
 	joined := strings.Join(args, "\n")
-	if strings.Contains(joined, "selected-dir") || !strings.Contains(joined, "--replace-dir=/workspace/framework") {
+	if strings.Contains(joined, "selected-dir") || !strings.Contains(joined, "--replace-dir="+testPath("workspace", "framework")) {
 		t.Fatalf("replacement identity was flattened:\n%s", joined)
 	}
 	if got.ApplicationArgs[0] != "" || got.ApplicationArgs[2] != "--" {
@@ -78,10 +99,13 @@ func TestRoundTripBuildSelectedWithoutPack(t *testing.T) {
 	want.ProviderOrigin = xgomod.ResolvedModule{
 		Selected: xgomod.ModuleRef{
 			Path: "example.test/framework", Version: "v1.2.3",
-			Dir: "/workspace/framework", GoMod: "/workspace/framework/go.mod",
+			Dir: testPath("workspace", "framework"), GoMod: testPath("workspace", "framework", "go.mod"),
 		},
 	}
-	want.Output = &BuildOutput{Staging: "/workspace/out/.game.tmp", Final: "/workspace/out/game"}
+	want.Output = &BuildOutput{
+		Staging: testPath("workspace", "out", ".game.tmp"),
+		Final:   testPath("workspace", "out", "game"),
+	}
 	args, err := Encode(want)
 	if err != nil {
 		t.Fatal(err)
@@ -103,7 +127,7 @@ func TestRoundTripOriginVariantsAndWorkspace(t *testing.T) {
 	tests := map[string]xgomod.ResolvedModule{
 		"main": {
 			Selected: xgomod.ModuleRef{
-				Path: "example.test/framework", Dir: "/workspace/framework", GoMod: "/workspace/framework/go.mod",
+				Path: "example.test/framework", Dir: testPath("workspace", "framework"), GoMod: testPath("workspace", "framework", "go.mod"),
 			},
 			Main: true,
 		},
@@ -111,7 +135,7 @@ func TestRoundTripOriginVariantsAndWorkspace(t *testing.T) {
 			Selected: xgomod.ModuleRef{Path: "example.test/framework", Version: "v1.2.3"},
 			Replace: &xgomod.ModuleRef{
 				Path: "example.test/framework-fork", Version: "v1.4.0",
-				Dir: "/workspace/framework-fork", GoMod: "/workspace/framework-fork/go.mod",
+				Dir: testPath("workspace", "framework-fork"), GoMod: testPath("workspace", "framework-fork", "go.mod"),
 			},
 		},
 	}
@@ -119,9 +143,9 @@ func TestRoundTripOriginVariantsAndWorkspace(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			want := testRequest()
 			want.ProviderOrigin = origin
-			want.Declaration.Path = origin.Effective().Dir + "/gox.mod"
-			want.Graph.GoWork = "/workspace/go.work"
-			want.Graph.Flags = append(want.Graph.Flags, "-overlay=/workspace/overlay.json")
+			want.Declaration.Path = filepath.Join(origin.Effective().Dir, "gox.mod")
+			want.Graph.GoWork = testPath("workspace", "go.work")
+			want.Graph.Flags = append(want.Graph.Flags, "-overlay="+testPath("workspace", "overlay.json"))
 			args, err := Encode(want)
 			if err != nil {
 				t.Fatal(err)
@@ -139,13 +163,13 @@ func TestRoundTripOriginVariantsAndWorkspace(t *testing.T) {
 
 func TestValidationIsStructural(t *testing.T) {
 	request := testRequest()
-	request.Project.Dir = "/does/not/exist/game"
-	request.Project.File = "/does/not/exist/game/main.foo"
-	request.Project.ModuleRoot = "/does/not/exist"
-	request.Declaration.Path = "/does/not/exist/framework/gox.mod"
-	request.ProviderOrigin.Replace.Path = "/does/not/exist/framework"
-	request.ProviderOrigin.Replace.Dir = "/does/not/exist/framework"
-	request.ProviderOrigin.Replace.GoMod = "/does/not/exist/framework/go.mod"
+	request.Project.Dir = testPath("does", "not", "exist", "game")
+	request.Project.File = testPath("does", "not", "exist", "game", "main.foo")
+	request.Project.ModuleRoot = testPath("does", "not", "exist")
+	request.Declaration.Path = testPath("does", "not", "exist", "framework", "gox.mod")
+	request.ProviderOrigin.Replace.Path = testPath("does", "not", "exist", "framework")
+	request.ProviderOrigin.Replace.Dir = testPath("does", "not", "exist", "framework")
+	request.ProviderOrigin.Replace.GoMod = testPath("does", "not", "exist", "framework", "go.mod")
 	if err := request.Validate(); err != nil {
 		t.Fatalf("structural validation consulted ambient filesystem: %v", err)
 	}
@@ -194,6 +218,471 @@ func TestRejectMalformedArgv(t *testing.T) {
 	}
 }
 
+func TestValidateRejectsStructuralRequests(t *testing.T) {
+	tests := []struct {
+		name   string
+		mutate func(*Request)
+		want   string
+	}{
+		{
+			name: "unsupported action",
+			mutate: func(r *Request) {
+				r.Action = Action("test")
+			},
+			want: "unsupported action",
+		},
+		{
+			name: "empty project directory",
+			mutate: func(r *Request) {
+				r.Project.Dir = ""
+			},
+			want: "path --project-dir may not be empty",
+		},
+		{
+			name: "nul project file",
+			mutate: func(r *Request) {
+				r.Project.File += "\x00"
+			},
+			want: "path --project-file may not be empty or contain NUL",
+		},
+		{
+			name: "relative module root",
+			mutate: func(r *Request) {
+				r.Project.ModuleRoot = "workspace/app"
+			},
+			want: "path --module-root must be absolute",
+		},
+		{
+			name: "unclean declaration file",
+			mutate: func(r *Request) {
+				r.Declaration.Path = testPath("workspace", "framework") + string(filepath.Separator) + ".." + string(filepath.Separator) + "framework"
+			},
+			want: "path --declaration-file must be clean",
+		},
+		{
+			name: "unclean go command",
+			mutate: func(r *Request) {
+				r.Graph.GoCommand = testPath("usr", "bin") + string(filepath.Separator) + ".." + string(filepath.Separator) + "bin" + string(filepath.Separator) + "go"
+			},
+			want: "path --go-command must be clean",
+		},
+		{
+			name: "nul graph work directory",
+			mutate: func(r *Request) {
+				r.Graph.WorkDir += "\x00"
+			},
+			want: "path --graph-work-dir may not be empty or contain NUL",
+		},
+		{
+			name: "nested project file",
+			mutate: func(r *Request) {
+				r.Project.File = testPath("workspace", "app", "game", "nested", "main.foo")
+			},
+			want: "project-file must be a top-level file",
+		},
+		{
+			name: "project outside module root",
+			mutate: func(r *Request) {
+				r.Project.ModuleRoot = testPath("workspace", "other")
+			},
+			want: "project-dir must be within module-root",
+		},
+		{
+			name: "empty project extension",
+			mutate: func(r *Request) {
+				r.Project.Extension = ""
+			},
+			want: "project extension may not be empty",
+		},
+		{
+			name: "nul project extension",
+			mutate: func(r *Request) {
+				r.Project.Extension = ".foo\x00"
+			},
+			want: "project extension may not be empty or contain NUL",
+		},
+		{
+			name: "empty full extension",
+			mutate: func(r *Request) {
+				r.Project.FullExtension = ""
+			},
+			want: "project full extension may not be empty",
+		},
+		{
+			name: "nul full extension",
+			mutate: func(r *Request) {
+				r.Project.FullExtension = "*.foo\x00"
+			},
+			want: "project full extension may not be empty or contain NUL",
+		},
+		{
+			name: "empty pack directory",
+			mutate: func(r *Request) {
+				r.Project.Pack.Directory = ""
+			},
+			want: "pack directory must be",
+		},
+		{
+			name: "backslash pack directory",
+			mutate: func(r *Request) {
+				r.Project.Pack.Directory = `payload\\data`
+			},
+			want: "pack directory must be",
+		},
+		{
+			name: "absolute pack directory",
+			mutate: func(r *Request) {
+				r.Project.Pack.Directory = testPath("workspace", "app", "payload")
+			},
+			want: "pack directory must be",
+		},
+		{
+			name: "unclean pack directory",
+			mutate: func(r *Request) {
+				r.Project.Pack.Directory = "payload/../payload"
+			},
+			want: "pack directory must be",
+		},
+		{
+			name: "pack directory escapes project",
+			mutate: func(r *Request) {
+				r.Project.Pack.Directory = "../payload"
+			},
+			want: "pack directory escapes",
+		},
+		{
+			name: "invalid pack index",
+			mutate: func(r *Request) {
+				r.Project.Pack.IndexFile = "index/data"
+			},
+			want: "pack index must be a plain file name",
+		},
+		{
+			name: "invalid provider origin",
+			mutate: func(r *Request) {
+				r.ProviderOrigin.Selected.Path = "bad path"
+			},
+			want: "provider origin",
+		},
+		{
+			name: "declaration outside provider metadata",
+			mutate: func(r *Request) {
+				r.Declaration.Path = testPath("workspace", "framework", "metadata.txt")
+			},
+			want: "declaration-file must be provider metadata",
+		},
+		{
+			name: "invalid provider package",
+			mutate: func(r *Request) {
+				r.ProviderPackage = "bad package"
+			},
+			want: "invalid provider package",
+		},
+		{
+			name: "relative go work",
+			mutate: func(r *Request) {
+				r.Graph.GoWork = "workspace/go.work"
+			},
+			want: "path --go-work must be absolute",
+		},
+		{
+			name: "malformed graph flag",
+			mutate: func(r *Request) {
+				r.Graph.Flags = []string{"-mod"}
+			},
+			want: "graph flag",
+		},
+		{
+			name: "duplicate graph flag",
+			mutate: func(r *Request) {
+				r.Graph.Flags = []string{"-mod=mod", "-mod=readonly"}
+			},
+			want: "graph flag -mod may not be repeated",
+		},
+		{
+			name: "unsupported graph mode",
+			mutate: func(r *Request) {
+				r.Graph.Flags = []string{"-mod=bad"}
+			},
+			want: "graph flag -mod has unsupported value",
+		},
+		{
+			name: "unsupported graph flag",
+			mutate: func(r *Request) {
+				r.Graph.Flags = []string{"-tags=all"}
+			},
+			want: "graph flag -tags is not supported",
+		},
+		{
+			name: "malformed build flag",
+			mutate: func(r *Request) {
+				r.BuildFlags = []string{"-v"}
+			},
+			want: "build flag",
+		},
+		{
+			name: "unsupported build boolean",
+			mutate: func(r *Request) {
+				r.BuildFlags = []string{"-v=false"}
+			},
+			want: "build flag -v has unsupported value",
+		},
+		{
+			name: "unsupported build vcs value",
+			mutate: func(r *Request) {
+				r.BuildFlags = []string{"-buildvcs=true"}
+			},
+			want: "build flag -buildvcs has unsupported value",
+		},
+		{
+			name: "unsupported build flag",
+			mutate: func(r *Request) {
+				r.BuildFlags = []string{"-ldflags=-s"}
+			},
+			want: "build flag -ldflags is not supported",
+		},
+		{
+			name: "application argument nul",
+			mutate: func(r *Request) {
+				r.ApplicationArgs = []string{"ok\x00"}
+			},
+			want: "application argument contains NUL",
+		},
+		{
+			name: "short declaration digest",
+			mutate: func(r *Request) {
+				r.Declaration.SHA256 = strings.Repeat("a", 63)
+			},
+			want: "must contain 64 hexadecimal characters",
+		},
+		{
+			name: "non-hex declaration digest",
+			mutate: func(r *Request) {
+				r.Declaration.SHA256 = strings.Repeat("g", 64)
+			},
+			want: "is not a SHA-256 digest",
+		},
+		{
+			name: "build application arguments",
+			mutate: func(r *Request) {
+				r.Action = ActionBuild
+				r.Output = &BuildOutput{Staging: testPath("workspace", "out", ".game.tmp"), Final: testPath("workspace", "out", "game")}
+			},
+			want: "build request cannot contain application arguments",
+		},
+		{
+			name: "empty staging output",
+			mutate: func(r *Request) {
+				r.Action = ActionBuild
+				r.ApplicationArgs = nil
+				r.Output = &BuildOutput{Final: testPath("workspace", "out", "game")}
+			},
+			want: "path --output may not be empty",
+		},
+		{
+			name: "relative staging output",
+			mutate: func(r *Request) {
+				r.Action = ActionBuild
+				r.ApplicationArgs = nil
+				r.Output = &BuildOutput{Staging: "out/.game.tmp", Final: testPath("workspace", "out", "game")}
+			},
+			want: "path --output must be absolute",
+		},
+		{
+			name: "unclean final output",
+			mutate: func(r *Request) {
+				r.Action = ActionBuild
+				r.ApplicationArgs = nil
+				r.Output = &BuildOutput{Staging: testPath("workspace", "out", ".game.tmp"), Final: testPath("workspace", "out") + string(filepath.Separator) + ".." + string(filepath.Separator) + "out" + string(filepath.Separator) + "game"}
+			},
+			want: "path --final-output must be clean",
+		},
+		{
+			name: "same build outputs",
+			mutate: func(r *Request) {
+				r.Action = ActionBuild
+				r.ApplicationArgs = nil
+				output := testPath("workspace", "out", "game")
+				r.Output = &BuildOutput{Staging: output, Final: output}
+			},
+			want: "output and final-output must be different",
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			request := testRequest()
+			test.mutate(&request)
+			if err := request.Validate(); err == nil || !strings.Contains(err.Error(), test.want) {
+				t.Fatalf("Validate() error = %v, want substring %q", err, test.want)
+			}
+		})
+	}
+}
+
+func TestEncodeRejectsInvalidRequest(t *testing.T) {
+	request := testRequest()
+	request.Action = Action("test")
+	if _, err := Encode(request); err == nil || !strings.Contains(err.Error(), "unsupported action") {
+		t.Fatalf("Encode() error = %v", err)
+	}
+}
+
+func TestParseRejectsMalformedRequests(t *testing.T) {
+	runArgs, err := Encode(testRequest())
+	if err != nil {
+		t.Fatal(err)
+	}
+	buildRequest := testRequest()
+	buildRequest.Action = ActionBuild
+	buildRequest.ApplicationArgs = nil
+	buildRequest.Project.Pack = nil
+	buildRequest.ProviderOrigin = xgomod.ResolvedModule{
+		Selected: xgomod.ModuleRef{
+			Path: "example.test/framework", Version: "v1.2.3",
+			Dir: testPath("workspace", "framework"), GoMod: testPath("workspace", "framework", "go.mod"),
+		},
+	}
+	buildRequest.Output = &BuildOutput{
+		Staging: testPath("workspace", "out", ".game.tmp"),
+		Final:   testPath("workspace", "out", "game"),
+	}
+	buildArgs, err := Encode(buildRequest)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []struct {
+		name string
+		args func() []string
+		want string
+	}{
+		{
+			name: "empty argv",
+			args: func() []string { return nil },
+			want: "requires preamble and action",
+		},
+		{
+			name: "preamble only",
+			args: func() []string { return []string{PreambleV1} },
+			want: "requires preamble and action",
+		},
+		{
+			name: "unsupported preamble",
+			args: func() []string {
+				args := append([]string(nil), runArgs...)
+				args[0] = "other-runtime"
+				return args
+			},
+			want: "unsupported preamble",
+		},
+		{
+			name: "unsupported action",
+			args: func() []string { return []string{PreambleV1, "test"} },
+			want: "unsupported action",
+		},
+		{
+			name: "build delimiter",
+			args: func() []string {
+				return append(append([]string(nil), buildArgs...), "--")
+			},
+			want: "build does not accept",
+		},
+		{
+			name: "run missing delimiter",
+			args: func() []string {
+				args := append([]string(nil), runArgs...)
+				for i, arg := range args {
+					if arg == "--" {
+						return args[:i]
+					}
+				}
+				return args
+			},
+			want: "run requires --",
+		},
+		{
+			name: "positional option",
+			args: func() []string {
+				args := append([]string(nil), runArgs...)
+				args[2] = "project-dir"
+				return args
+			},
+			want: "unexpected positional argument",
+		},
+		{
+			name: "malformed option",
+			args: func() []string {
+				args := append([]string(nil), runArgs...)
+				args[2] = "--project-dir"
+				return args
+			},
+			want: "must use --name=value",
+		},
+		{
+			name: "missing required option",
+			args: func() []string { return removeOption(runArgs, "--project-dir=") },
+			want: "option --project-dir is required",
+		},
+		{
+			name: "invalid origin main",
+			args: func() []string { return replaceOptionValue(runArgs, "--origin-main=", "maybe") },
+			want: "invalid --origin-main",
+		},
+		{
+			name: "missing selected source",
+			args: func() []string {
+				args := removeOption(buildArgs, "--selected-dir=")
+				return removeOption(args, "--selected-gomod=")
+			},
+			want: "without replacement requires",
+		},
+		{
+			name: "replacement with selected source",
+			args: func() []string {
+				args := insertBeforeDelimiter(runArgs, "--selected-dir="+testPath("workspace", "framework"))
+				return insertBeforeDelimiter(args, "--selected-gomod="+testPath("workspace", "framework", "go.mod"))
+			},
+			want: "with replacement forbids",
+		},
+		{
+			name: "missing build output",
+			args: func() []string { return removeOption(buildArgs, "--output=") },
+			want: "build requires --output and --final-output",
+		},
+		{
+			name: "missing build final output",
+			args: func() []string { return removeOption(buildArgs, "--final-output=") },
+			want: "build requires --output and --final-output",
+		},
+		{
+			name: "run output",
+			args: func() []string {
+				return insertBeforeDelimiter(runArgs, "--output="+testPath("workspace", "out", "game"))
+			},
+			want: "run does not accept --output",
+		},
+		{
+			name: "run final output",
+			args: func() []string {
+				return insertBeforeDelimiter(runArgs, "--final-output="+testPath("workspace", "out", "game"))
+			},
+			want: "run does not accept --final-output",
+		},
+		{
+			name: "incomplete replacement",
+			args: func() []string { return removeOption(runArgs, "--replace-gomod=") },
+			want: "replacement options must be supplied as a complete group",
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if _, err := Parse(test.args()); err == nil || !strings.Contains(err.Error(), test.want) {
+				t.Fatalf("Parse() error = %v, want substring %q", err, test.want)
+			}
+		})
+	}
+}
+
 func TestRejectInvalidRequestShapes(t *testing.T) {
 	tests := map[string]func(*Request){
 		"unsupported version": func(r *Request) { r.Version = "v2" },
@@ -201,28 +690,32 @@ func TestRejectInvalidRequestShapes(t *testing.T) {
 			r.Action = ActionBuild
 			r.ApplicationArgs = nil
 		},
-		"run with output":         func(r *Request) { r.Output = &BuildOutput{Staging: "/tmp/a", Final: "/tmp/b"} },
+		"run with output":         func(r *Request) { r.Output = &BuildOutput{Staging: testPath("tmp", "a"), Final: testPath("tmp", "b")} },
 		"bad graph flag":          func(r *Request) { r.Graph.Flags = []string{"-modfile=relative.mod"} },
 		"relative graph work dir": func(r *Request) { r.Graph.WorkDir = "relative" },
 		"bad build flag":          func(r *Request) { r.BuildFlags = []string{"-ldflags=-s"} },
 		"duplicate flag":          func(r *Request) { r.BuildFlags = []string{"-v=true", "-v=true"} },
 		"provider outside module": func(r *Request) { r.ProviderPackage = "example.test/other/cmd/provider" },
-		"flattened replacement":   func(r *Request) { r.ProviderOrigin.Selected.Dir = "/workspace/framework" },
+		"flattened replacement":   func(r *Request) { r.ProviderOrigin.Selected.Dir = testPath("workspace", "framework") },
 		"pack escapes":            func(r *Request) { r.Project.Pack.Directory = "../payload" },
 		"uppercase digest":        func(r *Request) { r.Declaration.SHA256 = strings.Repeat("A", 64) },
 		"declaration outside provider": func(r *Request) {
-			r.Declaration.Path = "/workspace/other/gox.mod"
+			r.Declaration.Path = testPath("workspace", "other", "gox.mod")
 		},
 		"main origin with version": func(r *Request) {
 			r.ProviderOrigin = xgomod.ResolvedModule{
-				Selected: xgomod.ModuleRef{Path: "example.test/framework", Version: "v1.2.3", Dir: "/workspace/framework", GoMod: "/workspace/framework/go.mod"}, Main: true,
+				Selected: xgomod.ModuleRef{
+					Path: "example.test/framework", Version: "v1.2.3",
+					Dir: testPath("workspace", "framework"), GoMod: testPath("workspace", "framework", "go.mod"),
+				},
+				Main: true,
 			}
 		},
 		"local replace with module path": func(r *Request) {
 			r.ProviderOrigin.Replace.Path = "example.test/framework-fork"
 		},
 		"local replace identity mismatch": func(r *Request) {
-			r.ProviderOrigin.Replace.Path = "/workspace/other-framework"
+			r.ProviderOrigin.Replace.Path = testPath("workspace", "other-framework")
 		},
 	}
 	for name, mutate := range tests {
@@ -265,6 +758,22 @@ func removeOption(args []string, prefix string) []string {
 		if !strings.HasPrefix(arg, prefix) {
 			result = append(result, arg)
 		}
+	}
+	return result
+}
+
+func insertBeforeDelimiter(args []string, value string) []string {
+	result := make([]string, 0, len(args)+1)
+	inserted := false
+	for _, arg := range args {
+		if !inserted && arg == "--" {
+			result = append(result, value)
+			inserted = true
+		}
+		result = append(result, arg)
+	}
+	if !inserted {
+		result = append(result, value)
 	}
 	return result
 }
