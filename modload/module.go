@@ -49,19 +49,18 @@ type Module struct {
 	goxModIdentity FileIdentity
 }
 
-// FileIdentity binds a module file path to the exact bytes read by LoadFrom.
-// The zero value means that no file snapshot was loaded.
+// FileIdentity binds a module file to the SHA-256 of bytes read; zero means none.
 type FileIdentity struct {
 	Path   string
 	SHA256 string
 }
 
-// GoModIdentity returns the exact go.mod snapshot used to parse File.
+// GoModIdentity returns the go.mod snapshot used to parse File.
 func (p Module) GoModIdentity() FileIdentity {
 	return p.goModIdentity
 }
 
-// GoxModIdentity returns the exact gox.mod or gop.mod snapshot used to parse Opt.
+// GoxModIdentity returns the gox.mod or gop.mod snapshot used to parse Opt.
 func (p Module) GoxModIdentity() FileIdentity {
 	return p.goxModIdentity
 }
@@ -333,9 +332,7 @@ func isClass(r *gomodfile.Require) bool {
 	return false
 }
 
-// HasClassMarker reports whether comments contain an xgo:class or gop:class
-// marker. A marker must end at a token boundary; optional payload must be
-// separated from the marker by whitespace.
+// HasClassMarker reports a token-boundary xgo:class or gop:class marker.
 func HasClassMarker(comments []gomodfile.Comment) bool {
 	for _, comment := range comments {
 		if !strings.HasPrefix(comment.Token, "//") {

@@ -1119,6 +1119,7 @@ func TestValidateFileIdentityRejectsMalformedShapes(t *testing.T) {
 		{name: "missing fields", identity: FileIdentity{}, want: "requires path and SHA-256"},
 		{name: "short digest", identity: FileIdentity{Path: goMod, SHA256: "abcd"}, want: "must be 64 hex characters"},
 		{name: "non-hex digest", identity: FileIdentity{Path: goMod, SHA256: strings.Repeat("g", 64)}, want: "invalid target modfile SHA-256"},
+		{name: "uppercase digest", identity: FileIdentity{Path: goMod, SHA256: strings.ToUpper(identity.SHA256)}, want: "must use lowercase"},
 		{name: "relative path", identity: FileIdentity{Path: "go.mod", SHA256: identity.SHA256}, want: "target modfile path"},
 		{name: "directory path", identity: FileIdentity{Path: root, SHA256: identity.SHA256}, want: "target modfile path"},
 	} {

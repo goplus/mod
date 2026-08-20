@@ -14,13 +14,8 @@
  * limitations under the License.
  */
 
-// Package runtimeprotocol defines the transport-neutral request model and the
-// argv encoding used by XGo runtime providers.
-//
-// Validation in this package is deliberately structural: it validates the
-// protocol shape, portable path spelling, module identities, and the bounded
-// flag vocabulary without reading the filesystem. A provider must separately
-// pin and verify every identity-bearing path before using it.
+// Package runtimeprotocol defines the provider request model and argv codec.
+// Validation is structural; consumers verify identity-bearing paths.
 package runtimeprotocol
 
 import (
@@ -35,14 +30,13 @@ import (
 )
 
 const (
-	// Version1 is the value used by the gox.mod runtime directive.
+	// Version1 is the gox.mod runtime protocol value.
 	Version1 = "v1"
 	// PreambleV1 is the first argv element passed to a v1 provider.
 	PreambleV1 = "xgo-runtime-v1"
 )
 
-// Action identifies the operation requested from a provider. Install uses a
-// transactional build request whose final output is selected by XGo.
+// Action identifies the requested provider operation.
 type Action string
 
 const (
@@ -50,14 +44,13 @@ const (
 	ActionBuild Action = "build"
 )
 
-// Pack describes optional project pack metadata. It is intentionally
-// provider-neutral: a runtime that does not use a pack receives nil.
+// Pack describes optional project pack metadata.
 type Pack struct {
 	Directory string
 	IndexFile string
 }
 
-// Project is the immutable project snapshot discovered by XGo.
+// Project is the project snapshot discovered by XGo.
 type Project struct {
 	Dir           string
 	File          string
@@ -67,7 +60,7 @@ type Project struct {
 	Pack          *Pack
 }
 
-// Graph carries the exact Go command/workspace policy used for discovery.
+// Graph carries the Go command and workspace policy used for discovery.
 type Graph struct {
 	GoCommand string
 	WorkDir   string
@@ -75,15 +68,13 @@ type Graph struct {
 	Flags     []string
 }
 
-// BuildOutput contains XGo's private staging path and user-visible final path.
+// BuildOutput contains staging and final output paths.
 type BuildOutput struct {
 	Staging string
 	Final   string
 }
 
-// Request is one complete provider request. Run requires Output == nil and
-// preserves ApplicationArgs verbatim. Build requires Output != nil and no
-// application arguments.
+// Request is one provider request; run has no Output, build has no ApplicationArgs.
 type Request struct {
 	Version         string
 	Action          Action
@@ -97,7 +88,7 @@ type Request struct {
 	ApplicationArgs []string
 }
 
-// Validate checks the v1 request without consulting ambient filesystem state.
+// Validate checks the request without reading the filesystem.
 func (r Request) Validate() error {
 	if r.Version != Version1 {
 		return fmt.Errorf("runtimeprotocol: unsupported version %q", r.Version)

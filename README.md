@@ -8,3 +8,7 @@ mod - Module support for Go/XGo
 [![XGo](https://img.shields.io/badge/project-XGo-blue.svg)](https://github.com/goplus/xgo)
 
 This repository holds packages for writing tools that work directly with Go/XGo module mechanics. That is, it is for direct manipulation of Go/XGo modules themselves.
+
+## Runtime providers
+
+`runtimeprotocol` defines the v1 request model and argv codec used by XGo runtime providers. XGo resolves the module graph and passes its snapshot; providers verify identity-bearing paths before use. `xgomod.ImportClassesResolved` validates the target snapshot and class-module provenance without rediscovering the graph.

@@ -30,10 +30,7 @@ import (
 	"golang.org/x/mod/module"
 )
 
-// ModuleRef identifies one logical module selection or its effective source.
-// Dir and GoMod are populated only for an effective source record. In
-// particular, a selected module with a replacement must not copy the
-// replacement's physical paths into Selected.
+// ModuleRef identifies a logical selection or its effective source.
 type ModuleRef struct {
 	Path    string
 	Version string
@@ -41,15 +38,14 @@ type ModuleRef struct {
 	GoMod   string
 }
 
-// ResolvedModule keeps the logical module selected by the graph separate from
-// an optional replacement source.
+// ResolvedModule separates selection from replacement source paths.
 type ResolvedModule struct {
 	Selected ModuleRef
 	Replace  *ModuleRef
 	Main     bool
 }
 
-// Effective returns the source selected for reading files and metadata.
+// Effective returns the source used for files and metadata.
 func (m ResolvedModule) Effective() ModuleRef {
 	if m.Replace != nil {
 		return *m.Replace
@@ -57,9 +53,7 @@ func (m ResolvedModule) Effective() ModuleRef {
 	return m.Selected
 }
 
-// IsLocal reports whether the module is supplied by the main module or by a
-// filesystem replacement. A replacement with a release version is still a
-// replacement source, not a local module.
+// IsLocal reports whether the module is main or has a local replacement.
 func (m ResolvedModule) IsLocal() bool {
 	return m.Main || (m.Replace != nil && m.Replace.Version == "")
 }
@@ -69,17 +63,12 @@ func (m ResolvedModule) Validate() error {
 	return validateResolvedModule(m)
 }
 
-// ValidateSyntax checks the resolved module's logical identity and path
-// spelling without reading the filesystem. Transport decoders use this to
-// reject malformed provenance; consumers must call Validate before using the
-// effective source.
+// ValidateSyntax checks identity and path spelling without filesystem access.
 func (m ResolvedModule) ValidateSyntax() error {
 	return validateResolvedModuleSyntax(m)
 }
 
-// ResolvedClassGraph is the already-resolved module/workspace graph supplied by
-// XGo. xgomod validates and consumes this snapshot; it never invokes the Go
-// command to discover another graph.
+// ResolvedClassGraph is XGo's resolved graph snapshot; it is not rediscovered.
 type ResolvedClassGraph struct {
 	Target        ResolvedModule
 	ClassModules  []ResolvedModule
@@ -89,9 +78,7 @@ type ResolvedClassGraph struct {
 // FileIdentity binds metadata to the exact bytes parsed by the caller.
 type FileIdentity = modload.FileIdentity
 
-// ProjectInfo is class metadata together with the module that declared it.
-// Built-in GshProject and TestProject entries have no Origin and no required
-// XGo version.
+// ProjectInfo pairs class metadata with its origin; built-ins omit provenance.
 type ProjectInfo struct {
 	Project     *modfile.Project
 	Origin      *ResolvedModule
@@ -153,19 +140,13 @@ func validateSource(ref ModuleRef, label string) error {
 	if err := validateSourceSyntax(ref, label); err != nil {
 		return err
 	}
-	canonDir, err := canonicalPath(ref.Dir, true)
+	canonDir, err := canonicalSourcePath(ref.Dir, label+".Dir", true)
 	if err != nil {
-		return fmt.Errorf("%s.Dir: %w", label, err)
+		return err
 	}
-	if filepath.Clean(ref.Dir) != canonDir {
-		return fmt.Errorf("%s.Dir must be canonical: %q", label, ref.Dir)
-	}
-	canonGoMod, err := canonicalPath(ref.GoMod, false)
+	canonGoMod, err := canonicalSourcePath(ref.GoMod, label+".GoMod", false)
 	if err != nil {
-		return fmt.Errorf("%s.GoMod: %w", label, err)
-	}
-	if filepath.Clean(ref.GoMod) != canonGoMod {
-		return fmt.Errorf("%s.GoMod must be canonical: %q", label, ref.GoMod)
+		return err
 	}
 	rel, err := filepath.Rel(canonDir, canonGoMod)
 	if err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) && !filepath.IsAbs(rel) {
@@ -175,6 +156,17 @@ func validateSource(ref ModuleRef, label string) error {
 		return fmt.Errorf("%s.GoMod must be inside %s or be matching Go module-cache metadata: %w", label, canonDir, err)
 	}
 	return nil
+}
+
+func canonicalSourcePath(value, label string, wantDir bool) (string, error) {
+	canonical, err := canonicalPath(value, wantDir)
+	if err != nil {
+		return "", fmt.Errorf("%s: %w", label, err)
+	}
+	if filepath.Clean(value) != canonical {
+		return "", fmt.Errorf("%s must be canonical: %q", label, value)
+	}
+	return canonical, nil
 }
 
 func validateSourceSyntax(ref ModuleRef, label string) error {
@@ -252,12 +244,9 @@ func validateResolvedModule(m ResolvedModule) error {
 		return validateSource(m.Selected, "selected")
 	}
 	if filepath.IsAbs(m.Replace.Path) {
-		canonPath, err := canonicalPath(m.Replace.Path, true)
+		_, err := canonicalSourcePath(m.Replace.Path, "replacement.Path", true)
 		if err != nil {
-			return fmt.Errorf("replacement.Path: %w", err)
-		}
-		if m.Replace.Path != canonPath {
-			return fmt.Errorf("replacement.Path must be canonical: %q", m.Replace.Path)
+			return err
 		}
 	}
 	return validateSource(*m.Replace, "replacement")
@@ -322,20 +311,19 @@ func validateFileIdentity(identity FileIdentity) ([]byte, error) {
 	if _, err := hex.DecodeString(identity.SHA256); err != nil {
 		return nil, fmt.Errorf("invalid target modfile SHA-256: %w", err)
 	}
-	path, err := canonicalPath(identity.Path, false)
-	if err != nil {
-		return nil, fmt.Errorf("target modfile path: %w", err)
+	if identity.SHA256 != strings.ToLower(identity.SHA256) {
+		return nil, fmt.Errorf("target modfile SHA-256 must use lowercase hexadecimal")
 	}
-	if filepath.Clean(identity.Path) != path {
-		return nil, fmt.Errorf("target modfile path must be canonical: %q", identity.Path)
+	path, err := canonicalSourcePath(identity.Path, "target modfile path", false)
+	if err != nil {
+		return nil, err
 	}
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("read target modfile: %w", err)
 	}
-	sum := sha256.Sum256(data)
-	got := hex.EncodeToString(sum[:])
-	if !strings.EqualFold(got, identity.SHA256) {
+	got := sha256Hex(data)
+	if got != identity.SHA256 {
 		return nil, fmt.Errorf("target modfile SHA-256 mismatch for %s", identity.Path)
 	}
 	return data, nil
@@ -346,8 +334,12 @@ func fileSHA256(path string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	sum := sha256.Sum256(b)
-	return hex.EncodeToString(sum[:]), nil
+	return sha256Hex(b), nil
+}
+
+func sha256Hex(data []byte) string {
+	sum := sha256.Sum256(data)
+	return hex.EncodeToString(sum[:])
 }
 
 func (g ResolvedClassGraph) validate() error {

@@ -94,17 +94,13 @@ func (p *Module) LookupClass(ext string) (c *Project, ok bool) {
 	return
 }
 
-// LookupClassInfo looks up a classfile and returns its declaring project and
-// resolved module provenance. Built-in projects have nil Origin and an empty
-// RequiredXGo.
+// LookupClassInfo returns class metadata and provenance; built-ins have none.
 func (p *Module) LookupClassInfo(ext string) (*ProjectInfo, bool) {
 	if info, ok := p.infos[ext]; ok {
 		return info, true
 	}
 	if project, ok := p.projs[ext]; ok {
-		// Modules loaded through the legacy API predate provenance. Keep the
-		// lookup useful without manufacturing an origin that could be mistaken
-		// for a resolved graph record.
+		// Preserve legacy lookups without fabricating provenance.
 		return &ProjectInfo{Project: project}, true
 	}
 	return nil, false
@@ -132,10 +128,7 @@ func (p *Module) ImportClasses(importClass ...func(c *Project)) (err error) {
 	return
 }
 
-// ImportClassesResolved imports class metadata from an already-resolved
-// module/workspace graph. The graph is validated before the receiver is
-// changed. In particular, class modules come only from graph.ClassModules; the
-// receiver's legacy Opt.ClassMods is never consulted by this method.
+// ImportClassesResolved imports class metadata from a validated graph.
 func (p *Module) ImportClassesResolved(graph ResolvedClassGraph, importClass ...func(*ProjectInfo)) error {
 	if p == nil || p.File == nil || p.Opt == nil {
 		return fmt.Errorf("receiver has no target module snapshot")
@@ -186,7 +179,7 @@ func (p *Module) ImportClassesResolved(graph ResolvedClassGraph, importClass ...
 		}
 		return nil
 	}
-	// Built-ins are deliberately provenance-free and cannot declare a runtime.
+	// Built-ins have no module provenance.
 	for _, builtin := range []*Project{TestProject, GshProject} {
 		if err := register(&ProjectInfo{Project: builtin}); err != nil {
 			return err

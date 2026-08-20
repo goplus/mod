@@ -83,10 +83,7 @@ type Pack struct {
 	Syntax    *Line
 }
 
-// Runtime declares the runtime provider for a project.
-//
-// Protocol is the provider protocol generation (for example, "v1"). It is
-// deliberately independent from the provider package's module version.
+// Runtime declares a project's sole provider and independent protocol generation.
 type Runtime struct {
 	Protocol string
 	Package  string
@@ -102,7 +99,7 @@ type Project struct {
 	PkgPaths []string  // package paths of classfile and optional inline-imported packages.
 	Import   []*Import // auto-imported packages
 	Pack     *Pack     // pack directive (at most one per project)
-	Runtime  *Runtime  // runtime provider (at most one per project)
+	Runtime  *Runtime  // runtime provider
 
 	// AutoLambdas maps command => number of parameters before auto lambda.
 	// See https://github.com/goplus/xgo/issues/2828.

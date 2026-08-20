@@ -80,7 +80,7 @@ type rawOptions struct {
 	buildFlags []string
 }
 
-// Encode returns the deterministic argv following the provider executable.
+// Encode returns deterministic argv following the provider executable.
 func Encode(request Request) ([]string, error) {
 	if err := request.Validate(); err != nil {
 		return nil, err
@@ -145,8 +145,7 @@ func Encode(request Request) ([]string, error) {
 	return args, nil
 }
 
-// Parse decodes the complete provider argv following argv[0]. Unknown,
-// duplicate, partial, and action-inapplicable fields fail closed.
+// Parse decodes provider argv and rejects unknown, duplicate, partial, or inapplicable fields.
 func Parse(args []string) (Request, error) {
 	var request Request
 	if len(args) < 2 {
@@ -203,12 +202,11 @@ func Parse(args []string) (Request, error) {
 	request.Declaration = xgomod.FileIdentity{
 		Path: raw.values["declaration-file"], SHA256: raw.values["declaration-sha256"],
 	}
-	_, hasPackDir := raw.values["pack-dir"]
-	_, hasPackIndex := raw.values["pack-index"]
-	if hasPackDir != hasPackIndex {
+	hasPack, completePack := optionGroup(raw.values, "pack-dir", "pack-index")
+	if hasPack && !completePack {
 		return Request{}, fmt.Errorf("runtimeprotocol: pack options must be supplied as a complete group")
 	}
-	if hasPackDir {
+	if hasPack {
 		request.Project.Pack = &Pack{Directory: raw.values["pack-dir"], IndexFile: raw.values["pack-index"]}
 	}
 
@@ -284,23 +282,13 @@ func parseOptions(args []string) (rawOptions, error) {
 }
 
 func parseModuleSource(origin *xgomod.ResolvedModule, raw rawOptions) error {
-	replacementCount := 0
-	for _, name := range replacementOptions {
-		if _, ok := raw.values[name]; ok {
-			replacementCount++
+	hasReplacement, completeReplacement := optionGroup(raw.values, replacementOptions...)
+	selectedDir, completeSelected := optionGroup(raw.values, "selected-dir", "selected-gomod")
+	if hasReplacement {
+		if !completeReplacement {
+			return fmt.Errorf("runtimeprotocol: replacement options must be supplied as a complete group")
 		}
-	}
-	_, selectedDir := raw.values["selected-dir"]
-	_, selectedGoMod := raw.values["selected-gomod"]
-	switch replacementCount {
-	case 0:
-		if !selectedDir || !selectedGoMod {
-			return fmt.Errorf("runtimeprotocol: origin without replacement requires --selected-dir and --selected-gomod")
-		}
-		origin.Selected.Dir = raw.values["selected-dir"]
-		origin.Selected.GoMod = raw.values["selected-gomod"]
-	case len(replacementOptions):
-		if selectedDir || selectedGoMod {
+		if selectedDir {
 			return fmt.Errorf("runtimeprotocol: origin with replacement forbids --selected-dir and --selected-gomod")
 		}
 		origin.Replace = &xgomod.ModuleRef{
@@ -309,10 +297,24 @@ func parseModuleSource(origin *xgomod.ResolvedModule, raw rawOptions) error {
 			Dir:     raw.values["replace-dir"],
 			GoMod:   raw.values["replace-gomod"],
 		}
-	default:
-		return fmt.Errorf("runtimeprotocol: replacement options must be supplied as a complete group")
+		return nil
 	}
+	if !completeSelected {
+		return fmt.Errorf("runtimeprotocol: origin without replacement requires --selected-dir and --selected-gomod")
+	}
+	origin.Selected.Dir = raw.values["selected-dir"]
+	origin.Selected.GoMod = raw.values["selected-gomod"]
 	return nil
+}
+
+func optionGroup(values map[string]string, names ...string) (present, complete bool) {
+	complete = true
+	for _, name := range names {
+		_, ok := values[name]
+		present = present || ok
+		complete = complete && ok
+	}
+	return
 }
 
 func option(name, value string) string { return "--" + name + "=" + value }
