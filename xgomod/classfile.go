@@ -259,16 +259,16 @@ func registerProject(projects map[string]*Project, infos map[string]*ProjectInfo
 	if info == nil || info.Project == nil {
 		return fmt.Errorf("class metadata contains a nil project")
 	}
-	if info.Project.Runtime != nil && info.Origin == nil {
-		return fmt.Errorf("runtime project %q has no module provenance", info.Project.Ext)
+	if info.Project.Driver != nil && info.Origin == nil {
+		return fmt.Errorf("driver-backed project %q has no module provenance", info.Project.Ext)
 	}
 	for _, ext := range projectExts(info.Project) {
 		if old, ok := infos[ext]; ok && old != info {
 			if old.Project == info.Project {
 				continue
 			}
-			if old.Project.Runtime != nil || info.Project.Runtime != nil {
-				return fmt.Errorf("runtime class extension collision for %q between %q and %q", ext, old.Project.Class, info.Project.Class)
+			if old.Project.Driver != nil || info.Project.Driver != nil {
+				return fmt.Errorf("driver-backed class extension collision for %q between %q and %q", ext, old.Project.Class, info.Project.Class)
 			}
 		}
 		projects[ext] = info.Project

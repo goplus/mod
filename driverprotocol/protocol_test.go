@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package runtimeprotocol
+package driverprotocol
 
 import (
 	"path/filepath"
@@ -26,7 +26,7 @@ import (
 )
 
 func testPath(parts ...string) string {
-	path, err := filepath.Abs(filepath.Join(append([]string{"runtimeprotocol-fixture"}, parts...)...))
+	path, err := filepath.Abs(filepath.Join(append([]string{"driverprotocol-fixture"}, parts...)...))
 	if err != nil {
 		panic(err)
 	}
@@ -45,8 +45,8 @@ func testRequest() Request {
 			FullExtension: "*.foo",
 			Pack:          &Pack{Directory: "payload", IndexFile: "index.data"},
 		},
-		ProviderPackage: "example.test/framework/cmd/provider",
-		ProviderOrigin: xgomod.ResolvedModule{
+		DriverPackage: "example.test/framework/cmd/driver",
+		DriverOrigin: xgomod.ResolvedModule{
 			Selected: xgomod.ModuleRef{Path: "example.test/framework", Version: "v1.2.3"},
 			Replace: &xgomod.ModuleRef{
 				Path:  testPath("workspace", "framework"),
@@ -96,7 +96,7 @@ func TestRoundTripBuildSelectedWithoutPack(t *testing.T) {
 	want.Action = ActionBuild
 	want.ApplicationArgs = nil
 	want.Project.Pack = nil
-	want.ProviderOrigin = xgomod.ResolvedModule{
+	want.DriverOrigin = xgomod.ResolvedModule{
 		Selected: xgomod.ModuleRef{
 			Path: "example.test/framework", Version: "v1.2.3",
 			Dir: testPath("workspace", "framework"), GoMod: testPath("workspace", "framework", "go.mod"),
@@ -142,7 +142,7 @@ func TestRoundTripOriginVariantsAndWorkspace(t *testing.T) {
 	for name, origin := range tests {
 		t.Run(name, func(t *testing.T) {
 			want := testRequest()
-			want.ProviderOrigin = origin
+			want.DriverOrigin = origin
 			want.Declaration.Path = filepath.Join(origin.Effective().Dir, "gox.mod")
 			want.Graph.GoWork = testPath("workspace", "go.work")
 			want.Graph.Flags = append(want.Graph.Flags, "-overlay="+testPath("workspace", "overlay.json"))
@@ -167,15 +167,15 @@ func TestValidationIsStructural(t *testing.T) {
 	request.Project.File = testPath("does", "not", "exist", "game", "main.foo")
 	request.Project.ModuleRoot = testPath("does", "not", "exist")
 	request.Declaration.Path = testPath("does", "not", "exist", "framework", "gox.mod")
-	request.ProviderOrigin.Replace.Path = testPath("does", "not", "exist", "framework")
-	request.ProviderOrigin.Replace.Dir = testPath("does", "not", "exist", "framework")
-	request.ProviderOrigin.Replace.GoMod = testPath("does", "not", "exist", "framework", "go.mod")
+	request.DriverOrigin.Replace.Path = testPath("does", "not", "exist", "framework")
+	request.DriverOrigin.Replace.Dir = testPath("does", "not", "exist", "framework")
+	request.DriverOrigin.Replace.GoMod = testPath("does", "not", "exist", "framework", "go.mod")
 	if err := request.Validate(); err != nil {
 		t.Fatalf("structural validation consulted ambient filesystem: %v", err)
 	}
 }
 
-func TestPackDotIsProviderNeutral(t *testing.T) {
+func TestPackDotIsDriverNeutral(t *testing.T) {
 	request := testRequest()
 	request.Project.Pack.Directory = "."
 	args, err := Encode(request)
@@ -358,25 +358,25 @@ func TestValidateRejectsStructuralRequests(t *testing.T) {
 			want: "pack index must be a plain file name",
 		},
 		{
-			name: "invalid provider origin",
+			name: "invalid driver origin",
 			mutate: func(r *Request) {
-				r.ProviderOrigin.Selected.Path = "bad path"
+				r.DriverOrigin.Selected.Path = "bad path"
 			},
-			want: "provider origin",
+			want: "driver origin",
 		},
 		{
-			name: "declaration outside provider metadata",
+			name: "declaration outside driver metadata",
 			mutate: func(r *Request) {
 				r.Declaration.Path = testPath("workspace", "framework", "metadata.txt")
 			},
-			want: "declaration-file must be provider metadata",
+			want: "declaration-file must be driver metadata",
 		},
 		{
-			name: "invalid provider package",
+			name: "invalid driver package",
 			mutate: func(r *Request) {
-				r.ProviderPackage = "bad package"
+				r.DriverPackage = "bad package"
 			},
-			want: "invalid provider package",
+			want: "invalid driver package",
 		},
 		{
 			name: "relative go work",
@@ -536,7 +536,7 @@ func TestParseRejectsMalformedRequests(t *testing.T) {
 	buildRequest.Action = ActionBuild
 	buildRequest.ApplicationArgs = nil
 	buildRequest.Project.Pack = nil
-	buildRequest.ProviderOrigin = xgomod.ResolvedModule{
+	buildRequest.DriverOrigin = xgomod.ResolvedModule{
 		Selected: xgomod.ModuleRef{
 			Path: "example.test/framework", Version: "v1.2.3",
 			Dir: testPath("workspace", "framework"), GoMod: testPath("workspace", "framework", "go.mod"),
@@ -570,7 +570,7 @@ func TestParseRejectsMalformedRequests(t *testing.T) {
 			name: "unsupported preamble",
 			args: func() []string {
 				args := append([]string(nil), runArgs...)
-				args[0] = "other-runtime"
+				args[0] = "other-driver"
 				return args
 			},
 			want: "unsupported preamble",
@@ -695,15 +695,15 @@ func TestRejectInvalidRequestShapes(t *testing.T) {
 		"relative graph work dir": func(r *Request) { r.Graph.WorkDir = "relative" },
 		"bad build flag":          func(r *Request) { r.BuildFlags = []string{"-ldflags=-s"} },
 		"duplicate flag":          func(r *Request) { r.BuildFlags = []string{"-v=true", "-v=true"} },
-		"provider outside module": func(r *Request) { r.ProviderPackage = "example.test/other/cmd/provider" },
-		"flattened replacement":   func(r *Request) { r.ProviderOrigin.Selected.Dir = testPath("workspace", "framework") },
+		"driver outside module":   func(r *Request) { r.DriverPackage = "example.test/other/cmd/driver" },
+		"flattened replacement":   func(r *Request) { r.DriverOrigin.Selected.Dir = testPath("workspace", "framework") },
 		"pack escapes":            func(r *Request) { r.Project.Pack.Directory = "../payload" },
 		"uppercase digest":        func(r *Request) { r.Declaration.SHA256 = strings.Repeat("A", 64) },
-		"declaration outside provider": func(r *Request) {
+		"declaration outside driver": func(r *Request) {
 			r.Declaration.Path = testPath("workspace", "other", "gox.mod")
 		},
 		"main origin with version": func(r *Request) {
-			r.ProviderOrigin = xgomod.ResolvedModule{
+			r.DriverOrigin = xgomod.ResolvedModule{
 				Selected: xgomod.ModuleRef{
 					Path: "example.test/framework", Version: "v1.2.3",
 					Dir: testPath("workspace", "framework"), GoMod: testPath("workspace", "framework", "go.mod"),
@@ -712,10 +712,10 @@ func TestRejectInvalidRequestShapes(t *testing.T) {
 			}
 		},
 		"local replace with module path": func(r *Request) {
-			r.ProviderOrigin.Replace.Path = "example.test/framework-fork"
+			r.DriverOrigin.Replace.Path = "example.test/framework-fork"
 		},
 		"local replace identity mismatch": func(r *Request) {
-			r.ProviderOrigin.Replace.Path = testPath("workspace", "other-framework")
+			r.DriverOrigin.Replace.Path = testPath("workspace", "other-framework")
 		},
 	}
 	for name, mutate := range tests {

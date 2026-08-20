@@ -243,7 +243,7 @@ func TestImportClassesResolvedProvenanceAndSelfOverlap(t *testing.T) {
 
 project .foo Game example.com/app
 class .foo Sprite
-	runtime v1 example.com/app/cmd/runtime
+	driver v1 example.com/app/cmd/driver
 `
 	targetGoMod := writeModule(t, root, "example.com/app", targetGox)
 	if err := os.WriteFile(targetGoMod, []byte("module example.com/app\n\ngo 1.25\n\nrequire example.com/class v1.2.3 //xgo:class\n"), 0644); err != nil {
@@ -276,7 +276,7 @@ project .dep Dep example.com/class
 		t.Fatal(err)
 	}
 	targetInfo, ok := m.LookupClassInfo(".foo")
-	if !ok || targetInfo.Project.Runtime == nil {
+	if !ok || targetInfo.Project.Driver == nil {
 		t.Fatalf("target info = %#v, ok=%v", targetInfo, ok)
 	}
 	if targetInfo.Origin == nil || targetInfo.Origin.Selected.Path != "example.com/app" || targetInfo.RequiredXGo != "1.9" {
@@ -509,15 +509,15 @@ func TestResolvedGraphRejectsUnrelatedExternalGoMod(t *testing.T) {
 	}
 }
 
-func TestImportClassesResolvedRuntimeCollision(t *testing.T) {
+func TestImportClassesResolvedDriverBackedCollision(t *testing.T) {
 	root := t.TempDir()
-	targetGox := "xgo 1.9\nproject .foo Game example.com/app\nruntime v1 example.com/app/runtime\n"
+	targetGox := "xgo 1.9\nproject .foo Game example.com/app\ndriver v1 example.com/app/driver\n"
 	targetGoMod := writeModule(t, root, "example.com/app", targetGox)
 	if err := os.WriteFile(targetGoMod, []byte("module example.com/app\n\ngo 1.25\n\nrequire example.com/class v1.2.3 //xgo:class\n"), 0644); err != nil {
 		t.Fatal(err)
 	}
 	dep := filepath.Join(root, "dep")
-	depGox := "xgo 1.8\nproject .foo Other example.com/class\nruntime v1 example.com/class/runtime\n"
+	depGox := "xgo 1.8\nproject .foo Other example.com/class\ndriver v1 example.com/class/driver\n"
 	depGoMod := writeModule(t, dep, "example.com/class", depGox)
 	loaded, err := modload.LoadFrom(targetGoMod, filepath.Join(root, "gox.mod"))
 	if err != nil {
@@ -528,7 +528,7 @@ func TestImportClassesResolvedRuntimeCollision(t *testing.T) {
 	depRecord := graphModule("example.com/class", "v1.2.3", dep, depGoMod, false)
 	graph := ResolvedClassGraph{Target: target, ClassModules: []ResolvedModule{depRecord}, TargetModFile: graphIdentity(t, targetGoMod)}
 	err = m.ImportClassesResolved(graph)
-	if err == nil || !strings.Contains(err.Error(), "runtime class extension collision") {
+	if err == nil || !strings.Contains(err.Error(), "driver-backed class extension collision") {
 		t.Fatalf("error = %v", err)
 	}
 }
@@ -691,12 +691,12 @@ func TestLookupClassInfoLegacyFallbackAndRegistrationSafety(t *testing.T) {
 	if err := registerProject(nil, nil, nil); err == nil || !strings.Contains(err.Error(), "nil project") {
 		t.Fatalf("nil project error = %v", err)
 	}
-	runtimeProject := &Project{
-		Ext:     ".runtime",
-		Runtime: &modfile.Runtime{Protocol: "v1", Package: "example.com/provider"},
+	driverBackedProject := &Project{
+		Ext:    ".driver",
+		Driver: &modfile.Driver{Protocol: "v1", Package: "example.com/driver"},
 	}
-	if err := registerProject(map[string]*Project{}, map[string]*ProjectInfo{}, &ProjectInfo{Project: runtimeProject}); err == nil || !strings.Contains(err.Error(), "no module provenance") {
-		t.Fatalf("orphan runtime error = %v", err)
+	if err := registerProject(map[string]*Project{}, map[string]*ProjectInfo{}, &ProjectInfo{Project: driverBackedProject}); err == nil || !strings.Contains(err.Error(), "driver-backed project") {
+		t.Fatalf("orphan driver-backed project error = %v", err)
 	}
 
 	same := &Project{Ext: ".same", Class: "Same"}

@@ -9,6 +9,6 @@ mod - Module support for Go/XGo
 
 This repository holds packages for writing tools that work directly with Go/XGo module mechanics. That is, it is for direct manipulation of Go/XGo modules themselves.
 
-## Runtime providers
+## Project drivers
 
-`runtimeprotocol` defines the v1 request model and argv codec used by XGo runtime providers. XGo resolves the module graph and passes its snapshot; providers verify identity-bearing paths before use. `xgomod.ImportClassesResolved` validates the target snapshot and class-module provenance without rediscovering the graph.
+`driverprotocol` defines the v1 request model and argv codec used by XGo drivers. XGo resolves the module graph and passes its snapshot; drivers verify identity-bearing paths before use. `xgomod.ImportClassesResolved` validates the target snapshot and class-module provenance without rediscovering the graph.

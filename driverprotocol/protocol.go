@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-// Package runtimeprotocol defines the provider request model and argv codec.
+// Package driverprotocol defines the driver request model and argv codec.
 // Validation is structural; consumers verify identity-bearing paths.
-package runtimeprotocol
+package driverprotocol
 
 import (
 	"encoding/hex"
@@ -30,13 +30,13 @@ import (
 )
 
 const (
-	// Version1 is the gox.mod runtime protocol value.
+	// Version1 is the gox.mod driver protocol value.
 	Version1 = "v1"
-	// PreambleV1 is the first argv element passed to a v1 provider.
-	PreambleV1 = "xgo-runtime-v1"
+	// PreambleV1 is the first argv element passed to a v1 driver.
+	PreambleV1 = "xgo-driver-v1"
 )
 
-// Action identifies the requested provider operation.
+// Action identifies the requested driver operation.
 type Action string
 
 const (
@@ -74,13 +74,13 @@ type BuildOutput struct {
 	Final   string
 }
 
-// Request is one provider request; run has no Output, build has no ApplicationArgs.
+// Request is one driver request; run has no Output, build has no ApplicationArgs.
 type Request struct {
 	Version         string
 	Action          Action
 	Project         Project
-	ProviderPackage string
-	ProviderOrigin  xgomod.ResolvedModule
+	DriverPackage   string
+	DriverOrigin    xgomod.ResolvedModule
 	Declaration     xgomod.FileIdentity
 	Graph           Graph
 	BuildFlags      []string
@@ -91,10 +91,10 @@ type Request struct {
 // Validate checks the request without reading the filesystem.
 func (r Request) Validate() error {
 	if r.Version != Version1 {
-		return fmt.Errorf("runtimeprotocol: unsupported version %q", r.Version)
+		return fmt.Errorf("driverprotocol: unsupported version %q", r.Version)
 	}
 	if r.Action != ActionRun && r.Action != ActionBuild {
-		return fmt.Errorf("runtimeprotocol: unsupported action %q", r.Action)
+		return fmt.Errorf("driverprotocol: unsupported action %q", r.Action)
 	}
 	for _, item := range []struct {
 		name  string
@@ -112,16 +112,16 @@ func (r Request) Validate() error {
 		}
 	}
 	if filepath.Dir(r.Project.File) != r.Project.Dir {
-		return fmt.Errorf("runtimeprotocol: project-file must be a top-level file in project-dir")
+		return fmt.Errorf("driverprotocol: project-file must be a top-level file in project-dir")
 	}
 	if !pathWithin(r.Project.ModuleRoot, r.Project.Dir) {
-		return fmt.Errorf("runtimeprotocol: project-dir must be within module-root")
+		return fmt.Errorf("driverprotocol: project-dir must be within module-root")
 	}
 	if r.Project.Extension == "" || strings.IndexByte(r.Project.Extension, 0) >= 0 {
-		return fmt.Errorf("runtimeprotocol: project extension may not be empty or contain NUL")
+		return fmt.Errorf("driverprotocol: project extension may not be empty or contain NUL")
 	}
 	if r.Project.FullExtension == "" || strings.IndexByte(r.Project.FullExtension, 0) >= 0 {
-		return fmt.Errorf("runtimeprotocol: project full extension may not be empty or contain NUL")
+		return fmt.Errorf("driverprotocol: project full extension may not be empty or contain NUL")
 	}
 	if r.Project.Pack != nil {
 		if err := validatePackDirectory(r.Project.Pack.Directory); err != nil {
@@ -131,22 +131,22 @@ func (r Request) Validate() error {
 			return err
 		}
 	}
-	if err := validateProviderOrigin(r.ProviderOrigin); err != nil {
-		return fmt.Errorf("runtimeprotocol: provider origin: %w", err)
+	if err := validateDriverOrigin(r.DriverOrigin); err != nil {
+		return fmt.Errorf("driverprotocol: driver origin: %w", err)
 	}
 	if err := validateSHA256("declaration-sha256", r.Declaration.SHA256); err != nil {
 		return err
 	}
-	effective := r.ProviderOrigin.Effective()
+	effective := r.DriverOrigin.Effective()
 	declarationBase := filepath.Base(r.Declaration.Path)
 	if filepath.Dir(r.Declaration.Path) != effective.Dir || (declarationBase != "gox.mod" && declarationBase != "gop.mod") {
-		return fmt.Errorf("runtimeprotocol: declaration-file must be provider metadata (gox.mod or gop.mod) in %q", effective.Dir)
+		return fmt.Errorf("driverprotocol: declaration-file must be driver metadata (gox.mod or gop.mod) in %q", effective.Dir)
 	}
-	if err := module.CheckImportPath(r.ProviderPackage); err != nil {
-		return fmt.Errorf("runtimeprotocol: invalid provider package %q: %w", r.ProviderPackage, err)
+	if err := module.CheckImportPath(r.DriverPackage); err != nil {
+		return fmt.Errorf("driverprotocol: invalid driver package %q: %w", r.DriverPackage, err)
 	}
-	if !moduleContainsPackage(r.ProviderOrigin.Selected.Path, r.ProviderPackage) {
-		return fmt.Errorf("runtimeprotocol: provider package %q is outside selected module %q", r.ProviderPackage, r.ProviderOrigin.Selected.Path)
+	if !moduleContainsPackage(r.DriverOrigin.Selected.Path, r.DriverPackage) {
+		return fmt.Errorf("driverprotocol: driver package %q is outside selected module %q", r.DriverPackage, r.DriverOrigin.Selected.Path)
 	}
 	if r.Graph.GoWork != "off" {
 		if err := validateAbsolutePath("go-work", r.Graph.GoWork); err != nil {
@@ -161,20 +161,20 @@ func (r Request) Validate() error {
 	}
 	for _, arg := range r.ApplicationArgs {
 		if strings.IndexByte(arg, 0) >= 0 {
-			return fmt.Errorf("runtimeprotocol: application argument contains NUL")
+			return fmt.Errorf("driverprotocol: application argument contains NUL")
 		}
 	}
 	switch r.Action {
 	case ActionRun:
 		if r.Output != nil {
-			return fmt.Errorf("runtimeprotocol: run request cannot contain output paths")
+			return fmt.Errorf("driverprotocol: run request cannot contain output paths")
 		}
 	case ActionBuild:
 		if r.Output == nil {
-			return fmt.Errorf("runtimeprotocol: build request requires output paths")
+			return fmt.Errorf("driverprotocol: build request requires output paths")
 		}
 		if len(r.ApplicationArgs) != 0 {
-			return fmt.Errorf("runtimeprotocol: build request cannot contain application arguments")
+			return fmt.Errorf("driverprotocol: build request cannot contain application arguments")
 		}
 		if err := validateAbsolutePath("output", r.Output.Staging); err != nil {
 			return err
@@ -183,55 +183,55 @@ func (r Request) Validate() error {
 			return err
 		}
 		if r.Output.Staging == r.Output.Final {
-			return fmt.Errorf("runtimeprotocol: output and final-output must be different paths")
+			return fmt.Errorf("driverprotocol: output and final-output must be different paths")
 		}
 	}
 	return nil
 }
 
-func validateProviderOrigin(origin xgomod.ResolvedModule) error {
+func validateDriverOrigin(origin xgomod.ResolvedModule) error {
 	return origin.ValidateSyntax()
 }
 
 func validateAbsolutePath(name, value string) error {
 	if value == "" || strings.IndexByte(value, 0) >= 0 {
-		return fmt.Errorf("runtimeprotocol: path --%s may not be empty or contain NUL", name)
+		return fmt.Errorf("driverprotocol: path --%s may not be empty or contain NUL", name)
 	}
 	if !filepath.IsAbs(value) {
-		return fmt.Errorf("runtimeprotocol: path --%s must be absolute: %q", name, value)
+		return fmt.Errorf("driverprotocol: path --%s must be absolute: %q", name, value)
 	}
 	if filepath.Clean(value) != value {
-		return fmt.Errorf("runtimeprotocol: path --%s must be clean: %q", name, value)
+		return fmt.Errorf("driverprotocol: path --%s must be clean: %q", name, value)
 	}
 	return nil
 }
 
 func validatePackDirectory(value string) error {
 	if value == "" || strings.Contains(value, "\\") || strings.IndexByte(value, 0) >= 0 || path.IsAbs(value) || path.Clean(value) != value {
-		return fmt.Errorf("runtimeprotocol: pack directory must be a clean non-empty relative slash path: %q", value)
+		return fmt.Errorf("driverprotocol: pack directory must be a clean non-empty relative slash path: %q", value)
 	}
 	if value == ".." || strings.HasPrefix(value, "../") {
-		return fmt.Errorf("runtimeprotocol: pack directory escapes the project: %q", value)
+		return fmt.Errorf("driverprotocol: pack directory escapes the project: %q", value)
 	}
 	return nil
 }
 
 func validatePackIndex(value string) error {
 	if value == "" || value == "." || value == ".." || strings.ContainsAny(value, "/\\\x00") {
-		return fmt.Errorf("runtimeprotocol: pack index must be a plain file name: %q", value)
+		return fmt.Errorf("driverprotocol: pack index must be a plain file name: %q", value)
 	}
 	return nil
 }
 
 func validateSHA256(name, value string) error {
 	if len(value) != 64 {
-		return fmt.Errorf("runtimeprotocol: --%s must contain 64 hexadecimal characters", name)
+		return fmt.Errorf("driverprotocol: --%s must contain 64 hexadecimal characters", name)
 	}
 	if _, err := hex.DecodeString(value); err != nil {
-		return fmt.Errorf("runtimeprotocol: --%s is not a SHA-256 digest: %w", name, err)
+		return fmt.Errorf("driverprotocol: --%s is not a SHA-256 digest: %w", name, err)
 	}
 	if value != strings.ToLower(value) {
-		return fmt.Errorf("runtimeprotocol: --%s must use lowercase hexadecimal", name)
+		return fmt.Errorf("driverprotocol: --%s must use lowercase hexadecimal", name)
 	}
 	return nil
 }
@@ -241,14 +241,14 @@ func validateGraphFlags(flags []string) error {
 		switch name {
 		case "mod":
 			if value != "mod" && value != "readonly" && value != "vendor" {
-				return fmt.Errorf("runtimeprotocol: graph flag -mod has unsupported value %q", value)
+				return fmt.Errorf("driverprotocol: graph flag -mod has unsupported value %q", value)
 			}
 		case "modfile", "overlay":
 			if err := validateAbsolutePath("graph flag -"+name, value); err != nil {
 				return err
 			}
 		default:
-			return fmt.Errorf("runtimeprotocol: graph flag -%s is not supported", name)
+			return fmt.Errorf("driverprotocol: graph flag -%s is not supported", name)
 		}
 		return nil
 	})
@@ -259,14 +259,14 @@ func validateBuildFlags(flags []string) error {
 		switch name {
 		case "v", "x", "work", "trimpath":
 			if value != "true" {
-				return fmt.Errorf("runtimeprotocol: build flag -%s has unsupported value %q", name, value)
+				return fmt.Errorf("driverprotocol: build flag -%s has unsupported value %q", name, value)
 			}
 		case "buildvcs":
 			if value != "false" {
-				return fmt.Errorf("runtimeprotocol: build flag -buildvcs has unsupported value %q", value)
+				return fmt.Errorf("driverprotocol: build flag -buildvcs has unsupported value %q", value)
 			}
 		default:
-			return fmt.Errorf("runtimeprotocol: build flag -%s is not supported", name)
+			return fmt.Errorf("driverprotocol: build flag -%s is not supported", name)
 		}
 		return nil
 	})
@@ -277,10 +277,10 @@ func validateFlags(kind string, flags []string, validateValue func(name, value s
 	for _, flag := range flags {
 		name, value, ok := splitCanonicalFlag(flag)
 		if !ok {
-			return fmt.Errorf("runtimeprotocol: %s flag %q must use -name=value", kind, flag)
+			return fmt.Errorf("driverprotocol: %s flag %q must use -name=value", kind, flag)
 		}
 		if _, duplicate := seen[name]; duplicate {
-			return fmt.Errorf("runtimeprotocol: %s flag -%s may not be repeated", kind, name)
+			return fmt.Errorf("driverprotocol: %s flag -%s may not be repeated", kind, name)
 		}
 		seen[name] = struct{}{}
 		if err := validateValue(name, value); err != nil {

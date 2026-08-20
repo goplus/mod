@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package runtimeprotocol
+package driverprotocol
 
 import (
 	"fmt"
@@ -27,7 +27,7 @@ var singularOptions = map[string]struct{}{
 	"project-dir":        {},
 	"project-file":       {},
 	"module-root":        {},
-	"provider-package":   {},
+	"driver-package":     {},
 	"selected-path":      {},
 	"selected-version":   {},
 	"origin-main":        {},
@@ -54,7 +54,7 @@ var commonRequiredOptions = []string{
 	"project-dir",
 	"project-file",
 	"module-root",
-	"provider-package",
+	"driver-package",
 	"selected-path",
 	"selected-version",
 	"origin-main",
@@ -80,7 +80,7 @@ type rawOptions struct {
 	buildFlags []string
 }
 
-// Encode returns deterministic argv following the provider executable.
+// Encode returns deterministic argv following the driver executable.
 func Encode(request Request) ([]string, error) {
 	if err := request.Validate(); err != nil {
 		return nil, err
@@ -91,18 +91,18 @@ func Encode(request Request) ([]string, error) {
 		option("project-dir", request.Project.Dir),
 		option("project-file", request.Project.File),
 		option("module-root", request.Project.ModuleRoot),
-		option("provider-package", request.ProviderPackage),
-		option("selected-path", request.ProviderOrigin.Selected.Path),
-		option("selected-version", request.ProviderOrigin.Selected.Version),
-		option("origin-main", fmt.Sprint(request.ProviderOrigin.Main)),
+		option("driver-package", request.DriverPackage),
+		option("selected-path", request.DriverOrigin.Selected.Path),
+		option("selected-version", request.DriverOrigin.Selected.Version),
+		option("origin-main", fmt.Sprint(request.DriverOrigin.Main)),
 	}
-	if request.ProviderOrigin.Replace == nil {
+	if request.DriverOrigin.Replace == nil {
 		args = append(args,
-			option("selected-dir", request.ProviderOrigin.Selected.Dir),
-			option("selected-gomod", request.ProviderOrigin.Selected.GoMod),
+			option("selected-dir", request.DriverOrigin.Selected.Dir),
+			option("selected-gomod", request.DriverOrigin.Selected.GoMod),
 		)
 	} else {
-		replacement := request.ProviderOrigin.Replace
+		replacement := request.DriverOrigin.Replace
 		args = append(args,
 			option("replace-path", replacement.Path),
 			option("replace-version", replacement.Version),
@@ -145,19 +145,19 @@ func Encode(request Request) ([]string, error) {
 	return args, nil
 }
 
-// Parse decodes provider argv and rejects unknown, duplicate, partial, or inapplicable fields.
+// Parse decodes driver argv and rejects unknown, duplicate, partial, or inapplicable fields.
 func Parse(args []string) (Request, error) {
 	var request Request
 	if len(args) < 2 {
-		return request, fmt.Errorf("runtimeprotocol: request requires preamble and action")
+		return request, fmt.Errorf("driverprotocol: request requires preamble and action")
 	}
 	if args[0] != PreambleV1 {
-		return request, fmt.Errorf("runtimeprotocol: unsupported preamble %q", args[0])
+		return request, fmt.Errorf("driverprotocol: unsupported preamble %q", args[0])
 	}
 	request.Version = Version1
 	request.Action = Action(args[1])
 	if request.Action != ActionRun && request.Action != ActionBuild {
-		return Request{}, fmt.Errorf("runtimeprotocol: unsupported action %q", args[1])
+		return Request{}, fmt.Errorf("driverprotocol: unsupported action %q", args[1])
 	}
 
 	optionArgs := args[2:]
@@ -170,14 +170,14 @@ func Parse(args []string) (Request, error) {
 			}
 		}
 		if delimiter < 0 {
-			return Request{}, fmt.Errorf("runtimeprotocol: run requires -- before application arguments")
+			return Request{}, fmt.Errorf("driverprotocol: run requires -- before application arguments")
 		}
 		request.ApplicationArgs = append([]string(nil), optionArgs[delimiter+1:]...)
 		optionArgs = optionArgs[:delimiter]
 	} else {
 		for _, arg := range optionArgs {
 			if arg == "--" {
-				return Request{}, fmt.Errorf("runtimeprotocol: build does not accept -- or positional arguments")
+				return Request{}, fmt.Errorf("driverprotocol: build does not accept -- or positional arguments")
 			}
 		}
 	}
@@ -188,7 +188,7 @@ func Parse(args []string) (Request, error) {
 	}
 	for _, name := range commonRequiredOptions {
 		if _, ok := raw.values[name]; !ok {
-			return Request{}, fmt.Errorf("runtimeprotocol: option --%s is required", name)
+			return Request{}, fmt.Errorf("driverprotocol: option --%s is required", name)
 		}
 	}
 
@@ -204,14 +204,14 @@ func Parse(args []string) (Request, error) {
 	}
 	hasPack, completePack := optionGroup(raw.values, "pack-dir", "pack-index")
 	if hasPack && !completePack {
-		return Request{}, fmt.Errorf("runtimeprotocol: pack options must be supplied as a complete group")
+		return Request{}, fmt.Errorf("driverprotocol: pack options must be supplied as a complete group")
 	}
 	if hasPack {
 		request.Project.Pack = &Pack{Directory: raw.values["pack-dir"], IndexFile: raw.values["pack-index"]}
 	}
 
-	request.ProviderPackage = raw.values["provider-package"]
-	request.ProviderOrigin = xgomod.ResolvedModule{
+	request.DriverPackage = raw.values["driver-package"]
+	request.DriverOrigin = xgomod.ResolvedModule{
 		Selected: xgomod.ModuleRef{
 			Path:    raw.values["selected-path"],
 			Version: raw.values["selected-version"],
@@ -219,12 +219,12 @@ func Parse(args []string) (Request, error) {
 	}
 	switch raw.values["origin-main"] {
 	case "true":
-		request.ProviderOrigin.Main = true
+		request.DriverOrigin.Main = true
 	case "false":
 	default:
-		return Request{}, fmt.Errorf("runtimeprotocol: invalid --origin-main %q: expected true or false", raw.values["origin-main"])
+		return Request{}, fmt.Errorf("driverprotocol: invalid --origin-main %q: expected true or false", raw.values["origin-main"])
 	}
-	if err := parseModuleSource(&request.ProviderOrigin, raw); err != nil {
+	if err := parseModuleSource(&request.DriverOrigin, raw); err != nil {
 		return Request{}, err
 	}
 
@@ -239,13 +239,13 @@ func Parse(args []string) (Request, error) {
 		output, hasOutput := raw.values["output"]
 		final, hasFinal := raw.values["final-output"]
 		if !hasOutput || !hasFinal {
-			return Request{}, fmt.Errorf("runtimeprotocol: build requires --output and --final-output")
+			return Request{}, fmt.Errorf("driverprotocol: build requires --output and --final-output")
 		}
 		request.Output = &BuildOutput{Staging: output, Final: final}
 	} else if _, ok := raw.values["output"]; ok {
-		return Request{}, fmt.Errorf("runtimeprotocol: run does not accept --output")
+		return Request{}, fmt.Errorf("driverprotocol: run does not accept --output")
 	} else if _, ok := raw.values["final-output"]; ok {
-		return Request{}, fmt.Errorf("runtimeprotocol: run does not accept --final-output")
+		return Request{}, fmt.Errorf("driverprotocol: run does not accept --final-output")
 	}
 	if err := request.Validate(); err != nil {
 		return Request{}, err
@@ -257,11 +257,11 @@ func parseOptions(args []string) (rawOptions, error) {
 	raw := rawOptions{values: make(map[string]string)}
 	for _, arg := range args {
 		if !strings.HasPrefix(arg, "--") || arg == "--" {
-			return rawOptions{}, fmt.Errorf("runtimeprotocol: unexpected positional argument %q", arg)
+			return rawOptions{}, fmt.Errorf("driverprotocol: unexpected positional argument %q", arg)
 		}
 		name, value, ok := strings.Cut(strings.TrimPrefix(arg, "--"), "=")
 		if !ok || name == "" {
-			return rawOptions{}, fmt.Errorf("runtimeprotocol: option %q must use --name=value", arg)
+			return rawOptions{}, fmt.Errorf("driverprotocol: option %q must use --name=value", arg)
 		}
 		switch name {
 		case "graph-flag":
@@ -270,10 +270,10 @@ func parseOptions(args []string) (rawOptions, error) {
 			raw.buildFlags = append(raw.buildFlags, value)
 		default:
 			if _, ok := singularOptions[name]; !ok {
-				return rawOptions{}, fmt.Errorf("runtimeprotocol: unknown option --%s", name)
+				return rawOptions{}, fmt.Errorf("driverprotocol: unknown option --%s", name)
 			}
 			if _, duplicate := raw.values[name]; duplicate {
-				return rawOptions{}, fmt.Errorf("runtimeprotocol: option --%s may not be repeated", name)
+				return rawOptions{}, fmt.Errorf("driverprotocol: option --%s may not be repeated", name)
 			}
 			raw.values[name] = value
 		}
@@ -286,10 +286,10 @@ func parseModuleSource(origin *xgomod.ResolvedModule, raw rawOptions) error {
 	selectedDir, completeSelected := optionGroup(raw.values, "selected-dir", "selected-gomod")
 	if hasReplacement {
 		if !completeReplacement {
-			return fmt.Errorf("runtimeprotocol: replacement options must be supplied as a complete group")
+			return fmt.Errorf("driverprotocol: replacement options must be supplied as a complete group")
 		}
 		if selectedDir {
-			return fmt.Errorf("runtimeprotocol: origin with replacement forbids --selected-dir and --selected-gomod")
+			return fmt.Errorf("driverprotocol: origin with replacement forbids --selected-dir and --selected-gomod")
 		}
 		origin.Replace = &xgomod.ModuleRef{
 			Path:    raw.values["replace-path"],
@@ -300,7 +300,7 @@ func parseModuleSource(origin *xgomod.ResolvedModule, raw rawOptions) error {
 		return nil
 	}
 	if !completeSelected {
-		return fmt.Errorf("runtimeprotocol: origin without replacement requires --selected-dir and --selected-gomod")
+		return fmt.Errorf("driverprotocol: origin without replacement requires --selected-dir and --selected-gomod")
 	}
 	origin.Selected.Dir = raw.values["selected-dir"]
 	origin.Selected.GoMod = raw.values["selected-gomod"]

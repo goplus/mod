@@ -158,48 +158,48 @@ func TestParsePack(t *testing.T) {
 	}
 }
 
-func TestParseRuntime(t *testing.T) {
+func TestParseDriver(t *testing.T) {
 	const src = `
 xgo 1.6
 
 project main.foo Game example.com/framework math
-runtime v1 example.com/framework/cmd/runtime // provider
+driver v1 example.com/framework/cmd/driver // driver
 `
 	f, err := ParseLax("gox.mod", []byte(src), nil)
 	if err != nil {
 		t.Fatal("ParseLax failed:", err)
 	}
 	proj := f.proj()
-	if proj == nil || proj.Runtime == nil {
-		t.Fatal("expected runtime")
+	if proj == nil || proj.Driver == nil {
+		t.Fatal("expected driver")
 	}
-	if proj.Runtime.Protocol != "v1" || proj.Runtime.Package != "example.com/framework/cmd/runtime" {
-		t.Fatalf("runtime = %#v", proj.Runtime)
+	if proj.Driver.Protocol != "v1" || proj.Driver.Package != "example.com/framework/cmd/driver" {
+		t.Fatalf("driver = %#v", proj.Driver)
 	}
 	formatted := Format(f.Syntax)
 	f2, err := ParseLax("gox.mod", formatted, nil)
 	if err != nil {
 		t.Fatal("round-trip ParseLax failed:", err)
 	}
-	if got := f2.proj().Runtime; got == nil || got.Protocol != "v1" || got.Package != proj.Runtime.Package {
-		t.Fatalf("round-trip runtime = %#v", got)
+	if got := f2.proj().Driver; got == nil || got.Protocol != "v1" || got.Package != proj.Driver.Package {
+		t.Fatalf("round-trip driver = %#v", got)
 	}
 }
 
-func TestParseRuntimeErrors(t *testing.T) {
+func TestParseDriverErrors(t *testing.T) {
 	tests := []struct {
 		name string
 		want string
 		src  string
 	}{
-		{"before project", "runtime must declare after a project definition", "runtime v1 example.com/provider"},
-		{"wrong arity", "usage: runtime <protocol> <package>", "project example.com/app\nruntime v1"},
-		{"invalid protocol", "runtime protocol must match v[1-9][0-9]*", "project example.com/app\nruntime 1 example.com/provider"},
-		{"zero protocol", "runtime protocol must match v[1-9][0-9]*", "project example.com/app\nruntime v0 example.com/provider"},
-		{"malformed protocol quote", "invalid syntax", "project example.com/app\nruntime \"bad\\q\" example.com/provider"},
-		{"invalid package", "runtime package", "project example.com/app\nruntime v1 ../provider"},
-		{"malformed package quote", "invalid syntax", "project example.com/app\nruntime v1 \"bad\\q\""},
-		{"duplicate", "duplicate runtime directive in the same project", "project example.com/app\nruntime v1 example.com/provider\nruntime v1 example.com/provider"},
+		{"before project", "driver must declare after a project definition", "driver v1 example.com/driver"},
+		{"wrong arity", "usage: driver <protocol> <package>", "project example.com/app\ndriver v1"},
+		{"invalid protocol", "driver protocol must match v[1-9][0-9]*", "project example.com/app\ndriver 1 example.com/driver"},
+		{"zero protocol", "driver protocol must match v[1-9][0-9]*", "project example.com/app\ndriver v0 example.com/driver"},
+		{"malformed protocol quote", "invalid syntax", "project example.com/app\ndriver \"bad\\q\" example.com/driver"},
+		{"invalid package", "driver package", "project example.com/app\ndriver v1 ../driver"},
+		{"malformed package quote", "invalid syntax", "project example.com/app\ndriver v1 \"bad\\q\""},
+		{"duplicate", "duplicate driver directive in the same project", "project example.com/app\ndriver v1 example.com/driver\ndriver v1 example.com/driver"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -216,16 +216,45 @@ func TestParseRuntimeErrors(t *testing.T) {
 	}
 }
 
-func TestParseRuntimeIsNotABlockDirective(t *testing.T) {
+func TestParseRejectsLegacyRuntimeDirective(t *testing.T) {
+	for _, parse := range []func(string, []byte) (*File, error){
+		func(name string, data []byte) (*File, error) { return Parse(name, data, nil) },
+		func(name string, data []byte) (*File, error) { return ParseLax(name, data, nil) },
+	} {
+		_, err := parse("gox.mod", []byte("project example.com/app\nruntime v1 example.com/driver\n"))
+		if err == nil || !strings.Contains(err.Error(), "runtime directive was renamed to driver") {
+			t.Fatalf("error = %v", err)
+		}
+	}
+}
+
+func TestParseRejectsLegacyRuntimeBlock(t *testing.T) {
+	for _, src := range []string{
+		"project example.com/app\nruntime (\nv1 example.com/driver\n)\n",
+		"project example.com/app\nruntime (\n)\n",
+	} {
+		for _, parse := range []func(string, []byte) (*File, error){
+			func(name string, data []byte) (*File, error) { return Parse(name, data, nil) },
+			func(name string, data []byte) (*File, error) { return ParseLax(name, data, nil) },
+		} {
+			_, err := parse("gox.mod", []byte(src))
+			if err == nil || !strings.Contains(err.Error(), "runtime directive was renamed to driver") {
+				t.Fatalf("error = %v", err)
+			}
+		}
+	}
+}
+
+func TestParseDriverIsNotABlockDirective(t *testing.T) {
 	_, err := ParseLax("gox.mod", []byte(`project example.com/app
-runtime (
-v1 example.com/provider
+driver (
+v1 example.com/driver
 )`), nil)
-	if err == nil || !strings.Contains(err.Error(), "runtime directive must not be a block") {
+	if err == nil || !strings.Contains(err.Error(), "driver directive must not be a block") {
 		t.Fatalf("error = %v", err)
 	}
-	_, err = ParseLax("gox.mod", []byte("project example.com/app\nruntime (\n)\n"), nil)
-	if err == nil || !strings.Contains(err.Error(), "runtime directive must not be a block") {
+	_, err = ParseLax("gox.mod", []byte("project example.com/app\ndriver (\n)\n"), nil)
+	if err == nil || !strings.Contains(err.Error(), "driver directive must not be a block") {
 		t.Fatalf("empty block error = %v", err)
 	}
 }
