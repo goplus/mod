@@ -16,6 +16,7 @@
 package modfile
 
 import (
+	"strings"
 	"syscall"
 	"testing"
 )
@@ -154,6 +155,78 @@ func TestParsePack(t *testing.T) {
 	}
 	if proj.Pack.IndexFile != "index.json" {
 		t.Errorf("pack indexfile expected be index.json, but %s got", proj.Pack.IndexFile)
+	}
+}
+
+func TestParseDriver(t *testing.T) {
+	const src = `
+xgo 1.6
+
+project main.foo Game example.com/framework math
+driver v1 example.com/framework/cmd/driver // driver
+`
+	f, err := ParseLax("gox.mod", []byte(src), nil)
+	if err != nil {
+		t.Fatal("ParseLax failed:", err)
+	}
+	proj := f.proj()
+	if proj == nil || proj.Driver == nil {
+		t.Fatal("expected driver")
+	}
+	if proj.Driver.Protocol != "v1" || proj.Driver.Package != "example.com/framework/cmd/driver" {
+		t.Fatalf("driver = %#v", proj.Driver)
+	}
+	formatted := Format(f.Syntax)
+	f2, err := ParseLax("gox.mod", formatted, nil)
+	if err != nil {
+		t.Fatal("round-trip ParseLax failed:", err)
+	}
+	if got := f2.proj().Driver; got == nil || got.Protocol != "v1" || got.Package != proj.Driver.Package {
+		t.Fatalf("round-trip driver = %#v", got)
+	}
+}
+
+func TestParseDriverErrors(t *testing.T) {
+	tests := []struct {
+		name string
+		want string
+		src  string
+	}{
+		{"before project", "driver must declare after a project definition", "driver v1 example.com/driver"},
+		{"wrong arity", "usage: driver <protocol> <package>", "project example.com/app\ndriver v1"},
+		{"invalid protocol", "driver protocol must match v[1-9][0-9]*", "project example.com/app\ndriver 1 example.com/driver"},
+		{"zero protocol", "driver protocol must match v[1-9][0-9]*", "project example.com/app\ndriver v0 example.com/driver"},
+		{"malformed protocol quote", "invalid syntax", "project example.com/app\ndriver \"bad\\q\" example.com/driver"},
+		{"invalid package", "driver package", "project example.com/app\ndriver v1 ../driver"},
+		{"malformed package quote", "invalid syntax", "project example.com/app\ndriver v1 \"bad\\q\""},
+		{"duplicate", "duplicate driver directive in the same project", "project example.com/app\ndriver v1 example.com/driver\ndriver v1 example.com/driver"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			for _, parse := range []func(string, []byte) (*File, error){
+				func(name string, data []byte) (*File, error) { return Parse(name, data, nil) },
+				func(name string, data []byte) (*File, error) { return ParseLax(name, data, nil) },
+			} {
+				_, err := parse("gox.mod", []byte(tt.src))
+				if err == nil || !strings.Contains(err.Error(), tt.want) {
+					t.Fatalf("error = %v, want substring %q", err, tt.want)
+				}
+			}
+		})
+	}
+}
+
+func TestParseDriverIsNotABlockDirective(t *testing.T) {
+	_, err := ParseLax("gox.mod", []byte(`project example.com/app
+driver (
+v1 example.com/driver
+)`), nil)
+	if err == nil || !strings.Contains(err.Error(), "driver directive must not be a block") {
+		t.Fatalf("error = %v", err)
+	}
+	_, err = ParseLax("gox.mod", []byte("project example.com/app\ndriver (\n)\n"), nil)
+	if err == nil || !strings.Contains(err.Error(), "driver directive must not be a block") {
+		t.Fatalf("empty block error = %v", err)
 	}
 }
 
