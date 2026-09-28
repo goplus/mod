@@ -231,16 +231,17 @@ func getResult(data string, reqPath string) (mod module.Version, err error) {
 		}
 		if reqPath != "" && m.Path == reqPath {
 			mod = m
-			fmt.Fprintln(os.Stderr, "xgo: downloading", mod.Path, mod.Version)
-			return
+			break
 		}
 	}
-	if found {
-		mod = first
-		fmt.Fprintln(os.Stderr, "xgo: downloading", mod.Path, mod.Version)
+	if !found {
+		err = xmod.ErrNotFound
 		return
 	}
-	err = xmod.ErrNotFound
+	if mod.Path == "" {
+		mod = first
+	}
+	fmt.Fprintln(os.Stderr, "xgo: downloading", mod.Path, mod.Version)
 	return
 }
 
