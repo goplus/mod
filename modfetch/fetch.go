@@ -189,7 +189,11 @@ func Get(modPath string, noCache ...bool) (mod module.Version, err error) {
 	cmd.Stderr = &stderr
 	cmd.Run()
 	if stderr.Len() > 0 {
-		mod, err = getResult(stderr.String())
+		reqPath := modPath
+		if pos := strings.IndexByte(reqPath, '@'); pos > 0 {
+			reqPath = reqPath[:pos]
+		}
+		mod, err = getResult(stderr.String(), reqPath)
 		if err != xmod.ErrNotFound {
 			if debugVerbose {
 				log.Println("modfetch.Get ret:", err)
@@ -200,17 +204,41 @@ func Get(modPath string, noCache ...bool) (mod module.Version, err error) {
 	return getFromCache(modPath)
 }
 
-func getResult(data string) (mod module.Version, err error) {
+func getResult(data string, reqPath string) (mod module.Version, err error) {
 	if debugVerbose {
 		log.Println("modfetch.getResult:", data)
 	}
 	// go: downloading github.com/xushiwei/foogop v0.1.0
+	//
+	// A single `go get` may emit multiple downloading lines (e.g. when the
+	// requested module lives in a multi-module repository, its parent module is
+	// downloaded too) and their order is not deterministic. Prefer the line
+	// whose module path exactly matches the requested one; fall back to the
+	// first downloading line to preserve the single-module behavior.
 	const downloading = "go: downloading "
-	if strings.HasPrefix(data, downloading) {
-		if pos := strings.IndexByte(data, '\n'); pos > 0 {
-			fmt.Fprintln(os.Stderr, "xgo:", data[4:pos])
+	var first module.Version
+	var found bool
+	for _, line := range strings.Split(data, "\n") {
+		if !strings.HasPrefix(line, downloading) {
+			continue
 		}
-		return getMod(data[len(downloading):], nil)
+		m, e := getMod(line[len(downloading):]+"\n", nil)
+		if e != nil {
+			continue
+		}
+		if !found {
+			first, found = m, true
+		}
+		if reqPath != "" && m.Path == reqPath {
+			mod = m
+			fmt.Fprintln(os.Stderr, "xgo: downloading", mod.Path, mod.Version)
+			return
+		}
+	}
+	if found {
+		mod = first
+		fmt.Fprintln(os.Stderr, "xgo: downloading", mod.Path, mod.Version)
+		return
 	}
 	err = xmod.ErrNotFound
 	return
