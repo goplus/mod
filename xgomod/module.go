@@ -48,6 +48,7 @@ type DepMod struct {
 type Module struct {
 	modload.Module
 	projs map[string]*Project // ext -> project
+	infos map[string]*ProjectInfo
 	deps  []DepMod
 }
 

@@ -17,6 +17,8 @@
 package modload
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -40,7 +42,25 @@ var (
 
 type Module struct {
 	*gomodfile.File
-	Opt *modfile.File
+	Opt            *modfile.File
+	goModIdentity  FileIdentity
+	goxModIdentity FileIdentity
+}
+
+// FileIdentity binds a module file to the SHA-256 of bytes read; zero means none.
+type FileIdentity struct {
+	Path   string
+	SHA256 string
+}
+
+// GoModIdentity returns the go.mod snapshot used to parse File.
+func (p Module) GoModIdentity() FileIdentity {
+	return p.goModIdentity
+}
+
+// GoxModIdentity returns the gox.mod or gop.mod snapshot used to parse Opt.
+func (p Module) GoxModIdentity() FileIdentity {
+	return p.goxModIdentity
 }
 
 // HasModfile returns if this module exists or not.
@@ -141,7 +161,7 @@ func Create(dir string, modPath, goVer, xgoVer string) (p Module, err error) {
 	}
 	mod := newGoMod(gomod, modPath, goVer)
 	opt := newGoxMod(goxmod, xgoVer)
-	return Module{mod, opt}, nil
+	return Module{File: mod, Opt: opt}, nil
 }
 
 func newGoMod(gomod, modPath, goVer string) *gomodfile.File {
@@ -193,6 +213,7 @@ func LoadFromEx(gomod, goxmod string, readFile func(string) ([]byte, error)) (p 
 		err = errors.NewWith(err, `readFile(gomod)`, -2, "readFile", gomod)
 		return
 	}
+	goModIdentity := fileIdentity(gomod, data)
 
 	var fixed bool
 	fix := fixVersion(&fixed)
@@ -213,6 +234,7 @@ func LoadFromEx(gomod, goxmod string, readFile func(string) ([]byte, error)) (p 
 	}
 
 	var opt *modfile.File
+	var goxModIdentity FileIdentity
 	if goxmod != "" {
 		data, err = readFile(goxmod)
 		if err != nil {
@@ -223,6 +245,7 @@ func LoadFromEx(gomod, goxmod string, readFile func(string) ([]byte, error)) (p 
 			}
 		}
 		if err == nil {
+			goxModIdentity = fileIdentity(goxmod, data)
 			opt, err = modfile.ParseLax(goxmod, data, fix)
 			if err != nil {
 				err = errors.NewWith(err, `modfile.Parse(goxmod, data, fix)`, -2, "modfile.Parse", goxmod, data, fix)
@@ -237,7 +260,12 @@ func LoadFromEx(gomod, goxmod string, readFile func(string) ([]byte, error)) (p 
 	if cl := getGoCompiler(f); cl != nil {
 		opt.Compiler = cl
 	}
-	return Module{f, opt}, nil
+	return Module{File: f, Opt: opt, goModIdentity: goModIdentity, goxModIdentity: goxModIdentity}, nil
+}
+
+func fileIdentity(path string, data []byte) FileIdentity {
+	sum := sha256.Sum256(data)
+	return FileIdentity{Path: path, SHA256: hex.EncodeToString(sum[:])}
 }
 
 // AddCompiler adds a custom Go compiler to this module.
@@ -297,11 +325,20 @@ func addClass(opt *modfile.File, r *gomodfile.Require) {
 
 func isClass(r *gomodfile.Require) bool {
 	if line := r.Syntax; line != nil {
-		for _, c := range line.Suffix {
-			text := strings.TrimLeft(c.Token[2:], " \t")
-			if strings.HasPrefix(text, "xgo:class") || strings.HasPrefix(text, "gop:class") {
-				return true
-			}
+		return HasClassMarker(line.Suffix)
+	}
+	return false
+}
+
+// HasClassMarker reports a token-boundary xgo:class or gop:class marker.
+func HasClassMarker(comments []gomodfile.Comment) bool {
+	for _, comment := range comments {
+		if !strings.HasPrefix(comment.Token, "//") {
+			continue
+		}
+		fields := strings.Fields(comment.Token[2:])
+		if len(fields) != 0 && (fields[0] == "xgo:class" || fields[0] == "gop:class") {
+			return true
 		}
 	}
 	return false
