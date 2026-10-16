@@ -20,6 +20,8 @@ import (
 	"encoding/json"
 	"log"
 	"os"
+	"path/filepath"
+	"reflect"
 	"runtime"
 	"testing"
 
@@ -62,6 +64,93 @@ func TestEmpty(t *testing.T) {
 	}
 	if v := len(mod.Opt.ClassMods); v != 0 {
 		t.Fatal("len(mod.Opt.ClassMods):", v)
+	}
+}
+
+func TestHasClassMarker(t *testing.T) {
+	tests := []struct {
+		token string
+		want  bool
+	}{
+		{"//xgo:class", true},
+		{"// xgo:class", true},
+		{"//xgo:class payload", true},
+		{"//gop:class\tpayload", true},
+		{"// gop:class   ", true},
+		{"//xgo:classroom", false},
+		{"//gop:classes", false},
+		{"//xgo:class-payload", false},
+		{"//prefix xgo:class", false},
+		{"xgo:class", false},
+	}
+	for _, test := range tests {
+		comments := []gomodfile.Comment{{Token: test.token}}
+		if got := HasClassMarker(comments); got != test.want {
+			t.Errorf("HasClassMarker(%q) = %v, want %v", test.token, got, test.want)
+		}
+	}
+}
+
+func TestLoadClassMarkerOrderAndBoundary(t *testing.T) {
+	const goMod = `module example.com/app
+
+go 1.25
+
+require (
+	example.com/second v1.0.0 //gop:class payload
+	example.com/classroom v1.0.0 //xgo:classroom
+	example.com/first v1.0.0 // xgo:class
+)
+`
+	mod, err := LoadFromEx("memory/go.mod", "", func(string) ([]byte, error) {
+		return []byte(goMod), nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"example.com/second", "example.com/first"}
+	if !reflect.DeepEqual(mod.Opt.ClassMods, want) {
+		t.Fatalf("ClassMods = %#v, want %#v", mod.Opt.ClassMods, want)
+	}
+}
+
+func TestModuleFileIdentitiesAreReadOnlySnapshots(t *testing.T) {
+	dir := t.TempDir()
+	goMod := filepath.Join(dir, "go.mod")
+	goxMod := filepath.Join(dir, "gox.mod")
+	if err := os.WriteFile(goMod, []byte("module example.com/app\n\ngo 1.25\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(goxMod, []byte("xgo 1.9\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	mod, err := LoadFrom(goMod, goxMod)
+	if err != nil {
+		t.Fatal(err)
+	}
+	goIdentity := mod.GoModIdentity()
+	goxIdentity := mod.GoxModIdentity()
+	if goIdentity.Path != goMod || len(goIdentity.SHA256) != 64 {
+		t.Fatalf("go.mod identity = %#v", goIdentity)
+	}
+	if goxIdentity.Path != goxMod || len(goxIdentity.SHA256) != 64 {
+		t.Fatalf("gox.mod identity = %#v", goxIdentity)
+	}
+	goIdentity.Path = "tampered"
+	goIdentity.SHA256 = "tampered"
+	if got := mod.GoModIdentity(); got.Path != goMod || len(got.SHA256) != 64 {
+		t.Fatalf("stored go.mod identity was mutable: %#v", got)
+	}
+
+	inMemory, err := Create(filepath.Join(dir, "new"), "example.com/new", "1.25", "1.9")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := inMemory.GoModIdentity(); got != (FileIdentity{}) {
+		t.Fatalf("in-memory go.mod identity = %#v", got)
+	}
+	if got := inMemory.GoxModIdentity(); got != (FileIdentity{}) {
+		t.Fatalf("in-memory gox.mod identity = %#v", got)
 	}
 }
 

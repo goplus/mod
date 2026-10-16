@@ -96,6 +96,7 @@ func (p *Module) ImportClasses(importClass ...func(c *Project)) (err error) {
 		impcls = importClass[0]
 	}
 	p.projs = make(map[string]*Project)
+	p.infos = make(map[string]*ProjectInfo)
 	p.importClass(TestProject, impcls)
 	p.importClass(GshProject, impcls)
 	opt := p.Opt
@@ -146,9 +147,10 @@ func (p *Module) importClassFrom(modVer module.Version, impcls func(c *Project))
 }
 
 func (p *Module) importClass(c *Project, impcls func(c *Project)) {
-	p.projs[c.Ext] = c
-	for _, w := range c.Works {
-		p.projs[w.Ext] = c
+	info := &ProjectInfo{Project: c}
+	for _, ext := range projectExts(c) {
+		p.projs[ext] = c
+		p.infos[ext] = info
 	}
 	if impcls != nil {
 		impcls(c)
