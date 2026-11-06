@@ -52,8 +52,9 @@ func FindGoMod(dirFrom string) (dir, file string, err error) {
 	return
 }
 
-// GoxModfile returns the path to the gox.mod file in the specified directory.
-// If gox.mod does not exist, it returns the path to gop.mod for backward compatibility.
+// GoxModfile returns the path to the gox.mod file in the specified directory. If gox.mod
+// does not exist, it returns the gop.mod path for backward compatibility, without checking
+// that it exists.
 func GoxModfile(dir string) string {
 	file := filepath.Join(dir, "gox.mod")
 	if _, e := os.Lstat(file); e == nil { // gox.mod exists
@@ -70,8 +71,8 @@ func GOMOD(dirFrom string) (file string, err error) {
 	return
 }
 
-// GOXMOD returns the path to the nearest gox.mod file starting from the specified directory.
-// If gox.mod does not exist, it returns the path to gop.mod for backward compatibility.
+// GOXMOD finds the directory of the nearest go.mod starting from dirFrom and returns the
+// gox.mod path in that directory (falling back to gop.mod for backward compatibility).
 func GOXMOD(dirFrom string) (file string, err error) {
 	dir, _, err := FindGoMod(dirFrom)
 	if err != nil {
