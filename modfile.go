@@ -20,11 +20,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"syscall"
-)
-
-const (
-	ErrNotFound = syscall.ENOENT
 )
 
 // -----------------------------------------------------------------------------
@@ -32,6 +27,8 @@ const (
 // FindGoMod searches for the nearest go.mod file starting from the specified directory
 // and moving up the directory tree. It returns the directory containing the go.mod file,
 // the file path, and an error if not found.
+//
+// Deprecated: Use Discover instead.
 func FindGoMod(dirFrom string) (dir, file string, err error) {
 	if dirFrom == "" {
 		dirFrom = "."
@@ -52,20 +49,11 @@ func FindGoMod(dirFrom string) (dir, file string, err error) {
 	return
 }
 
-// GoxModfile returns the path to the gox.mod file in the specified directory. If gox.mod
-// does not exist, it returns the gop.mod path for backward compatibility, without checking
-// that it exists.
-func GoxModfile(dir string) string {
-	file := filepath.Join(dir, "gox.mod")
-	if _, e := os.Lstat(file); e == nil { // gox.mod exists
-		return file
-	}
-	return filepath.Join(dir, "gop.mod") // backward compatibility
-}
-
 // -----------------------------------------------------------------------------
 
 // GOMOD returns the path to the nearest go.mod file starting from the specified directory.
+//
+// Deprecated: Use Discover instead.
 func GOMOD(dirFrom string) (file string, err error) {
 	_, file, err = FindGoMod(dirFrom)
 	return
@@ -73,12 +61,18 @@ func GOMOD(dirFrom string) (file string, err error) {
 
 // GOXMOD finds the directory of the nearest go.mod starting from dirFrom and returns the
 // gox.mod path in that directory (falling back to gop.mod for backward compatibility).
+//
+// Deprecated: Use Discover instead.
 func GOXMOD(dirFrom string) (file string, err error) {
 	dir, _, err := FindGoMod(dirFrom)
 	if err != nil {
 		return
 	}
-	return GoxModfile(dir), nil
+	file = filepath.Join(dir, "gox.mod")
+	if _, e := os.Lstat(file); e == nil { // gox.mod exists
+		return
+	}
+	return filepath.Join(dir, "gop.mod"), nil // backward compatibility
 }
 
 // -----------------------------------------------------------------------------
