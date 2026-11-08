@@ -115,7 +115,7 @@ func NewGoWork(dir string, f *modfile.WorkFile) (*Workspace, error) {
 		}
 		m, err := loadMainMod(moddir)
 		if err != nil {
-			return nil, fmt.Errorf("%s: use %s: %w", filepath.Join(abs, goWorkFile), u.Path, err)
+			return nil, fmt.Errorf("%s: use %s: %w", filepath.Join(abs, goworkFile), u.Path, err)
 		}
 		w.mainMods = append(w.mainMods, m)
 	}

@@ -194,7 +194,7 @@ func TestFindChecksRoot(t *testing.T) {
 	// The root directory itself must be examined.
 	vol := filepath.VolumeName(os.TempDir())
 	rootDir := vol + string(filepath.Separator)
-	want := filepath.Join(rootDir, goWorkFile)
+	want := filepath.Join(rootDir, goworkFile)
 	f := Finder{Stat: func(name string) (fs.FileInfo, error) {
 		if name == want {
 			return os.Stat(os.Args[0]) // any regular file

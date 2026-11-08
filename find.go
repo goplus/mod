@@ -25,8 +25,8 @@ import (
 )
 
 const (
-	// goWorkFile is the file name of a workspace file.
-	goWorkFile = "go.work"
+	// goworkFile is the file name of a workspace file.
+	goworkFile = "go.work"
 
 	// gomodFile is the file name of a module file.
 	gomodFile = "go.mod"
@@ -76,7 +76,7 @@ func (f Finder) Find(dirFrom string) (gowork, gomod string, err error) {
 		return
 	}
 	for {
-		if file := filepath.Join(dir, goWorkFile); f.isFile(file) {
+		if file := filepath.Join(dir, goworkFile); f.isFile(file) {
 			return file, "", nil
 		}
 		if gomod == "" {
