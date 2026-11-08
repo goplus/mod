@@ -20,9 +20,12 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 )
 
 // -----------------------------------------------------------------------------
+
+const ErrNotFound = syscall.ENOENT
 
 // FindGoMod searches for the nearest go.mod file starting from the specified directory
 // and moving up the directory tree. It returns the directory containing the go.mod file,

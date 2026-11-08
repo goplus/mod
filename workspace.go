@@ -28,10 +28,6 @@ import (
 	"golang.org/x/mod/module"
 )
 
-// ErrNoModule is returned by LoadDir when neither a go.work nor a go.mod is
-// found at or above the directory.
-var ErrNoModule = errors.New("mod: no go.work or go.mod found")
-
 // mainMod is one main module of the workspace: a local directory with a
 // parsed go.mod. It is unexported; callers see main modules only through
 // Modules and LookupModule, as entries of the unified module list.
@@ -197,9 +193,6 @@ func LoadGoMod(gomod string) (*Workspace, error) {
 func LoadDir(dir string) (*Workspace, error) {
 	gowork, gomod, err := Discover(dir)
 	if err != nil {
-		if err == ErrNotFound {
-			return nil, ErrNoModule
-		}
 		return nil, err
 	}
 	if gowork != "" {
