@@ -52,8 +52,8 @@ func (m *mainMod) goVersion() string {
 //
 // If go.work, a go.mod, or the module cache changes, load the workspace again.
 type Workspace struct {
-	Dir  string            // directory containing go.work, or the module's directory
-	File *modfile.WorkFile // parsed go.work, nil for a go.mod-only workspace
+	dir  string            // directory containing go.work, or the module's directory
+	file *modfile.WorkFile // parsed go.work, nil for a go.mod-only workspace
 
 	mainMods []*mainMod // main modules, in the order of the "use" directives
 
@@ -74,13 +74,11 @@ type Workspace struct {
 // there is none. For a go.mod-only workspace it returns the version of the
 // main module's "go" directive.
 func (w *Workspace) GoVersion() string {
-	if w.File != nil {
-		if w.File.Go != nil {
-			return w.File.Go.Version
+	if w.file != nil {
+		if w.file.Go != nil {
+			return w.file.Go.Version
 		}
-		return ""
-	}
-	if len(w.mainMods) == 1 {
+	} else {
 		return w.mainMods[0].goVersion()
 	}
 	return ""
@@ -107,7 +105,7 @@ func NewGoWork(dir string, f *modfile.WorkFile) (*Workspace, error) {
 	if err != nil {
 		return nil, err
 	}
-	w := &Workspace{Dir: abs, File: f}
+	w := &Workspace{dir: abs, file: f}
 	for _, u := range f.Use {
 		moddir := filepath.FromSlash(u.Path)
 		if !filepath.IsAbs(moddir) {
@@ -139,7 +137,7 @@ func NewGoMod(dir string, f *modfile.File) (*Workspace, error) {
 	if f.Module == nil {
 		return nil, fmt.Errorf("%s: no module declaration", filepath.Join(abs, gomodFile))
 	}
-	w := &Workspace{Dir: abs}
+	w := &Workspace{dir: abs}
 	w.mainMods = []*mainMod{{dir: abs, path: f.Module.Mod.Path, file: f}}
 	return w, nil
 }
@@ -174,15 +172,15 @@ func LoadGoMod(gomod string) (*Workspace, error) {
 	return NewGoMod(filepath.Dir(gomod), f)
 }
 
-// LoadDir finds the workspace that contains dir, the way the go command does,
-// and loads it: the go.work file found by searching dir and its parents,
+// LoadFromDir finds the workspace that contains dir, the way the go command
+// does, and loads it: the go.work file found by searching dir and its parents,
 // otherwise the go.mod file found the same way. dir may be relative; it is made
 // absolute first.
 //
 // The search honors GOWORK: GOWORK=off skips go.work, and GOWORK=<path> uses
 // that go.work and does no search (see Discover). If neither a go.work nor a
-// go.mod is found, LoadDir returns ErrNoModule.
-func LoadDir(dir string) (*Workspace, error) {
+// go.mod is found, LoadFromDir returns ErrNoModule.
+func LoadFromDir(dir string) (*Workspace, error) {
 	gowork, gomod, err := Discover(dir)
 	if err != nil {
 		return nil, err
@@ -272,8 +270,8 @@ func (w *Workspace) Validate() error {
 // workGoVersion returns the "go" version of go.work, or "" for a go.mod-only
 // workspace (where there is no go.work version to check a module against).
 func (w *Workspace) workGoVersion() string {
-	if w.File != nil && w.File.Go != nil {
-		return w.File.Go.Version
+	if w.file != nil && w.file.Go != nil {
+		return w.file.Go.Version
 	}
 	return ""
 }
@@ -306,10 +304,10 @@ func (e *ReplaceConflictError) Error() string {
 func (w *Workspace) Replacements() (map[module.Version]module.Version, error) {
 	repl := make(map[module.Version]module.Version)
 	byWork := make(map[string]bool)
-	if w.File != nil {
-		for _, r := range w.File.Replace {
+	if w.file != nil {
+		for _, r := range w.file.Replace {
 			byWork[r.Old.Path] = true
-			repl[r.Old] = absReplace(w.Dir, r.New)
+			repl[r.Old] = absReplace(w.dir, r.New)
 		}
 	}
 	for _, m := range w.mainMods {

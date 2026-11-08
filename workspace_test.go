@@ -69,9 +69,15 @@ var standard = map[string]string{
 }
 
 func TestLoadGoWork(t *testing.T) {
+	w := &Workspace{
+		file: new(modfile.WorkFile),
+	}
+	if w.GoVersion() != "" {
+		t.Errorf("GoVersion of empty workspace = %q, want empty string", w.GoVersion())
+	}
 	root, w := loadWS(t, standard)
-	if w.Dir != filepath.Join(root, "ws") {
-		t.Errorf("Dir = %q", w.Dir)
+	if w.dir != filepath.Join(root, "ws") {
+		t.Errorf("Dir = %q", w.dir)
 	}
 	if got := w.GoVersion(); got != "1.22" {
 		t.Errorf("GoVersion = %q", got)
@@ -209,11 +215,11 @@ func TestLoadGoModIsStrict(t *testing.T) {
 		t.Fatal(err)
 	}
 	// A go.mod-only workspace has no go.work.
-	if w.File != nil {
-		t.Errorf("File = %v; want nil", w.File)
+	if w.file != nil {
+		t.Errorf("File = %v; want nil", w.file)
 	}
-	if w.Dir != filepath.Join(root, "ok") {
-		t.Errorf("Dir = %q, want the module directory", w.Dir)
+	if w.dir != filepath.Join(root, "ok") {
+		t.Errorf("Dir = %q, want the module directory", w.dir)
 	}
 	if got := w.GoVersion(); got != "1.21" {
 		t.Errorf("GoVersion = %q, want 1.21", got)
@@ -266,18 +272,18 @@ func TestLoadDir(t *testing.T) {
 	root, _ := loadWS(t, standard)
 
 	// From a nested directory inside a main module, find the go.work above.
-	w, err := LoadDir(filepath.Join(root, "ws", "app", "cmd"))
+	w, err := LoadFromDir(filepath.Join(root, "ws", "app", "cmd"))
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// A go.work in a parent wins over a nearer go.mod: ws/app has a go.mod but
 	// LoadDir from ws/app still finds ws/go.work.
-	w, err = LoadDir(filepath.Join(root, "ws", "app"))
+	w, err = LoadFromDir(filepath.Join(root, "ws", "app"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if w.File == nil {
+	if w.file == nil {
 		t.Error("LoadDir should prefer the go.work in the parent")
 	}
 }
@@ -288,15 +294,15 @@ func TestLoadDirGoModOnly(t *testing.T) {
 	writeFile(t, filepath.Join(root, "proj", "sub", "x.go"), "package sub\n")
 
 	// No go.work anywhere, so LoadDir finds the nearest go.mod.
-	w, err := LoadDir(filepath.Join(root, "proj", "sub"))
+	w, err := LoadFromDir(filepath.Join(root, "proj", "sub"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if w.File != nil {
-		t.Errorf("expected a go.mod-only workspace, got File=%v", w.File)
+	if w.file != nil {
+		t.Errorf("expected a go.mod-only workspace, got File=%v", w.file)
 	}
-	if w.Dir != filepath.Join(root, "proj") {
-		t.Errorf("Dir = %q, want the module directory", w.Dir)
+	if w.dir != filepath.Join(root, "proj") {
+		t.Errorf("Dir = %q, want the module directory", w.dir)
 	}
 	pkg, err := w.Lookup("example.com/proj/sub")
 	if err != nil {
@@ -309,7 +315,7 @@ func TestLoadDirGoModOnly(t *testing.T) {
 
 func TestLoadDirNoModule(t *testing.T) {
 	root := tempRoot(t)
-	if _, err := LoadDir(root); !errors.Is(err, ErrNoModule) {
+	if _, err := LoadFromDir(root); !errors.Is(err, ErrNoModule) {
 		t.Errorf("LoadDir outside any module = %v, want ErrNoModule", err)
 	}
 }
@@ -322,7 +328,7 @@ func TestLoadDirHonorsGOWORK(t *testing.T) {
 
 	t.Run("GOWORK=path", func(t *testing.T) {
 		t.Setenv("GOWORK", filepath.Join(root, "ws.work"))
-		w, err := LoadDir(filepath.Join(root, "proj"))
+		w, err := LoadFromDir(filepath.Join(root, "proj"))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -331,11 +337,11 @@ func TestLoadDirHonorsGOWORK(t *testing.T) {
 
 	t.Run("GOWORK=off", func(t *testing.T) {
 		t.Setenv("GOWORK", "off")
-		w, err := LoadDir(filepath.Join(root, "proj"))
+		w, err := LoadFromDir(filepath.Join(root, "proj"))
 		if err != nil {
 			t.Fatal(err)
 		}
-		if w.File != nil {
+		if w.file != nil {
 			t.Error("GOWORK=off should skip go.work")
 		}
 	})
@@ -350,12 +356,12 @@ func TestLoadDirRelative(t *testing.T) {
 	}
 	defer chdir(t, wd)
 	chdir(t, root)
-	w, err := LoadDir(".")
+	w, err := LoadFromDir(".")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if w.Dir != root {
-		t.Errorf("Dir = %q, want %q", w.Dir, root)
+	if w.dir != root {
+		t.Errorf("Dir = %q, want %q", w.dir, root)
 	}
 }
 
@@ -375,7 +381,7 @@ func TestConstructorsAgree(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	fromDir, err := LoadDir(filepath.Join(root, "ws", "app"))
+	fromDir, err := LoadFromDir(filepath.Join(root, "ws", "app"))
 	if err != nil {
 		t.Fatal(err)
 	}
