@@ -107,7 +107,7 @@ type Package struct {
 // returns the *ReplaceConflictError, as Replacements does. The returned slice
 // is shared and must not be modified.
 func (w *Workspace) Modules() ([]Module, error) {
-	w.once.Do(func() {
+	w.onceMod.Do(func() {
 		w.modules, w.modErr = w.buildModules()
 	})
 	return w.modules, w.modErr
@@ -118,7 +118,7 @@ func (w *Workspace) Modules() ([]Module, error) {
 // requirements of the main modules, plus the immediate requirements of every
 // module version they list, and nothing deeper.
 func (w *Workspace) buildModules() ([]Module, error) {
-	repl, err := w.Replacements()
+	repl, err := w.replacements()
 	if err != nil {
 		return nil, err
 	}
