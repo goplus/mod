@@ -71,7 +71,7 @@ type Workspace struct {
 
 	// Cached answers of the standard-library check, keyed by the first path
 	// element (see PkgType). Guarded by stdMu.
-	stdMu    sync.Mutex
+	stdMu    sync.RWMutex
 	stdCache map[string]bool
 }
 
@@ -129,7 +129,7 @@ func NewGoWork(dir string, f *modfile.WorkFile) (*Workspace, error) {
 
 // NewGoMod creates a workspace with one main module, from a parsed go.mod
 // file, and no go.work. dir is the directory that holds the file, which is the
-// module's directory; it is made absolute first. The go.mod directive is
+// module's directory; it is made absolute first. The module directive is
 // required.
 //
 // NewGoMod does not read any file, and does not modify f; the workspace keeps

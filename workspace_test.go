@@ -550,6 +550,45 @@ func TestStdlibWinsOverModule(t *testing.T) {
 	}
 }
 
+// TestStdlibCacheNotPoisoned guards against a per-first-element cache that is
+// keyed on the first path element but decided by the full path: before the fix,
+// a lookup of a non-existent subpackage ("encoding/doesnotexist") cached
+// "encoding" as non-standard and so misclassified the real "encoding/json".
+// isStandard is a first-element test, so any path rooted at a standard top-level
+// package is classified standard, independent of lookup order.
+func TestStdlibCacheNotPoisoned(t *testing.T) {
+	root := writeFiles(t, map[string]string{
+		"ws/go.work":    "go 1.22\nuse ./app\n",
+		"ws/app/go.mod": "module example.com/app\n\ngo 1.21\n",
+	})
+	// Fresh workspaces so the two orders use independent caches.
+	load := func() *Workspace {
+		w, err := LoadGoWork(filepath.Join(root, "ws", "go.work"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return w
+	}
+
+	// "encoding/doesnotexist" shares the first element "encoding" with the
+	// standard "encoding/json"; both are classified by that first element.
+	w := load()
+	_ = w.PkgType("encoding/doesnotexist") // populate the cache first
+	if got := w.PkgType("encoding/json"); got != PkgtStandard {
+		t.Errorf("after a sibling miss, PkgType(encoding/json) = %v, want standard", got)
+	}
+
+	// The reverse order gives the same answer.
+	w = load()
+	if got := w.PkgType("encoding/json"); got != PkgtStandard {
+		t.Errorf("PkgType(encoding/json) = %v, want standard", got)
+	}
+	pkg, err := w.LookupFrom("encoding/json", "")
+	if err != nil || pkg.Type != PkgtStandard {
+		t.Errorf("LookupFrom(encoding/json) = %+v, %v; want standard", pkg, err)
+	}
+}
+
 func TestLookupMissing(t *testing.T) {
 	_, w := depWS(t)
 	_, err := w.LookupFrom("github.com/nope/here", "")

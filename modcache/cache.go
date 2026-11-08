@@ -48,6 +48,25 @@ func DownloadCachePath(mod module.Version) (string, error) {
 	return filepath.Join(GOMODCACHE, "cache/download", encPath, "@v", mod.Version+".zip"), nil
 }
 
+// GoModPath returns the path of the ".mod" file of a versioned module in the
+// download cache: $GOMODCACHE/cache/download/<escaped path>/@v/<escaped
+// version>.mod. Both the module path and the version are escaped, as the go
+// command does.
+func GoModPath(mod module.Version) (string, error) {
+	if mod.Version == "" {
+		return "", ErrNoNeedToDownload
+	}
+	encPath, err := module.EscapePath(mod.Path)
+	if err != nil {
+		return "", err
+	}
+	encVer, err := module.EscapeVersion(mod.Version)
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(GOMODCACHE, "cache/download", encPath, "@v", encVer+".mod"), nil
+}
+
 // Path returns cache dir of a versioned module.
 func Path(mod module.Version) (string, error) {
 	if mod.Version == "" {

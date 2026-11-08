@@ -265,15 +265,10 @@ func (w *Workspace) readRootRequires(root module.Version, repl map[module.Versio
 // returns (nil, nil) when neither is present: the module is not downloaded and
 // contributes no requirements.
 func readModFile(mv module.Version) ([]byte, error) {
-	encPath, err := module.EscapePath(mv.Path)
+	download, err := modcache.GoModPath(mv)
 	if err != nil {
 		return nil, err
 	}
-	encVer, err := module.EscapeVersion(mv.Version)
-	if err != nil {
-		return nil, err
-	}
-	download := filepath.Join(modcache.GOMODCACHE, "cache", "download", encPath, "@v", encVer+".mod")
 	if data, err := os.ReadFile(download); err == nil {
 		return data, nil
 	} else if !os.IsNotExist(err) {
@@ -350,25 +345,31 @@ func (w *Workspace) PkgType(pkgPath string) PkgType {
 	return PkgtInvalid
 }
 
-// isStandard reports whether the first element of pkgPath has no dot and the
-// directory exists under GOROOT/src: the go command's own test for a standard
-// package. The answer is cached per first path element.
+// isStandard reports whether the first element of pkgPath has no dot and names
+// a directory under GOROOT/src: the go command's own test for a standard
+// package. Because the answer depends only on the first element, it is both
+// decided by and cached per first path element — the stat target must be elem,
+// not pkgPath, or a query for a non-existent subpackage would poison the entry
+// for its (standard) root.
 func (w *Workspace) isStandard(pkgPath string) bool {
 	elem := firstElem(pkgPath)
 	if strings.Contains(elem, ".") {
 		return false
 	}
+	w.stdMu.RLock()
+	ok, found := w.stdCache[elem]
+	w.stdMu.RUnlock()
+	if found {
+		return ok
+	}
+	fi, err := os.Stat(filepath.Join(goroot, "src", elem))
+	ok = err == nil && fi.IsDir()
 	w.stdMu.Lock()
-	defer w.stdMu.Unlock()
 	if w.stdCache == nil {
 		w.stdCache = make(map[string]bool)
 	}
-	if ok, found := w.stdCache[elem]; found {
-		return ok
-	}
-	fi, err := os.Stat(filepath.Join(goroot, "src", filepath.FromSlash(pkgPath)))
-	ok := err == nil && fi.IsDir()
 	w.stdCache[elem] = ok
+	w.stdMu.Unlock()
 	return ok
 }
 
