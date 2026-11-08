@@ -24,7 +24,6 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/goplus/mod/goxmod"
 	"golang.org/x/mod/modfile"
 	"golang.org/x/mod/module"
 )
@@ -58,23 +57,31 @@ type Workspace struct {
 
 	mainMods []*mainMod // main modules, in the order of the "use" directives
 
-	// Lazily built, cached module list (see Modules). Guarded by onceMod so that
+	// Lazily built, cached module list (see Modules). Guarded by once so that
 	// concurrent lookups are safe.
-	onceMod sync.Once
+	once    sync.Once
 	modules []Module
 	modErr  error
-
-	// Lazily built, cached classfiles (see Classes). Guarded by onceCls so that
-	// concurrent lookups are safe.
-	onceCls sync.Once
-	classes *Classes
-	clsErr  error
 
 	// Cached answers of the standard-library check, keyed by the first path
 	// element (see PkgType). Guarded by stdMu.
 	stdMu    sync.RWMutex
 	stdCache map[string]bool
 	goroot   string
+}
+
+// GoVersion returns the version of the "go" directive of go.work, or "" if
+// there is none. For a go.mod-only workspace it returns the version of the
+// main module's "go" directive.
+func (w *Workspace) GoVersion() string {
+	if w.file != nil {
+		if w.file.Go != nil {
+			return w.file.Go.Version
+		}
+	} else {
+		return w.mainMods[0].goVersion()
+	}
+	return ""
 }
 
 // -----------------------------------------------------------------------------
@@ -254,7 +261,7 @@ func (w *Workspace) Validate() error {
 		}
 	}
 
-	if _, err := w.replacements(); err != nil {
+	if _, err := w.Replacements(); err != nil {
 		errs = append(errs, err)
 	}
 	return errors.Join(errs...)
@@ -283,7 +290,7 @@ func (e *ReplaceConflictError) Error() string {
 	return fmt.Sprintf("conflicting replacements for %v:\n\t%v\n\t%v\nadd a replace for it to go.work to resolve", e.Old, e.A, e.B)
 }
 
-// replacements returns the replace directives in effect in the workspace.
+// Replacements returns the replace directives in effect in the workspace.
 //
 // The replaces of go.work take precedence: as soon as go.work replaces a
 // module path (with or without a version), the replaces of that module path
@@ -292,9 +299,9 @@ func (e *ReplaceConflictError) Error() string {
 // *ReplaceConflictError. A go.mod-only workspace has no go.work, so only that
 // module's own replace directives apply.
 //
-// replacements that point to a directory are returned as absolute paths,
+// Replacements that point to a directory are returned as absolute paths,
 // resolved against the directory of the file that declares them.
-func (w *Workspace) replacements() (map[module.Version]module.Version, error) {
+func (w *Workspace) Replacements() (map[module.Version]module.Version, error) {
 	repl := make(map[module.Version]module.Version)
 	byWork := make(map[string]bool)
 	if w.file != nil {
@@ -326,44 +333,6 @@ func absReplace(dir string, v module.Version) module.Version {
 		v.Path = filepath.Join(dir, filepath.FromSlash(v.Path))
 	}
 	return v
-}
-
-// -----------------------------------------------------------------------------
-
-// GoVersion returns the version of the "go" directive of go.work, or "" if
-// there is none. For a go.mod-only workspace it returns the version of the
-// main module's "go" directive.
-func (w *Workspace) GoVersion() string {
-	if w.file != nil {
-		if w.file.Go != nil {
-			return w.file.Go.Version
-		}
-	} else {
-		return w.mainMods[0].goVersion()
-	}
-	return ""
-}
-
-// -----------------------------------------------------------------------------
-
-// Classes represents a collection of classfiles.
-type Classes = goxmod.Classes
-
-// Classes returns the collection of classfiles for the main module.
-func (w *Workspace) Classes() (*Classes, error) {
-	w.onceCls.Do(func() {
-		w.classes, w.clsErr = w.buildClasses()
-	})
-	return w.classes, w.clsErr
-}
-
-func (w *Workspace) buildClasses() (_ *Classes, err error) {
-	mainMod := w.mainMods[0]
-	gox, err := goxmod.LoadModfile(mainMod.file, filepath.Join(mainMod.dir, "gox.mod"))
-	if err != nil {
-		return
-	}
-	return goxmod.ImportClasses(gox, w.LookupModule)
 }
 
 // -----------------------------------------------------------------------------

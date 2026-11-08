@@ -18,6 +18,8 @@ package modfetch
 
 import (
 	"testing"
+
+	xmod "github.com/goplus/mod"
 )
 
 func TestGetResult(t *testing.T) {
@@ -64,7 +66,7 @@ func TestGetResultFallback(t *testing.T) {
 }
 
 func TestGetResultNotFound(t *testing.T) {
-	if _, err := getResult("go: added something\n", ""); err != ErrNotFound {
+	if _, err := getResult("go: added something\n", ""); err != xmod.ErrNotFound {
 		t.Fatal("getResult: expected ErrNotFound, got", err)
 	}
 }
