@@ -68,6 +68,12 @@ type Workspace struct {
 	stdMu    sync.RWMutex
 	stdCache map[string]bool
 	goroot   string
+
+	// Lazily built, cached collection of classfiles for the main module (see
+	// Classes). Guarded by onceCls so that concurrent calls are safe.
+	onceCls sync.Once
+	classes *Classes
+	clsErr  error
 }
 
 // GoVersion returns the version of the "go" directive of go.work, or "" if
