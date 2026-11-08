@@ -482,7 +482,7 @@ func TestLookup(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if pkg.ModDir != filepath.Join(goroot, "src") || pkg.Dir != filepath.Join(goroot, "src", "fmt") {
+	if pkg.ModDir != filepath.Join(w.goroot, "src") || pkg.Dir != filepath.Join(w.goroot, "src", "fmt") {
 		t.Errorf("fmt = %+v", pkg)
 	}
 }

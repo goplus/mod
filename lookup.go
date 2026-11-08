@@ -357,15 +357,21 @@ func (w *Workspace) isStandard(pkgPath string) bool {
 	}
 	w.stdMu.RLock()
 	ok, found := w.stdCache[elem]
-	w.stdMu.RUnlock()
 	if found {
+		w.stdMu.RUnlock()
 		return ok
+	}
+	goroot := w.goroot
+	w.stdMu.RUnlock()
+	if goroot == "" {
+		goroot = runtime.GOROOT()
 	}
 	fi, err := os.Stat(filepath.Join(goroot, "src", elem))
 	ok = err == nil && fi.IsDir()
 	w.stdMu.Lock()
 	if w.stdCache == nil {
 		w.stdCache = make(map[string]bool)
+		w.goroot = goroot
 	}
 	w.stdCache[elem] = ok
 	w.stdMu.Unlock()
@@ -374,7 +380,7 @@ func (w *Workspace) isStandard(pkgPath string) bool {
 
 // firstElem returns the first path element of a slash-separated path.
 func firstElem(pkgPath string) string {
-	if i := strings.Index(pkgPath, "/"); i >= 0 {
+	if i := strings.IndexByte(pkgPath, '/'); i >= 0 {
 		return pkgPath[:i]
 	}
 	return pkgPath
@@ -392,7 +398,7 @@ func (w *Workspace) Lookup(pkgPath string) (pkg *Package, err error) {
 		return nil, ErrInvalidPkgPath
 	}
 	if w.isStandard(pkgPath) {
-		modDir := filepath.Join(goroot, "src")
+		modDir := filepath.Join(w.goroot, "src")
 		return &Package{
 			Type:   PkgtStandard,
 			ModDir: modDir,
@@ -438,9 +444,5 @@ func joinPkgDir(modDir, rest string) string {
 	}
 	return filepath.Join(modDir, filepath.FromSlash(rest))
 }
-
-// -----------------------------------------------------------------------------
-
-var goroot = runtime.GOROOT()
 
 // -----------------------------------------------------------------------------

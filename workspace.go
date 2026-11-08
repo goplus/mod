@@ -73,6 +73,7 @@ type Workspace struct {
 	// element (see PkgType). Guarded by stdMu.
 	stdMu    sync.RWMutex
 	stdCache map[string]bool
+	goroot   string
 }
 
 // GoVersion returns the version of the "go" directive of go.work, or "" if
