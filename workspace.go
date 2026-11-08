@@ -58,11 +58,17 @@ type Workspace struct {
 
 	mainMods []*mainMod // main modules, in the order of the "use" directives
 
-	// Lazily built, cached module list (see Modules). Guarded by once so that
+	// Lazily built, cached module list (see Modules). Guarded by onceMod so that
 	// concurrent lookups are safe.
-	once    sync.Once
+	onceMod sync.Once
 	modules []Module
 	modErr  error
+
+	// Lazily built, cached classfiles (see Classes). Guarded by onceCls so that
+	// concurrent lookups are safe.
+	onceCls sync.Once
+	classes *Classes
+	clsErr  error
 
 	// Cached answers of the standard-library check, keyed by the first path
 	// element (see PkgType). Guarded by stdMu.
@@ -248,7 +254,7 @@ func (w *Workspace) Validate() error {
 		}
 	}
 
-	if _, err := w.Replacements(); err != nil {
+	if _, err := w.replacements(); err != nil {
 		errs = append(errs, err)
 	}
 	return errors.Join(errs...)
@@ -277,7 +283,7 @@ func (e *ReplaceConflictError) Error() string {
 	return fmt.Sprintf("conflicting replacements for %v:\n\t%v\n\t%v\nadd a replace for it to go.work to resolve", e.Old, e.A, e.B)
 }
 
-// Replacements returns the replace directives in effect in the workspace.
+// replacements returns the replace directives in effect in the workspace.
 //
 // The replaces of go.work take precedence: as soon as go.work replaces a
 // module path (with or without a version), the replaces of that module path
@@ -286,9 +292,9 @@ func (e *ReplaceConflictError) Error() string {
 // *ReplaceConflictError. A go.mod-only workspace has no go.work, so only that
 // module's own replace directives apply.
 //
-// Replacements that point to a directory are returned as absolute paths,
+// replacements that point to a directory are returned as absolute paths,
 // resolved against the directory of the file that declares them.
-func (w *Workspace) Replacements() (map[module.Version]module.Version, error) {
+func (w *Workspace) replacements() (map[module.Version]module.Version, error) {
 	repl := make(map[module.Version]module.Version)
 	byWork := make(map[string]bool)
 	if w.file != nil {
@@ -340,11 +346,18 @@ func (w *Workspace) GoVersion() string {
 
 // -----------------------------------------------------------------------------
 
-// Classes represents a collection of classfiles,
+// Classes represents a collection of classfiles.
 type Classes = goxmod.Classes
 
 // Classes returns the collection of classfiles for the main module.
-func (w *Workspace) Classes() (p *Classes, err error) {
+func (w *Workspace) Classes() (*Classes, error) {
+	w.onceCls.Do(func() {
+		w.classes, w.clsErr = w.buildClasses()
+	})
+	return w.classes, w.clsErr
+}
+
+func (w *Workspace) buildClasses() (_ *Classes, err error) {
 	mainMod := w.mainMods[0]
 	gox, err := goxmod.LoadModfile(mainMod.file, filepath.Join(mainMod.dir, "gox.mod"))
 	if err != nil {

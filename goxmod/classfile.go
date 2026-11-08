@@ -50,7 +50,7 @@ var (
 
 // -----------------------------------------------------------------------------
 
-// Classes represents a collection of classfiles,
+// Classes represents a collection of classfiles.
 type Classes struct {
 	projs map[string]*Project // ext -> project
 }
@@ -122,8 +122,7 @@ func (p *Classes) importClassFrom(modVer module.Version) (err error) {
 			if !os.IsNotExist(err) {
 				return
 			}
-			modVer, err = modfetch.Get(modVer.String()) // fetch it
-			if err != nil {
+			if _, err = modfetch.Get(modVer.String()); err != nil { // fetch it
 				return
 			}
 		}
