@@ -57,10 +57,10 @@ type Module struct {
 	Real module.Version
 }
 
-// isLocal reports whether the module's code lives in a local directory (a main
+// IsLocal reports whether the module's code lives in a local directory (a main
 // module or a module replaced by a local directory), as opposed to the module
 // cache.
-func (m Module) isLocal() bool {
+func (m Module) IsLocal() bool {
 	return m.Real.Version == ""
 }
 
@@ -74,8 +74,7 @@ const (
 	PkgtExtern                  // an external package
 )
 
-// String returns a short name of the package type: "invalid", "standard",
-// "local" or "extern".
+// String returns a short name of the package type: "invalid", "standard", "local" or "extern".
 func (t PkgType) String() string {
 	switch t {
 	case PkgtStandard:
@@ -134,9 +133,6 @@ func (w *Workspace) buildModules() ([]Module, error) {
 	selected := make(map[string]string) // module path -> highest required version
 	var roots []module.Version
 	for _, m := range w.mainMods {
-		if m.file == nil {
-			continue
-		}
 		for _, r := range m.file.Require {
 			if r.Mod.Path == "" || mainByPath[r.Mod.Path] {
 				continue
@@ -230,7 +226,7 @@ func (w *Workspace) readRootRequires(root module.Version, repl map[module.Versio
 	var name string
 	var err error
 	if target.Version == "" { // directory replacement (or a main module, excluded earlier)
-		name = filepath.Join(target.Path, GoModFile)
+		name = filepath.Join(target.Path, gomodFile)
 		data, err = os.ReadFile(name)
 		if err != nil {
 			if os.IsNotExist(err) {
@@ -278,7 +274,7 @@ func readModFile(mv module.Version) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	data, err := os.ReadFile(filepath.Join(dir, GoModFile))
+	data, err := os.ReadFile(filepath.Join(dir, gomodFile))
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, nil
@@ -314,6 +310,15 @@ func lookupModule(mods []Module, pkgPath string) (Module, bool) {
 	return Module{}, false
 }
 
+// hasPathPrefix reports whether path equals prefix or starts with prefix
+// followed by a slash.
+func hasPathPrefix(path, prefix string) bool {
+	if !strings.HasPrefix(path, prefix) {
+		return false
+	}
+	return len(path) == len(prefix) || path[len(prefix)] == '/'
+}
+
 // -----------------------------------------------------------------------------
 // Classification and lookup
 
@@ -334,7 +339,7 @@ func (w *Workspace) PkgType(pkgPath string) PkgType {
 		return PkgtInvalid
 	}
 	if m, ok := lookupModule(mods, pkgPath); ok {
-		if m.isLocal() {
+		if m.IsLocal() {
 			return PkgtLocal
 		}
 		return PkgtExtern
@@ -358,15 +363,21 @@ func (w *Workspace) isStandard(pkgPath string) bool {
 	}
 	w.stdMu.RLock()
 	ok, found := w.stdCache[elem]
-	w.stdMu.RUnlock()
 	if found {
+		w.stdMu.RUnlock()
 		return ok
+	}
+	goroot := w.goroot
+	w.stdMu.RUnlock()
+	if goroot == "" {
+		goroot = runtime.GOROOT()
 	}
 	fi, err := os.Stat(filepath.Join(goroot, "src", elem))
 	ok = err == nil && fi.IsDir()
 	w.stdMu.Lock()
 	if w.stdCache == nil {
 		w.stdCache = make(map[string]bool)
+		w.goroot = goroot
 	}
 	w.stdCache[elem] = ok
 	w.stdMu.Unlock()
@@ -375,30 +386,25 @@ func (w *Workspace) isStandard(pkgPath string) bool {
 
 // firstElem returns the first path element of a slash-separated path.
 func firstElem(pkgPath string) string {
-	if i := strings.Index(pkgPath, "/"); i >= 0 {
+	if i := strings.IndexByte(pkgPath, '/'); i >= 0 {
 		return pkgPath[:i]
 	}
 	return pkgPath
 }
 
-// LookupFrom returns where a package lives. pkgPath is an import path, or a
-// relative path ("./x", "../y") that is resolved against fromDir, the directory
-// of the code that contains the import. For any other path fromDir is ignored
-// and may be empty. It is safe for concurrent use.
+// Lookup returns where a package lives. pkgPath is an import path.
+// It is safe for concurrent use.
 //
 // On failure it returns nil and an error: ErrInvalidPkgPath for an empty path
 // or a relative path that cannot be resolved, a *MissingError for a path that
 // is not standard and in no module, or the error from Modules when the module
 // list cannot be built.
-func (w *Workspace) LookupFrom(pkgPath, fromDir string) (pkg *Package, err error) {
-	if pkgPath == "" {
+func (w *Workspace) Lookup(pkgPath string) (pkg *Package, err error) {
+	if pkgPath == "" || pkgPath[0] == '.' {
 		return nil, ErrInvalidPkgPath
 	}
-	if pkgPath[0] == '.' {
-		return w.lookupRelative(pkgPath, fromDir)
-	}
 	if w.isStandard(pkgPath) {
-		modDir := filepath.Join(goroot, "src")
+		modDir := filepath.Join(w.goroot, "src")
 		return &Package{
 			Type:   PkgtStandard,
 			ModDir: modDir,
@@ -414,7 +420,7 @@ func (w *Workspace) LookupFrom(pkgPath, fromDir string) (pkg *Package, err error
 		return nil, &MissingError{Path: pkgPath}
 	}
 	rest := pkgPath[len(m.Path):]
-	if m.isLocal() {
+	if m.IsLocal() {
 		modDir := m.Real.Path
 		return &Package{
 			Type:    PkgtLocal,
@@ -436,46 +442,6 @@ func (w *Workspace) LookupFrom(pkgPath, fromDir string) (pkg *Package, err error
 	}, nil
 }
 
-// lookupRelative resolves a relative import ("./x", "../y") against fromDir.
-// The local module whose directory is the longest prefix of the resulting
-// directory owns the package.
-func (w *Workspace) lookupRelative(pkgPath, fromDir string) (*Package, error) {
-	if fromDir == "" {
-		return nil, ErrInvalidPkgPath
-	}
-	base, err := filepath.Abs(fromDir)
-	if err != nil {
-		return nil, err
-	}
-	dir := filepath.Join(base, filepath.FromSlash(pkgPath))
-	mods, err := w.Modules()
-	if err != nil {
-		return nil, err
-	}
-	var best Module
-	var bestLen int
-	found := false
-	for _, m := range mods {
-		if !m.isLocal() {
-			continue
-		}
-		if dirHasPrefix(dir, m.Real.Path) {
-			if !found || len(m.Real.Path) > bestLen {
-				best, bestLen, found = m, len(m.Real.Path), true
-			}
-		}
-	}
-	if !found {
-		return nil, ErrInvalidPkgPath
-	}
-	return &Package{
-		Type:    PkgtLocal,
-		ModPath: best.Path,
-		ModDir:  best.Real.Path,
-		Dir:     dir,
-	}, nil
-}
-
 // joinPkgDir joins the rest of an import path (below the module path, with a
 // leading slash or empty) to a module directory, using the OS separators.
 func joinPkgDir(modDir, rest string) string {
@@ -484,22 +450,5 @@ func joinPkgDir(modDir, rest string) string {
 	}
 	return filepath.Join(modDir, filepath.FromSlash(rest))
 }
-
-// dirHasPrefix reports whether dir equals prefix or is a subdirectory of it,
-// comparing path elements (not raw strings), honoring case folding where the
-// platform does.
-func dirHasPrefix(dir, prefix string) bool {
-	if samePath(dir, prefix) {
-		return true
-	}
-	if !strings.HasSuffix(prefix, string(filepath.Separator)) {
-		prefix += string(filepath.Separator)
-	}
-	return len(dir) > len(prefix) && samePath(dir[:len(prefix)], prefix)
-}
-
-// -----------------------------------------------------------------------------
-
-var goroot = runtime.GOROOT()
 
 // -----------------------------------------------------------------------------

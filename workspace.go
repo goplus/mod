@@ -22,16 +22,11 @@ import (
 	"go/version"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 
 	"golang.org/x/mod/modfile"
 	"golang.org/x/mod/module"
 )
-
-// ErrNoModule is returned by LoadDir when neither a go.work nor a go.mod is
-// found at or above the directory.
-var ErrNoModule = errors.New("mod: no go.work or go.mod found")
 
 // mainMod is one main module of the workspace: a local directory with a
 // parsed go.mod. It is unexported; callers see main modules only through
@@ -39,12 +34,12 @@ var ErrNoModule = errors.New("mod: no go.work or go.mod found")
 type mainMod struct {
 	dir  string        // absolute directory of the module
 	path string        // module path, from the "module" directive
-	file *modfile.File // parsed go.mod (strictly, see loadMainMod)
+	file *modfile.File // parsed go.mod (strictly, see loadMainMod), not nil
 }
 
 // goVersion returns the version of the "go" directive, or "" if there is none.
 func (m *mainMod) goVersion() string {
-	if m.file != nil && m.file.Go != nil {
+	if m.file.Go != nil {
 		return m.file.Go.Version
 	}
 	return ""
@@ -57,7 +52,6 @@ func (m *mainMod) goVersion() string {
 //
 // If go.work, a go.mod, or the module cache changes, load the workspace again.
 type Workspace struct {
-	Path string            // absolute path of go.work, "" for a go.mod-only workspace
 	Dir  string            // directory containing go.work, or the module's directory
 	File *modfile.WorkFile // parsed go.work, nil for a go.mod-only workspace
 
@@ -73,6 +67,7 @@ type Workspace struct {
 	// element (see PkgType). Guarded by stdMu.
 	stdMu    sync.RWMutex
 	stdCache map[string]bool
+	goroot   string
 }
 
 // GoVersion returns the version of the "go" directive of go.work, or "" if
@@ -112,7 +107,7 @@ func NewGoWork(dir string, f *modfile.WorkFile) (*Workspace, error) {
 	if err != nil {
 		return nil, err
 	}
-	w := &Workspace{Path: filepath.Join(abs, GoWorkFile), Dir: abs, File: f}
+	w := &Workspace{Dir: abs, File: f}
 	for _, u := range f.Use {
 		moddir := filepath.FromSlash(u.Path)
 		if !filepath.IsAbs(moddir) {
@@ -120,7 +115,7 @@ func NewGoWork(dir string, f *modfile.WorkFile) (*Workspace, error) {
 		}
 		m, err := loadMainMod(moddir)
 		if err != nil {
-			return nil, fmt.Errorf("%s: use %s: %w", w.Path, u.Path, err)
+			return nil, fmt.Errorf("%s: use %s: %w", filepath.Join(abs, goworkFile), u.Path, err)
 		}
 		w.mainMods = append(w.mainMods, m)
 	}
@@ -142,7 +137,7 @@ func NewGoMod(dir string, f *modfile.File) (*Workspace, error) {
 		return nil, err
 	}
 	if f.Module == nil {
-		return nil, fmt.Errorf("%s: no module declaration", filepath.Join(abs, GoModFile))
+		return nil, fmt.Errorf("%s: no module declaration", filepath.Join(abs, gomodFile))
 	}
 	w := &Workspace{Dir: abs}
 	w.mainMods = []*mainMod{{dir: abs, path: f.Module.Mod.Path, file: f}}
@@ -165,12 +160,7 @@ func LoadGoWork(gowork string) (*Workspace, error) {
 	if err != nil {
 		return nil, err
 	}
-	w, err := NewGoWork(filepath.Dir(abs), f)
-	if err != nil {
-		return nil, err
-	}
-	w.Path = abs // the file that was actually read (e.g. a GOWORK with another name)
-	return w, nil
+	return NewGoWork(filepath.Dir(abs), f)
 }
 
 // LoadGoMod reads and parses the go.mod file at gomod and calls NewGoMod with
@@ -203,9 +193,6 @@ func LoadGoMod(gomod string) (*Workspace, error) {
 func LoadDir(dir string) (*Workspace, error) {
 	gowork, gomod, err := Discover(dir)
 	if err != nil {
-		if err == ErrNotFound {
-			return nil, ErrNoModule
-		}
 		return nil, err
 	}
 	if gowork != "" {
@@ -223,7 +210,7 @@ func loadMainMod(dir string) (*mainMod, error) {
 	if err != nil {
 		return nil, err
 	}
-	gomod := filepath.Join(dir, GoModFile)
+	gomod := filepath.Join(dir, gomodFile)
 	data, err := os.ReadFile(gomod)
 	if err != nil {
 		return nil, err
@@ -239,94 +226,7 @@ func loadMainMod(dir string) (*mainMod, error) {
 }
 
 // -----------------------------------------------------------------------------
-// Directory queries
-
-// ImportPath returns the import path of the package in dir: the module path of
-// the main module that owns dir, followed by the directory relative to the
-// module root. ok is false if dir belongs to no main module.
-func (w *Workspace) ImportPath(dir string) (importPath string, ok bool) {
-	m, _ := w.locate(dir)
-	if m == nil {
-		return "", false
-	}
-	abs, err := filepath.Abs(dir)
-	if err != nil {
-		return "", false
-	}
-	rel, err := filepath.Rel(m.dir, abs)
-	if err != nil {
-		return "", false
-	}
-	if rel == "." {
-		return m.path, true
-	}
-	return m.path + "/" + filepath.ToSlash(rel), true
-}
-
-// locate walks up from dir. It returns the main module that owns dir, or
-// otherwise the go.mod of the nearest non-main module (if any).
-func (w *Workspace) locate(dir string) (m *mainMod, otherGoMod string) {
-	dir, err := filepath.Abs(dir)
-	if err != nil {
-		return nil, ""
-	}
-	for {
-		for _, x := range w.mainMods {
-			if samePath(x.dir, dir) {
-				return x, ""
-			}
-		}
-		if file := filepath.Join(dir, GoModFile); isFile(file) {
-			return nil, file
-		}
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			return nil, ""
-		}
-		dir = parent
-	}
-}
-
-// hasPathPrefix reports whether path equals prefix or starts with prefix
-// followed by a slash.
-func hasPathPrefix(path, prefix string) bool {
-	if !strings.HasPrefix(path, prefix) {
-		return false
-	}
-	return len(path) == len(prefix) || path[len(prefix)] == '/'
-}
-
-// -----------------------------------------------------------------------------
 // Validation
-
-// NotInWorkspaceError reports a directory that is inside a module which is not
-// listed in the "use" directives of go.work.
-type NotInWorkspaceError struct {
-	Dir   string // the directory that was checked
-	GoMod string // go.mod of the module that contains it
-}
-
-func (e *NotInWorkspaceError) Error() string {
-	return fmt.Sprintf("directory %s is contained in a module (%s) that is not one of the workspace modules listed in go.work", e.Dir, e.GoMod)
-}
-
-// CheckDir verifies that the module containing dir is one of the main
-// modules. Like the go command, it reports a *NotInWorkspaceError when dir is
-// inside a module that go.work does not list.
-//
-// A dir outside of any module is not an error here (the go command allows
-// some operations there); neither is a dir inside a main module.
-func (w *Workspace) CheckDir(dir string) error {
-	m, other := w.locate(dir)
-	if m != nil || other == "" {
-		return nil
-	}
-	abs, err := filepath.Abs(dir)
-	if err != nil {
-		abs = dir
-	}
-	return &NotInWorkspaceError{Dir: abs, GoMod: other}
-}
 
 // Validate checks the workspace for the problems the go command rejects:
 //
@@ -421,9 +321,6 @@ func (w *Workspace) Replacements() (map[module.Version]module.Version, error) {
 		}
 	}
 	for _, m := range w.mainMods {
-		if m.file == nil {
-			continue
-		}
 		declared := make(map[module.Version]bool) // replaces of this go.mod, so far
 		for _, r := range m.file.Replace {
 			if byWork[r.Old.Path] {
@@ -446,13 +343,6 @@ func absReplace(dir string, v module.Version) module.Version {
 		v.Path = filepath.Join(dir, filepath.FromSlash(v.Path))
 	}
 	return v
-}
-
-// -----------------------------------------------------------------------------
-
-func isFile(name string) bool {
-	fi, err := os.Stat(name)
-	return err == nil && !fi.IsDir()
 }
 
 // -----------------------------------------------------------------------------

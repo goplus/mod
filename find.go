@@ -17,24 +17,24 @@
 package mod
 
 import (
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
-	"syscall"
 )
 
 const (
-	// GoWorkFile is the file name of a workspace file.
-	GoWorkFile = "go.work"
+	// goworkFile is the file name of a workspace file.
+	goworkFile = "go.work"
 
-	// GoModFile is the file name of a module file.
-	GoModFile = "go.mod"
+	// gomodFile is the file name of a module file.
+	gomodFile = "go.mod"
 )
 
-const (
-	ErrNotFound = syscall.ENOENT
-)
+// ErrNoModule is returned by LoadDir when neither a go.work nor a go.mod is
+// found at or above the directory.
+var ErrNoModule = errors.New("mod: no go.work or go.mod found")
 
 // Finder locates go.work and go.mod files. The zero value uses the real file
 // system and the process environment; the fields exist so that tests (and
@@ -66,7 +66,7 @@ func Discover(dirFrom string) (gowork, gomod string, err error) {
 // directory is one of them.
 //
 // If there is no go.work, gomod is the nearest go.mod and gowork is empty.
-// ErrNotFound is returned if there is neither.
+// ErrNoModule is returned if there is neither.
 //
 // A directory named go.work or go.mod is not a match. Find does not consult
 // the GOWORK environment variable; see Discover.
@@ -76,18 +76,18 @@ func (f Finder) Find(dirFrom string) (gowork, gomod string, err error) {
 		return
 	}
 	for {
-		if file := filepath.Join(dir, GoWorkFile); f.isFile(file) {
+		if file := filepath.Join(dir, goworkFile); f.isFile(file) {
 			return file, "", nil
 		}
 		if gomod == "" {
-			if file := filepath.Join(dir, GoModFile); f.isFile(file) {
+			if file := filepath.Join(dir, gomodFile); f.isFile(file) {
 				gomod = file
 			}
 		}
 		parent := filepath.Dir(dir)
 		if parent == dir { // reached the root
 			if gomod == "" {
-				err = ErrNotFound
+				err = ErrNoModule
 			}
 			return
 		}
@@ -120,7 +120,7 @@ func (f Finder) Discover(dirFrom string) (gowork, gomod string, err error) {
 }
 
 // FindGoMod returns the nearest go.mod at or above dirFrom (the current
-// directory if empty), ignoring any go.work. It returns ErrNotFound if there
+// directory if empty), ignoring any go.work. It returns ErrNoModule if there
 // is none.
 func (f Finder) FindGoMod(dirFrom string) (gomod string, err error) {
 	dir, err := absDir(dirFrom)
@@ -128,12 +128,12 @@ func (f Finder) FindGoMod(dirFrom string) (gomod string, err error) {
 		return "", err
 	}
 	for {
-		if file := filepath.Join(dir, GoModFile); f.isFile(file) {
+		if file := filepath.Join(dir, gomodFile); f.isFile(file) {
 			return file, nil
 		}
 		parent := filepath.Dir(dir)
 		if parent == dir {
-			return "", ErrNotFound
+			return "", ErrNoModule
 		}
 		dir = parent
 	}

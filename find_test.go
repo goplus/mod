@@ -154,8 +154,8 @@ func TestFind(t *testing.T) {
 				return filepath.Join(root, filepath.FromSlash(rel))
 			}
 			if c.wantNF {
-				if !errors.Is(err, ErrNotFound) {
-					t.Fatalf("err = %v, want ErrNotFound", err)
+				if !errors.Is(err, ErrNoModule) {
+					t.Fatalf("err = %v, want ErrNoModule", err)
 				}
 			} else if err != nil {
 				t.Fatal(err)
@@ -175,8 +175,8 @@ func TestFindIgnoresDirectories(t *testing.T) {
 	mkdir(t, filepath.Join(root, "go.work"))
 	mkdir(t, filepath.Join(root, "go.mod"))
 	_, _, err := finderFor(root, nil).Find(root)
-	if !errors.Is(err, ErrNotFound) {
-		t.Fatalf("err = %v, want ErrNotFound", err)
+	if !errors.Is(err, ErrNoModule) {
+		t.Fatalf("err = %v, want ErrNoModule", err)
 	}
 }
 
@@ -184,8 +184,8 @@ func TestFindReachesRoot(t *testing.T) {
 	// A file system with no files: the walk must terminate at the root.
 	f := Finder{Stat: func(string) (fs.FileInfo, error) { return nil, fs.ErrNotExist }}
 	for _, from := range []string{string(filepath.Separator), "", "a/b/c"} {
-		if _, _, err := f.Find(from); !errors.Is(err, ErrNotFound) {
-			t.Errorf("Find(%q): err = %v, want ErrNotFound", from, err)
+		if _, _, err := f.Find(from); !errors.Is(err, ErrNoModule) {
+			t.Errorf("Find(%q): err = %v, want ErrNoModule", from, err)
 		}
 	}
 }
@@ -194,7 +194,7 @@ func TestFindChecksRoot(t *testing.T) {
 	// The root directory itself must be examined.
 	vol := filepath.VolumeName(os.TempDir())
 	rootDir := vol + string(filepath.Separator)
-	want := filepath.Join(rootDir, GoWorkFile)
+	want := filepath.Join(rootDir, goworkFile)
 	f := Finder{Stat: func(name string) (fs.FileInfo, error) {
 		if name == want {
 			return os.Stat(os.Args[0]) // any regular file
@@ -239,8 +239,8 @@ func TestFindGoMod(t *testing.T) {
 	if err != nil || got != filepath.Join(root, "app", "go.mod") {
 		t.Fatalf("FindGoMod = %q, %v", got, err)
 	}
-	if _, err := f.FindGoMod(root); !errors.Is(err, ErrNotFound) {
-		t.Fatalf("err = %v, want ErrNotFound", err)
+	if _, err := f.FindGoMod(root); !errors.Is(err, ErrNoModule) {
+		t.Fatalf("err = %v, want ErrNoModule", err)
 	}
 }
 
@@ -270,8 +270,8 @@ func TestDiscover(t *testing.T) {
 	t.Run("off without go.mod", func(t *testing.T) {
 		env := map[string]string{"GOWORK": "off"}
 		_, _, err := finderFor(root, env).Discover(filepath.Join(root, "ws"))
-		if !errors.Is(err, ErrNotFound) {
-			t.Fatalf("err = %v, want ErrNotFound", err)
+		if !errors.Is(err, ErrNoModule) {
+			t.Fatalf("err = %v, want ErrNoModule", err)
 		}
 	})
 	t.Run("explicit file", func(t *testing.T) {
