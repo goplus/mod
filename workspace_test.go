@@ -228,7 +228,7 @@ func TestLoadGoModIsStrict(t *testing.T) {
 		t.Errorf("Validate without go.work = %v", err)
 	}
 	// Its own replace applies.
-	repl, err := w.replacements()
+	repl, err := w.Replacements()
 	if err != nil {
 		t.Fatal(err)
 	}
