@@ -25,6 +25,7 @@ import (
 
 	"github.com/qiniu/x/errors"
 	"golang.org/x/mod/modfile"
+	"golang.org/x/mod/module"
 )
 
 type Compiler struct {
@@ -82,6 +83,13 @@ type Pack struct {
 	Syntax    *Line
 }
 
+// Driver declares a project's driver package and protocol version.
+type Driver struct {
+	Protocol string
+	Package  string
+	Syntax   *Line
+}
+
 // A Project is the project statement.
 type Project struct {
 	Ext      string    // can be "_[class].gox" or ".[class]", eg. "_yap.gox" or ".gmx"
@@ -91,6 +99,7 @@ type Project struct {
 	PkgPaths []string  // package paths of classfile and optional inline-imported packages.
 	Import   []*Import // auto-imported packages
 	Pack     *Pack     // pack directive (at most one per project)
+	Driver   *Driver   // project driver
 
 	// AutoLambdas maps command => number of parameters before auto lambda.
 	// See https://github.com/goplus/xgo/issues/2828.
@@ -176,6 +185,10 @@ func parseToFile(file string, data []byte, fix VersionFixer, strict bool) (parse
 			parsed.parseVerb(&errs, x.Token[0], x, x.Token[1:], strict)
 		case *LineBlock:
 			verb := x.Token[0]
+			if verb == "driver" && len(x.Line) == 0 {
+				parsed.parseVerb(&errs, verb, &Line{Comments: x.Comments, Start: x.Start, End: x.RParen.Pos, Token: x.Token, InBlock: true}, nil, strict)
+				continue
+			}
 			for _, line := range x.Line {
 				parsed.parseVerb(&errs, verb, line, line.Token, strict)
 			}
@@ -390,6 +403,43 @@ usage: class [-embed -prefix=Prefix] *.workExt WorkClass [WorkPrototype]`, sw)
 			return
 		}
 		proj.Pack = &Pack{Directory: dir, IndexFile: indexFile, Syntax: line}
+	case "driver":
+		if line.InBlock {
+			errorf("driver directive must not be a block")
+			return
+		}
+		proj := f.proj()
+		if proj == nil {
+			errorf("driver must declare after a project definition")
+			return
+		}
+		if proj.Driver != nil {
+			errorf("duplicate driver directive in the same project")
+			return
+		}
+		if len(args) != 2 {
+			errorf("usage: driver <protocol> <package>")
+			return
+		}
+		protocol, err := parseString(&args[0])
+		if err != nil {
+			wrapError(err)
+			return
+		}
+		if !driverProtocolRE.MatchString(protocol) {
+			errorf("driver protocol must match v[1-9][0-9]*, got %q", protocol)
+			return
+		}
+		pkgPath, err := parseString(&args[1])
+		if err != nil {
+			wrapError(err)
+			return
+		}
+		if err := module.CheckImportPath(pkgPath); err != nil {
+			errorf("driver package %q is not a valid import path: %v", pkgPath, err)
+			return
+		}
+		proj.Driver = &Driver{Protocol: protocol, Package: pkgPath, Syntax: line}
 	case "autolambda":
 		proj := f.proj()
 		if proj == nil {
@@ -485,8 +535,9 @@ func AutoQuote(s string) string {
 }
 
 var (
-	typeRE = regexp.MustCompile(`\*?[A-Z]\w*`)
-	idenRE = regexp.MustCompile(`\w+`)
+	typeRE           = regexp.MustCompile(`\*?[A-Z]\w*`)
+	idenRE           = regexp.MustCompile(`\w+`)
+	driverProtocolRE = regexp.MustCompile(`^v[1-9][0-9]*$`)
 )
 
 // TODO(xsw): to be optimized
