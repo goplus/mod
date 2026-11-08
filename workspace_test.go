@@ -305,7 +305,7 @@ func TestLoadDirGoModOnly(t *testing.T) {
 	if w.Dir != filepath.Join(root, "proj") {
 		t.Errorf("Dir = %q, want the module directory", w.Dir)
 	}
-	pkg, err := w.LookupFrom("example.com/proj/sub", "")
+	pkg, err := w.Lookup("example.com/proj/sub")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -390,9 +390,9 @@ func TestConstructorsAgree(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, imp := range []string{"example.com/app", "example.com/app/x", "fmt"} {
-		pw, ew := fromWork.LookupFrom(imp, "")
-		pm, em := fromMod.LookupFrom(imp, "")
-		pd, ed := fromDir.LookupFrom(imp, "")
+		pw, ew := fromWork.Lookup(imp)
+		pm, em := fromMod.Lookup(imp)
+		pd, ed := fromDir.Lookup(imp)
 		if (ew == nil) != (em == nil) || (ew == nil) != (ed == nil) {
 			t.Errorf("%q: err work=%v mod=%v dir=%v", imp, ew, em, ed)
 			continue
@@ -440,10 +440,8 @@ func depWS(t *testing.T) (root string, w *Workspace) {
 	return root, w
 }
 
-func TestLookupFrom(t *testing.T) {
+func TestLookup(t *testing.T) {
 	root, w := depWS(t)
-	appCmd := filepath.Join(root, "ws", "app", "cmd")
-
 	cases := []struct {
 		imp     string
 		typ     PkgType
@@ -460,7 +458,7 @@ func TestLookupFrom(t *testing.T) {
 			module.Version{Path: "github.com/dep/thing", Version: "v1.2.0"}},
 	}
 	for _, c := range cases {
-		pkg, err := w.LookupFrom(c.imp, appCmd)
+		pkg, err := w.Lookup(c.imp)
 		if err != nil {
 			t.Errorf("LookupFrom(%q) = %v", c.imp, err)
 			continue
@@ -480,7 +478,7 @@ func TestLookupFrom(t *testing.T) {
 	}
 
 	// A standard package reads from GOROOT/src.
-	pkg, err := w.LookupFrom("fmt", "")
+	pkg, err := w.Lookup("fmt")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -533,7 +531,7 @@ func TestStdlibWinsOverModule(t *testing.T) {
 	if got := w.PkgType("fmt"); got != PkgtStandard {
 		t.Errorf("PkgType(fmt) = %v, want standard", got)
 	}
-	pkg, err := w.LookupFrom("fmt", "")
+	pkg, err := w.Lookup("fmt")
 	if err != nil || pkg.Type != PkgtStandard {
 		t.Errorf("LookupFrom(fmt) = %+v, %v", pkg, err)
 	}
@@ -541,7 +539,7 @@ func TestStdlibWinsOverModule(t *testing.T) {
 	if got := w.PkgType("hello/x"); got != PkgtLocal {
 		t.Errorf("PkgType(hello/x) = %v, want local", got)
 	}
-	pkg, err = w.LookupFrom("hello/x", "")
+	pkg, err = w.Lookup("hello/x")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -583,7 +581,7 @@ func TestStdlibCacheNotPoisoned(t *testing.T) {
 	if got := w.PkgType("encoding/json"); got != PkgtStandard {
 		t.Errorf("PkgType(encoding/json) = %v, want standard", got)
 	}
-	pkg, err := w.LookupFrom("encoding/json", "")
+	pkg, err := w.Lookup("encoding/json")
 	if err != nil || pkg.Type != PkgtStandard {
 		t.Errorf("LookupFrom(encoding/json) = %+v, %v; want standard", pkg, err)
 	}
@@ -591,7 +589,7 @@ func TestStdlibCacheNotPoisoned(t *testing.T) {
 
 func TestLookupMissing(t *testing.T) {
 	_, w := depWS(t)
-	_, err := w.LookupFrom("github.com/nope/here", "")
+	_, err := w.Lookup("github.com/nope/here")
 	var me *MissingError
 	if !errors.As(err, &me) {
 		t.Fatalf("err = %v, want *MissingError", err)
@@ -602,7 +600,7 @@ func TestLookupMissing(t *testing.T) {
 	if !strings.Contains(me.Error(), "github.com/nope/here") {
 		t.Errorf("MissingError.Error() = %q", me.Error())
 	}
-	if _, err := w.LookupFrom("", ""); !errors.Is(err, ErrInvalidPkgPath) {
+	if _, err := w.Lookup(""); !errors.Is(err, ErrInvalidPkgPath) {
 		t.Errorf("empty path = %v, want ErrInvalidPkgPath", err)
 	}
 }
@@ -618,7 +616,7 @@ func TestLongestPrefixWins(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	pkg, err := w.LookupFrom("example.com/app/extra/x", "")
+	pkg, err := w.Lookup("example.com/app/extra/x")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -626,7 +624,7 @@ func TestLongestPrefixWins(t *testing.T) {
 		t.Errorf("lookup = %+v, want the longer module", pkg)
 	}
 	// A package under the shorter module is still found.
-	pkg, err = w.LookupFrom("example.com/app/other", "")
+	pkg, err = w.Lookup("example.com/app/other")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -646,14 +644,14 @@ func TestV2ModulePaths(t *testing.T) {
 		t.Fatal(err)
 	}
 	// example.com/x/v2 is a different path from example.com/x.
-	p2, err := w.LookupFrom("example.com/x/v2/sub", "")
+	p2, err := w.Lookup("example.com/x/v2/sub")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if p2.ModPath != "example.com/x/v2" || p2.Dir != filepath.Join(root, "ws", "v2", "sub") {
 		t.Errorf("v2 lookup = %+v", p2)
 	}
-	p1, err := w.LookupFrom("example.com/x/sub", "")
+	p1, err := w.Lookup("example.com/x/sub")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -799,48 +797,6 @@ func TestVersionSelection(t *testing.T) {
 }
 
 // -----------------------------------------------------------------------------
-// Relative paths
-
-func TestLookupRelative(t *testing.T) {
-	root, w := depWS(t)
-	cases := []struct {
-		path    string
-		fromDir string // relative to root
-		wantDir string // relative to root; "" means error
-		modPath string
-	}{
-		{"./internal/x", "ws/app", "ws/app/internal/x", "example.com/app"},
-		{"../cmd", "ws/app/internal", "ws/app/cmd", "example.com/app"},
-		{"./util", "localdep", "localdep/util", "example.com/local"},
-		{"./sub", "shared/lib", "shared/lib/sub", "example.com/lib"},
-		{"../../outside", "ws/app", "", ""}, // leaves every local module
-	}
-	for _, c := range cases {
-		from := filepath.Join(root, filepath.FromSlash(c.fromDir))
-		pkg, err := w.LookupFrom(c.path, from)
-		if c.wantDir == "" {
-			if !errors.Is(err, ErrInvalidPkgPath) {
-				t.Errorf("LookupFrom(%q, %q) = %+v, %v; want ErrInvalidPkgPath", c.path, c.fromDir, pkg, err)
-			}
-			continue
-		}
-		if err != nil {
-			t.Errorf("LookupFrom(%q, %q) = %v", c.path, c.fromDir, err)
-			continue
-		}
-		if pkg.Type != PkgtLocal || pkg.ModPath != c.modPath ||
-			pkg.Dir != filepath.Join(root, filepath.FromSlash(c.wantDir)) {
-			t.Errorf("LookupFrom(%q, %q) = %+v, want %s in %s", c.path, c.fromDir, pkg, c.modPath, c.wantDir)
-		}
-	}
-
-	// An empty fromDir with a relative path is an error.
-	if _, err := w.LookupFrom("./x", ""); !errors.Is(err, ErrInvalidPkgPath) {
-		t.Errorf("relative path with empty fromDir = %v, want ErrInvalidPkgPath", err)
-	}
-}
-
-// -----------------------------------------------------------------------------
 // Replace conflicts
 
 func TestConflictingReplaces(t *testing.T) {
@@ -849,12 +805,12 @@ func TestConflictingReplaces(t *testing.T) {
 		"ws/a/go.mod": "module example.com/a\n\nreplace example.com/dep v1.0.0 => example.com/forkA v1.0.0\n",
 		"ws/b/go.mod": "module example.com/b\n\nreplace example.com/dep v1.0.0 => example.com/forkB v1.0.0\n",
 	})
-	// Modules and LookupFrom return the conflict error.
+	// Modules and Lookup return the conflict error.
 	if _, err := w.Modules(); !isConflict(err) {
 		t.Errorf("Modules err = %v, want *ReplaceConflictError", err)
 	}
-	if _, err := w.LookupFrom("example.com/dep/x", ""); !isConflict(err) {
-		t.Errorf("LookupFrom err = %v, want *ReplaceConflictError", err)
+	if _, err := w.Lookup("example.com/dep/x"); !isConflict(err) {
+		t.Errorf("Lookup err = %v, want *ReplaceConflictError", err)
 	}
 	// PkgType returns PkgtInvalid when the list cannot be built.
 	if got := w.PkgType("example.com/dep/x"); got != PkgtInvalid {
@@ -894,7 +850,7 @@ func TestLookupConcurrent(t *testing.T) {
 			defer func() { done <- struct{}{} }()
 			for j := 0; j < 50; j++ {
 				for _, imp := range imports {
-					w.LookupFrom(imp, "")
+					w.Lookup(imp)
 					w.PkgType(imp)
 				}
 				w.Modules()
