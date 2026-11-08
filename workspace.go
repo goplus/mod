@@ -24,6 +24,7 @@ import (
 	"path/filepath"
 	"sync"
 
+	"github.com/goplus/mod/goxmod"
 	"golang.org/x/mod/modfile"
 	"golang.org/x/mod/module"
 )
@@ -68,20 +69,6 @@ type Workspace struct {
 	stdMu    sync.RWMutex
 	stdCache map[string]bool
 	goroot   string
-}
-
-// GoVersion returns the version of the "go" directive of go.work, or "" if
-// there is none. For a go.mod-only workspace it returns the version of the
-// main module's "go" directive.
-func (w *Workspace) GoVersion() string {
-	if w.file != nil {
-		if w.file.Go != nil {
-			return w.file.Go.Version
-		}
-	} else {
-		return w.mainMods[0].goVersion()
-	}
-	return ""
 }
 
 // -----------------------------------------------------------------------------
@@ -333,6 +320,37 @@ func absReplace(dir string, v module.Version) module.Version {
 		v.Path = filepath.Join(dir, filepath.FromSlash(v.Path))
 	}
 	return v
+}
+
+// -----------------------------------------------------------------------------
+
+// GoVersion returns the version of the "go" directive of go.work, or "" if
+// there is none. For a go.mod-only workspace it returns the version of the
+// main module's "go" directive.
+func (w *Workspace) GoVersion() string {
+	if w.file != nil {
+		if w.file.Go != nil {
+			return w.file.Go.Version
+		}
+	} else {
+		return w.mainMods[0].goVersion()
+	}
+	return ""
+}
+
+// -----------------------------------------------------------------------------
+
+// Classes represents a collection of classfiles,
+type Classes = goxmod.Classes
+
+// Classes returns the collection of classfiles for the main module.
+func (w *Workspace) Classes() (p *Classes, err error) {
+	mainMod := w.mainMods[0]
+	gox, err := goxmod.LoadModfile(mainMod.file, filepath.Join(mainMod.dir, "gox.mod"))
+	if err != nil {
+		return
+	}
+	return goxmod.ImportClasses(gox, w.LookupModule)
 }
 
 // -----------------------------------------------------------------------------

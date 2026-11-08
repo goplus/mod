@@ -18,10 +18,6 @@
 
 package mod
 
-func samePath(a, b string) bool {
-	return a == b
-}
-
 func pathKey(p string) string {
 	return p
 }

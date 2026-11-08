@@ -22,10 +22,6 @@ import (
 	"strings"
 )
 
-func samePath(a, b string) bool {
-	return strings.EqualFold(a, b)
-}
-
 func pathKey(p string) string {
 	return strings.ToLower(p)
 }
