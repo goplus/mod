@@ -310,6 +310,15 @@ func lookupModule(mods []Module, pkgPath string) (Module, bool) {
 	return Module{}, false
 }
 
+// hasPathPrefix reports whether path equals prefix or starts with prefix
+// followed by a slash.
+func hasPathPrefix(path, prefix string) bool {
+	if !strings.HasPrefix(path, prefix) {
+		return false
+	}
+	return len(path) == len(prefix) || path[len(prefix)] == '/'
+}
+
 // -----------------------------------------------------------------------------
 // Classification and lookup
 

@@ -22,7 +22,6 @@ import (
 	"go/version"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 
 	"golang.org/x/mod/modfile"
@@ -234,94 +233,7 @@ func loadMainMod(dir string) (*mainMod, error) {
 }
 
 // -----------------------------------------------------------------------------
-// Directory queries
-
-// ImportPath returns the import path of the package in dir: the module path of
-// the main module that owns dir, followed by the directory relative to the
-// module root. ok is false if dir belongs to no main module.
-func (w *Workspace) ImportPath(dir string) (importPath string, ok bool) {
-	m, _ := w.locate(dir)
-	if m == nil {
-		return "", false
-	}
-	abs, err := filepath.Abs(dir)
-	if err != nil {
-		return "", false
-	}
-	rel, err := filepath.Rel(m.dir, abs)
-	if err != nil {
-		return "", false
-	}
-	if rel == "." {
-		return m.path, true
-	}
-	return m.path + "/" + filepath.ToSlash(rel), true
-}
-
-// locate walks up from dir. It returns the main module that owns dir, or
-// otherwise the go.mod of the nearest non-main module (if any).
-func (w *Workspace) locate(dir string) (m *mainMod, otherGoMod string) {
-	dir, err := filepath.Abs(dir)
-	if err != nil {
-		return nil, ""
-	}
-	for {
-		for _, x := range w.mainMods {
-			if samePath(x.dir, dir) {
-				return x, ""
-			}
-		}
-		if file := filepath.Join(dir, gomodFile); isFile(file) {
-			return nil, file
-		}
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			return nil, ""
-		}
-		dir = parent
-	}
-}
-
-// hasPathPrefix reports whether path equals prefix or starts with prefix
-// followed by a slash.
-func hasPathPrefix(path, prefix string) bool {
-	if !strings.HasPrefix(path, prefix) {
-		return false
-	}
-	return len(path) == len(prefix) || path[len(prefix)] == '/'
-}
-
-// -----------------------------------------------------------------------------
 // Validation
-
-// NotInWorkspaceError reports a directory that is inside a module which is not
-// listed in the "use" directives of go.work.
-type NotInWorkspaceError struct {
-	Dir   string // the directory that was checked
-	GoMod string // go.mod of the module that contains it
-}
-
-func (e *NotInWorkspaceError) Error() string {
-	return fmt.Sprintf("directory %s is contained in a module (%s) that is not one of the workspace modules listed in go.work", e.Dir, e.GoMod)
-}
-
-// CheckDir verifies that the module containing dir is one of the main
-// modules. Like the go command, it reports a *NotInWorkspaceError when dir is
-// inside a module that go.work does not list.
-//
-// A dir outside of any module is not an error here (the go command allows
-// some operations there); neither is a dir inside a main module.
-func (w *Workspace) CheckDir(dir string) error {
-	m, other := w.locate(dir)
-	if m != nil || other == "" {
-		return nil
-	}
-	abs, err := filepath.Abs(dir)
-	if err != nil {
-		abs = dir
-	}
-	return &NotInWorkspaceError{Dir: abs, GoMod: other}
-}
 
 // Validate checks the workspace for the problems the go command rejects:
 //
@@ -438,13 +350,6 @@ func absReplace(dir string, v module.Version) module.Version {
 		v.Path = filepath.Join(dir, filepath.FromSlash(v.Path))
 	}
 	return v
-}
-
-// -----------------------------------------------------------------------------
-
-func isFile(name string) bool {
-	fi, err := os.Stat(name)
-	return err == nil && !fi.IsDir()
 }
 
 // -----------------------------------------------------------------------------

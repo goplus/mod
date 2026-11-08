@@ -892,58 +892,6 @@ func setModCache(t *testing.T, dir string) {
 }
 
 // -----------------------------------------------------------------------------
-// Retained directory queries (ImportPath, CheckDir)
-
-func TestImportPath(t *testing.T) {
-	root, w := loadWS(t, standard)
-	cases := []struct {
-		dir  string
-		want string
-		ok   bool
-	}{
-		{"ws/app", "example.com/app", true},
-		{"ws/app/cmd", "example.com/app/cmd", true},
-		{"shared/lib/sub", "example.com/lib/sub", true},
-		{"ws/other", "", false},
-		{"ws/app/internal/nested", "", false},
-	}
-	for _, c := range cases {
-		got, ok := w.ImportPath(filepath.Join(root, filepath.FromSlash(c.dir)))
-		if got != c.want || ok != c.ok {
-			t.Errorf("ImportPath(%s) = %q, %v; want %q, %v", c.dir, got, ok, c.want, c.ok)
-		}
-	}
-}
-
-func TestCheckDir(t *testing.T) {
-	root, w := loadWS(t, standard)
-	p := func(rel string) string { return filepath.Join(root, filepath.FromSlash(rel)) }
-
-	for _, ok := range []string{"ws/app", "ws/app/cmd", "shared/lib/sub"} {
-		if err := w.CheckDir(p(ok)); err != nil {
-			t.Errorf("CheckDir(%s) = %v, want nil", ok, err)
-		}
-	}
-	bad := []struct{ dir, gomod string }{
-		{"ws/other", "ws/other/go.mod"},
-		{"ws/other/pkg", "ws/other/go.mod"},
-		{"ws/app/internal/nested", "ws/app/internal/nested/go.mod"},
-	}
-	for _, c := range bad {
-		err := w.CheckDir(p(c.dir))
-		var nw *NotInWorkspaceError
-		if !errors.As(err, &nw) {
-			t.Errorf("CheckDir(%s) = %v, want *NotInWorkspaceError", c.dir, err)
-			continue
-		}
-		if nw.GoMod != p(c.gomod) || nw.Dir != p(c.dir) {
-			t.Errorf("CheckDir(%s): error = %+v", c.dir, nw)
-		}
-		if !strings.Contains(nw.Error(), "not one of the workspace modules") {
-			t.Errorf("unexpected message %q", nw.Error())
-		}
-	}
-}
 
 func TestValidateErrors(t *testing.T) {
 	cases := []struct {
