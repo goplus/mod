@@ -23,49 +23,136 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"golang.org/x/mod/modfile"
 	"golang.org/x/mod/module"
 )
 
-// Module is one main module: a directory with a go.mod file.
-type Module struct {
-	Dir   string        // absolute directory of the module
-	GoMod string        // absolute path of its go.mod
-	Path  string        // module path, from the "module" directive
-	File  *modfile.File // parsed go.mod (strictly, see LoadModule)
+// ErrNoModule is returned by LoadDir when neither a go.work nor a go.mod is
+// found at or above the directory.
+var ErrNoModule = errors.New("mod: no go.work or go.mod found")
+
+// mainMod is one main module of the workspace: a local directory with a
+// parsed go.mod. It is unexported; callers see main modules only through
+// Modules and LookupModule, as entries of the unified module list.
+type mainMod struct {
+	dir  string        // absolute directory of the module
+	path string        // module path, from the "module" directive
+	file *modfile.File // parsed go.mod (strictly, see loadMainMod)
 }
 
-// GoVersion returns the version of the "go" directive, or "" if there is none.
-func (m *Module) GoVersion() string {
-	if m.File != nil && m.File.Go != nil {
-		return m.File.Go.Version
+// goVersion returns the version of the "go" directive, or "" if there is none.
+func (m *mainMod) goVersion() string {
+	if m.file != nil && m.file.Go != nil {
+		return m.file.Go.Version
 	}
 	return ""
 }
 
-// Workspace is a parsed go.work together with the main modules it lists.
-// It is read-only: nothing in this package modifies the files.
+// Workspace is a snapshot of a go.work (or a single go.mod) together with the
+// main modules it lists. It is read-only: nothing in this package modifies the
+// files. A Workspace serves both a real workspace and a plain single-module
+// project; a caller never has to branch on "is there a go.work?".
+//
+// If go.work, a go.mod, or the module cache changes, load the workspace again.
 type Workspace struct {
-	Path    string            // absolute path of go.work
-	Dir     string            // directory containing go.work
-	File    *modfile.WorkFile // parsed go.work
-	Modules []*Module         // main modules, in the order of the "use" directives
+	Path string            // absolute path of go.work, "" for a go.mod-only workspace
+	Dir  string            // directory containing go.work, or the module's directory
+	File *modfile.WorkFile // parsed go.work, nil for a go.mod-only workspace
+
+	mainMods []*mainMod // main modules, in the order of the "use" directives
+
+	// Lazily built, cached module list (see Modules). Guarded by once so that
+	// concurrent lookups are safe.
+	once    sync.Once
+	modules []Module
+	modErr  error
+
+	// Cached answers of the standard-library check, keyed by the first path
+	// element (see PkgType). Guarded by stdMu.
+	stdMu    sync.RWMutex
+	stdCache map[string]bool
 }
 
 // GoVersion returns the version of the "go" directive of go.work, or "" if
-// there is none.
+// there is none. For a go.mod-only workspace it returns the version of the
+// main module's "go" directive.
 func (w *Workspace) GoVersion() string {
-	if w.File != nil && w.File.Go != nil {
-		return w.File.Go.Version
+	if w.File != nil {
+		if w.File.Go != nil {
+			return w.File.Go.Version
+		}
+		return ""
+	}
+	if len(w.mainMods) == 1 {
+		return w.mainMods[0].goVersion()
 	}
 	return ""
 }
 
-// Load reads and parses the go.work file at gowork, and loads the go.mod of
-// every directory listed in its "use" directives. Relative "use" paths are
-// resolved against the directory of go.work and may point outside of it.
-func Load(gowork string) (*Workspace, error) {
+// -----------------------------------------------------------------------------
+// Construction
+
+// NewGoWork creates a workspace from a parsed go.work file. dir is the
+// directory that holds the file; the "use" and "replace" directories in the
+// file are relative to it. dir is made absolute first.
+//
+// NewGoWork reads the go.mod of every "use"d directory from disk, because the
+// lookup needs the main modules' requirements, and returns an error if one
+// cannot be read or parsed. It does not read the go.work file again and does
+// not modify f; the workspace keeps f, so the caller must not modify it
+// afterwards.
+//
+// By convention Workspace.Path is set to dir/go.work; LoadGoWork sets it to the
+// file that was actually read, which matters when GOWORK names a file with
+// another name.
+func NewGoWork(dir string, f *modfile.WorkFile) (*Workspace, error) {
+	abs, err := filepath.Abs(dir)
+	if err != nil {
+		return nil, err
+	}
+	w := &Workspace{Path: filepath.Join(abs, GoWorkFile), Dir: abs, File: f}
+	for _, u := range f.Use {
+		moddir := filepath.FromSlash(u.Path)
+		if !filepath.IsAbs(moddir) {
+			moddir = filepath.Join(abs, moddir)
+		}
+		m, err := loadMainMod(moddir)
+		if err != nil {
+			return nil, fmt.Errorf("%s: use %s: %w", w.Path, u.Path, err)
+		}
+		w.mainMods = append(w.mainMods, m)
+	}
+	return w, nil
+}
+
+// NewGoMod creates a workspace with one main module, from a parsed go.mod
+// file, and no go.work. dir is the directory that holds the file, which is the
+// module's directory; it is made absolute first. The module directive is
+// required.
+//
+// NewGoMod does not read any file, and does not modify f; the workspace keeps
+// f, so the caller must not modify it afterwards. Workspace.Path and
+// Workspace.File are empty ("" and nil); Workspace.Dir is the module's
+// directory.
+func NewGoMod(dir string, f *modfile.File) (*Workspace, error) {
+	abs, err := filepath.Abs(dir)
+	if err != nil {
+		return nil, err
+	}
+	if f.Module == nil {
+		return nil, fmt.Errorf("%s: no module declaration", filepath.Join(abs, GoModFile))
+	}
+	w := &Workspace{Dir: abs}
+	w.mainMods = []*mainMod{{dir: abs, path: f.Module.Mod.Path, file: f}}
+	return w, nil
+}
+
+// LoadGoWork reads and parses the go.work file at gowork and calls NewGoWork
+// with its directory. Relative "use" paths are resolved against the directory
+// of go.work and may point outside of it.
+func LoadGoWork(gowork string) (*Workspace, error) {
 	abs, err := filepath.Abs(gowork)
 	if err != nil {
 		return nil, err
@@ -74,42 +161,64 @@ func Load(gowork string) (*Workspace, error) {
 	if err != nil {
 		return nil, err
 	}
-	return Parse(abs, data)
-}
-
-// Parse is like Load, with the content of the go.work file given by data.
-// path only names the file: it is used in error messages and as the base for
-// relative "use" paths. The go.mod files of the used directories are still
-// read from disk.
-func Parse(path string, data []byte) (*Workspace, error) {
-	abs, err := filepath.Abs(path)
+	f, err := modfile.ParseWork(abs, data, nil)
 	if err != nil {
 		return nil, err
 	}
-	file, err := modfile.ParseWork(abs, data, nil)
+	w, err := NewGoWork(filepath.Dir(abs), f)
 	if err != nil {
 		return nil, err
 	}
-	w := &Workspace{Path: abs, Dir: filepath.Dir(abs), File: file}
-	for _, u := range file.Use {
-		dir := filepath.FromSlash(u.Path)
-		if !filepath.IsAbs(dir) {
-			dir = filepath.Join(w.Dir, dir)
-		}
-		m, err := LoadModule(dir)
-		if err != nil {
-			return nil, fmt.Errorf("%s: use %s: %w", abs, u.Path, err)
-		}
-		w.Modules = append(w.Modules, m)
-	}
+	w.Path = abs // the file that was actually read (e.g. a GOWORK with another name)
 	return w, nil
 }
 
-// LoadModule reads the go.mod in dir. Like the go command does for a main
+// LoadGoMod reads and parses the go.mod file at gomod and calls NewGoMod with
+// its directory. The file is parsed strictly (modfile.Parse), as the go
+// command parses a main module's go.mod.
+func LoadGoMod(gomod string) (*Workspace, error) {
+	abs, err := filepath.Abs(gomod)
+	if err != nil {
+		return nil, err
+	}
+	data, err := os.ReadFile(abs)
+	if err != nil {
+		return nil, err
+	}
+	f, err := modfile.Parse(abs, data, nil)
+	if err != nil {
+		return nil, err
+	}
+	return NewGoMod(filepath.Dir(abs), f)
+}
+
+// LoadDir finds the workspace that contains dir, the way the go command does,
+// and loads it: the go.work file found by searching dir and its parents,
+// otherwise the go.mod file found the same way. dir may be relative; it is made
+// absolute first.
+//
+// The search honors GOWORK: GOWORK=off skips go.work, and GOWORK=<path> uses
+// that go.work and does no search (see Discover). If neither a go.work nor a
+// go.mod is found, LoadDir returns ErrNoModule.
+func LoadDir(dir string) (*Workspace, error) {
+	gowork, gomod, err := Discover(dir)
+	if err != nil {
+		if err == ErrNotFound {
+			return nil, ErrNoModule
+		}
+		return nil, err
+	}
+	if gowork != "" {
+		return LoadGoWork(gowork)
+	}
+	return LoadGoMod(gomod)
+}
+
+// loadMainMod reads the go.mod in dir. Like the go command does for a main
 // module, the file is parsed strictly (modfile.Parse): unknown directives are
 // an error, and directives that only apply to main modules, such as replace,
 // are kept. The module directive is required.
-func LoadModule(dir string) (*Module, error) {
+func loadMainMod(dir string) (*mainMod, error) {
 	dir, err := filepath.Abs(dir)
 	if err != nil {
 		return nil, err
@@ -126,43 +235,44 @@ func LoadModule(dir string) (*Module, error) {
 	if file.Module == nil {
 		return nil, fmt.Errorf("%s: no module declaration", gomod)
 	}
-	return &Module{Dir: dir, GoMod: gomod, Path: file.Module.Mod.Path, File: file}, nil
+	return &mainMod{dir: dir, path: file.Module.Mod.Path, file: file}, nil
 }
 
 // -----------------------------------------------------------------------------
-// Queries
+// Directory queries
 
-// ModuleByPath returns the main module with the given module path, or nil.
-func (w *Workspace) ModuleByPath(modPath string) *Module {
-	for _, m := range w.Modules {
-		if m.Path == modPath {
-			return m
-		}
-	}
-	return nil
-}
-
-// ModuleOf reports which main module contains dir. It returns nil if dir
-// belongs to no main module: either it is outside every main module, or the
-// nearest go.mod above it is a module that is not listed in "use" (a nested
-// module is not part of the module that encloses it).
-//
-// dir does not have to exist.
-func (w *Workspace) ModuleOf(dir string) *Module {
+// ImportPath returns the import path of the package in dir: the module path of
+// the main module that owns dir, followed by the directory relative to the
+// module root. ok is false if dir belongs to no main module.
+func (w *Workspace) ImportPath(dir string) (importPath string, ok bool) {
 	m, _ := w.locate(dir)
-	return m
+	if m == nil {
+		return "", false
+	}
+	abs, err := filepath.Abs(dir)
+	if err != nil {
+		return "", false
+	}
+	rel, err := filepath.Rel(m.dir, abs)
+	if err != nil {
+		return "", false
+	}
+	if rel == "." {
+		return m.path, true
+	}
+	return m.path + "/" + filepath.ToSlash(rel), true
 }
 
 // locate walks up from dir. It returns the main module that owns dir, or
 // otherwise the go.mod of the nearest non-main module (if any).
-func (w *Workspace) locate(dir string) (m *Module, otherGoMod string) {
+func (w *Workspace) locate(dir string) (m *mainMod, otherGoMod string) {
 	dir, err := filepath.Abs(dir)
 	if err != nil {
 		return nil, ""
 	}
 	for {
-		for _, x := range w.Modules {
-			if samePath(x.Dir, dir) {
+		for _, x := range w.mainMods {
+			if samePath(x.dir, dir) {
 				return x, ""
 			}
 		}
@@ -175,66 +285,6 @@ func (w *Workspace) locate(dir string) (m *Module, otherGoMod string) {
 		}
 		dir = parent
 	}
-}
-
-// ImportPath returns the import path of the package in dir: the module path
-// of the main module that owns dir, followed by the directory relative to the
-// module root. ok is false if dir belongs to no main module (see ModuleOf).
-func (w *Workspace) ImportPath(dir string) (importPath string, ok bool) {
-	m := w.ModuleOf(dir)
-	if m == nil {
-		return "", false
-	}
-	abs, err := filepath.Abs(dir)
-	if err != nil {
-		return "", false
-	}
-	rel, err := filepath.Rel(m.Dir, abs)
-	if err != nil {
-		return "", false
-	}
-	if rel == "." {
-		return m.Path, true
-	}
-	return m.Path + "/" + filepath.ToSlash(rel), true
-}
-
-// Resolve maps an import path to the local source of a main module.
-//
-// The main module whose path is the longest prefix of importPath (at a path
-// element boundary) is chosen, and dir is the corresponding directory inside
-// it. ok is false when the package has to come from the dependency graph
-// instead: no main module matches, importPath is malformed (empty, "." or
-// ".." elements), or a nested go.mod between the module root and dir makes the
-// package part of another module.
-//
-// Resolve does not check that dir exists, and it does not know about the
-// standard library.
-func (w *Workspace) Resolve(importPath string) (m *Module, dir string, ok bool) {
-	for _, x := range w.Modules {
-		if !hasPathPrefix(importPath, x.Path) {
-			continue
-		}
-		if m == nil || len(x.Path) > len(m.Path) {
-			m = x
-		}
-	}
-	if m == nil {
-		return nil, "", false
-	}
-	dir = m.Dir
-	if rest := importPath[len(m.Path):]; rest != "" {
-		for _, elem := range strings.Split(rest[1:], "/") {
-			if elem == "" || elem == "." || elem == ".." {
-				return nil, "", false
-			}
-			dir = filepath.Join(dir, elem)
-			if isFile(filepath.Join(dir, GoModFile)) {
-				return nil, "", false // belongs to a nested module
-			}
-		}
-	}
-	return m, dir, true
 }
 
 // hasPathPrefix reports whether path equals prefix or starts with prefix
@@ -285,33 +335,38 @@ func (w *Workspace) CheckDir(dir string) error {
 //   - a module requires a newer Go version than go.work declares;
 //   - the replace directives conflict (see Replacements).
 //
+// For a go.mod-only workspace the checks that are about go.work (duplicate
+// "use" directories and the go.work "go" version) do not apply; the module is
+// still checked, and Replacements reports a conflict only if that one go.mod
+// conflicts with itself.
+//
 // All problems found are reported together (see errors.Join).
 func (w *Workspace) Validate() error {
 	var errs []error
-	if len(w.Modules) == 0 {
+	if len(w.mainMods) == 0 {
 		errs = append(errs, errors.New("no modules were found in the current workspace; see 'go help work'"))
 	}
 
-	byDir := make(map[string]*Module)
-	byPath := make(map[string]*Module)
-	for _, m := range w.Modules {
-		key := pathKey(m.Dir)
+	byDir := make(map[string]*mainMod)
+	byPath := make(map[string]*mainMod)
+	for _, m := range w.mainMods {
+		key := pathKey(m.dir)
 		if prev := byDir[key]; prev != nil {
-			errs = append(errs, fmt.Errorf("directory %s is listed more than once in go.work", m.Dir))
+			errs = append(errs, fmt.Errorf("directory %s is listed more than once in go.work", m.dir))
 			continue
 		}
 		byDir[key] = m
-		if prev := byPath[m.Path]; prev != nil {
-			errs = append(errs, fmt.Errorf("module %s appears multiple times in workspace (%s and %s)", m.Path, prev.Dir, m.Dir))
+		if prev := byPath[m.path]; prev != nil {
+			errs = append(errs, fmt.Errorf("module %s appears multiple times in workspace (%s and %s)", m.path, prev.dir, m.dir))
 			continue
 		}
-		byPath[m.Path] = m
+		byPath[m.path] = m
 	}
 
-	if wv := w.GoVersion(); wv != "" {
-		for _, m := range w.Modules {
-			if mv := m.GoVersion(); mv != "" && version.Compare("go"+mv, "go"+wv) > 0 {
-				errs = append(errs, fmt.Errorf("module %s listed in go.work file requires go >= %s, but go.work lists go %s", m.Path, mv, wv))
+	if wv := w.workGoVersion(); wv != "" {
+		for _, m := range w.mainMods {
+			if mv := m.goVersion(); mv != "" && version.Compare("go"+mv, "go"+wv) > 0 {
+				errs = append(errs, fmt.Errorf("module %s listed in go.work file requires go >= %s, but go.work lists go %s", m.path, mv, wv))
 			}
 		}
 	}
@@ -320,6 +375,15 @@ func (w *Workspace) Validate() error {
 		errs = append(errs, err)
 	}
 	return errors.Join(errs...)
+}
+
+// workGoVersion returns the "go" version of go.work, or "" for a go.mod-only
+// workspace (where there is no go.work version to check a module against).
+func (w *Workspace) workGoVersion() string {
+	if w.File != nil && w.File.Go != nil {
+		return w.File.Go.Version
+	}
+	return ""
 }
 
 // -----------------------------------------------------------------------------
@@ -342,7 +406,8 @@ func (e *ReplaceConflictError) Error() string {
 // module path (with or without a version), the replaces of that module path
 // in the go.mod files are ignored. Among the go.mod files, replacing the same
 // module the same way is fine, but replacing it differently is reported as a
-// *ReplaceConflictError.
+// *ReplaceConflictError. A go.mod-only workspace has no go.work, so only that
+// module's own replace directives apply.
 //
 // Replacements that point to a directory are returned as absolute paths,
 // resolved against the directory of the file that declares them.
@@ -355,16 +420,16 @@ func (w *Workspace) Replacements() (map[module.Version]module.Version, error) {
 			repl[r.Old] = absReplace(w.Dir, r.New)
 		}
 	}
-	for _, m := range w.Modules {
-		if m.File == nil {
+	for _, m := range w.mainMods {
+		if m.file == nil {
 			continue
 		}
 		declared := make(map[module.Version]bool) // replaces of this go.mod, so far
-		for _, r := range m.File.Replace {
+		for _, r := range m.file.Replace {
 			if byWork[r.Old.Path] {
 				continue
 			}
-			nv := absReplace(m.Dir, r.New)
+			nv := absReplace(m.dir, r.New)
 			if prev, ok := repl[r.Old]; ok && !declared[r.Old] && prev != nv {
 				return nil, &ReplaceConflictError{Old: r.Old, A: prev, B: nv}
 			}
