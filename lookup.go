@@ -133,9 +133,6 @@ func (w *Workspace) buildModules() ([]Module, error) {
 	selected := make(map[string]string) // module path -> highest required version
 	var roots []module.Version
 	for _, m := range w.mainMods {
-		if m.file == nil {
-			continue
-		}
 		for _, r := range m.file.Require {
 			if r.Mod.Path == "" || mainByPath[r.Mod.Path] {
 				continue

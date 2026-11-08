@@ -39,12 +39,12 @@ var ErrNoModule = errors.New("mod: no go.work or go.mod found")
 type mainMod struct {
 	dir  string        // absolute directory of the module
 	path string        // module path, from the "module" directive
-	file *modfile.File // parsed go.mod (strictly, see loadMainMod)
+	file *modfile.File // parsed go.mod (strictly, see loadMainMod), not nil
 }
 
 // goVersion returns the version of the "go" directive, or "" if there is none.
 func (m *mainMod) goVersion() string {
-	if m.file != nil && m.file.Go != nil {
+	if m.file.Go != nil {
 		return m.file.Go.Version
 	}
 	return ""
@@ -416,9 +416,6 @@ func (w *Workspace) Replacements() (map[module.Version]module.Version, error) {
 		}
 	}
 	for _, m := range w.mainMods {
-		if m.file == nil {
-			continue
-		}
 		declared := make(map[module.Version]bool) // replaces of this go.mod, so far
 		for _, r := range m.file.Replace {
 			if byWork[r.Old.Path] {
