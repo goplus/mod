@@ -148,38 +148,30 @@ func NewGoMod(dir string, f *modfile.File) (*Workspace, error) {
 // with its directory. Relative "use" paths are resolved against the directory
 // of go.work and may point outside of it.
 func LoadGoWork(gowork string) (*Workspace, error) {
-	abs, err := filepath.Abs(gowork)
+	data, err := os.ReadFile(gowork)
 	if err != nil {
 		return nil, err
 	}
-	data, err := os.ReadFile(abs)
+	f, err := modfile.ParseWork(gowork, data, nil)
 	if err != nil {
 		return nil, err
 	}
-	f, err := modfile.ParseWork(abs, data, nil)
-	if err != nil {
-		return nil, err
-	}
-	return NewGoWork(filepath.Dir(abs), f)
+	return NewGoWork(filepath.Dir(gowork), f)
 }
 
 // LoadGoMod reads and parses the go.mod file at gomod and calls NewGoMod with
 // its directory. The file is parsed strictly (modfile.Parse), as the go
 // command parses a main module's go.mod.
 func LoadGoMod(gomod string) (*Workspace, error) {
-	abs, err := filepath.Abs(gomod)
+	data, err := os.ReadFile(gomod)
 	if err != nil {
 		return nil, err
 	}
-	data, err := os.ReadFile(abs)
+	f, err := modfile.Parse(gomod, data, nil)
 	if err != nil {
 		return nil, err
 	}
-	f, err := modfile.Parse(abs, data, nil)
-	if err != nil {
-		return nil, err
-	}
-	return NewGoMod(filepath.Dir(abs), f)
+	return NewGoMod(filepath.Dir(gomod), f)
 }
 
 // LoadDir finds the workspace that contains dir, the way the go command does,
