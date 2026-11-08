@@ -229,7 +229,7 @@ func (w *Workspace) readRootRequires(root module.Version, repl map[module.Versio
 	var name string
 	var err error
 	if target.Version == "" { // directory replacement (or a main module, excluded earlier)
-		name = filepath.Join(target.Path, GoModFile)
+		name = filepath.Join(target.Path, gomodFile)
 		data, err = os.ReadFile(name)
 		if err != nil {
 			if os.IsNotExist(err) {
@@ -277,7 +277,7 @@ func readModFile(mv module.Version) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	data, err := os.ReadFile(filepath.Join(dir, GoModFile))
+	data, err := os.ReadFile(filepath.Join(dir, gomodFile))
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, nil

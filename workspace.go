@@ -57,7 +57,6 @@ func (m *mainMod) goVersion() string {
 //
 // If go.work, a go.mod, or the module cache changes, load the workspace again.
 type Workspace struct {
-	Path string            // absolute path of go.work, "" for a go.mod-only workspace
 	Dir  string            // directory containing go.work, or the module's directory
 	File *modfile.WorkFile // parsed go.work, nil for a go.mod-only workspace
 
@@ -113,7 +112,7 @@ func NewGoWork(dir string, f *modfile.WorkFile) (*Workspace, error) {
 	if err != nil {
 		return nil, err
 	}
-	w := &Workspace{Path: filepath.Join(abs, GoWorkFile), Dir: abs, File: f}
+	w := &Workspace{Dir: abs, File: f}
 	for _, u := range f.Use {
 		moddir := filepath.FromSlash(u.Path)
 		if !filepath.IsAbs(moddir) {
@@ -121,7 +120,7 @@ func NewGoWork(dir string, f *modfile.WorkFile) (*Workspace, error) {
 		}
 		m, err := loadMainMod(moddir)
 		if err != nil {
-			return nil, fmt.Errorf("%s: use %s: %w", w.Path, u.Path, err)
+			return nil, fmt.Errorf("%s: use %s: %w", filepath.Join(abs, goWorkFile), u.Path, err)
 		}
 		w.mainMods = append(w.mainMods, m)
 	}
@@ -143,7 +142,7 @@ func NewGoMod(dir string, f *modfile.File) (*Workspace, error) {
 		return nil, err
 	}
 	if f.Module == nil {
-		return nil, fmt.Errorf("%s: no module declaration", filepath.Join(abs, GoModFile))
+		return nil, fmt.Errorf("%s: no module declaration", filepath.Join(abs, gomodFile))
 	}
 	w := &Workspace{Dir: abs}
 	w.mainMods = []*mainMod{{dir: abs, path: f.Module.Mod.Path, file: f}}
@@ -166,12 +165,7 @@ func LoadGoWork(gowork string) (*Workspace, error) {
 	if err != nil {
 		return nil, err
 	}
-	w, err := NewGoWork(filepath.Dir(abs), f)
-	if err != nil {
-		return nil, err
-	}
-	w.Path = abs // the file that was actually read (e.g. a GOWORK with another name)
-	return w, nil
+	return NewGoWork(filepath.Dir(abs), f)
 }
 
 // LoadGoMod reads and parses the go.mod file at gomod and calls NewGoMod with
@@ -224,7 +218,7 @@ func loadMainMod(dir string) (*mainMod, error) {
 	if err != nil {
 		return nil, err
 	}
-	gomod := filepath.Join(dir, GoModFile)
+	gomod := filepath.Join(dir, gomodFile)
 	data, err := os.ReadFile(gomod)
 	if err != nil {
 		return nil, err
@@ -277,7 +271,7 @@ func (w *Workspace) locate(dir string) (m *mainMod, otherGoMod string) {
 				return x, ""
 			}
 		}
-		if file := filepath.Join(dir, GoModFile); isFile(file) {
+		if file := filepath.Join(dir, gomodFile); isFile(file) {
 			return nil, file
 		}
 		parent := filepath.Dir(dir)

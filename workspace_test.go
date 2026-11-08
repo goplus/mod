@@ -70,8 +70,8 @@ var standard = map[string]string{
 
 func TestLoadGoWork(t *testing.T) {
 	root, w := loadWS(t, standard)
-	if w.Path != filepath.Join(root, "ws", "go.work") || w.Dir != filepath.Join(root, "ws") {
-		t.Errorf("Path/Dir = %q, %q", w.Path, w.Dir)
+	if w.Dir != filepath.Join(root, "ws") {
+		t.Errorf("Dir = %q", w.Dir)
 	}
 	if got := w.GoVersion(); got != "1.22" {
 		t.Errorf("GoVersion = %q", got)
@@ -209,8 +209,8 @@ func TestLoadGoModIsStrict(t *testing.T) {
 		t.Fatal(err)
 	}
 	// A go.mod-only workspace has no go.work.
-	if w.Path != "" || w.File != nil {
-		t.Errorf("Path/File = %q, %v; want empty", w.Path, w.File)
+	if w.File != nil {
+		t.Errorf("File = %v; want nil", w.File)
 	}
 	if w.Dir != filepath.Join(root, "ok") {
 		t.Errorf("Dir = %q, want the module directory", w.Dir)
@@ -256,10 +256,6 @@ func TestNewGoWorkKeepsRelativeUseBase(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// By convention, NewGoWork sets Path to dir/go.work.
-	if w.Path != filepath.Join(root, "ws", "go.work") {
-		t.Errorf("Path = %q", w.Path)
-	}
 	dir, _ := w.LookupModule("example.com/a")
 	if dir.Path != filepath.Join(root, "ws", "a") {
 		t.Fatalf("module a Real = %+v", dir)
@@ -273,9 +269,6 @@ func TestLoadDir(t *testing.T) {
 	w, err := LoadDir(filepath.Join(root, "ws", "app", "cmd"))
 	if err != nil {
 		t.Fatal(err)
-	}
-	if w.Path != filepath.Join(root, "ws", "go.work") {
-		t.Errorf("LoadDir found %q, want the go.work", w.Path)
 	}
 
 	// A go.work in a parent wins over a nearer go.mod: ws/app has a go.mod but
@@ -299,8 +292,8 @@ func TestLoadDirGoModOnly(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if w.File != nil || w.Path != "" {
-		t.Errorf("expected a go.mod-only workspace, got Path=%q File=%v", w.Path, w.File)
+	if w.File != nil {
+		t.Errorf("expected a go.mod-only workspace, got File=%v", w.File)
 	}
 	if w.Dir != filepath.Join(root, "proj") {
 		t.Errorf("Dir = %q, want the module directory", w.Dir)
@@ -333,10 +326,7 @@ func TestLoadDirHonorsGOWORK(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		// LoadGoWork sets Path to the file that was actually read.
-		if w.Path != filepath.Join(root, "ws.work") {
-			t.Errorf("Path = %q, want the GOWORK file", w.Path)
-		}
+		_ = w
 	})
 
 	t.Run("GOWORK=off", func(t *testing.T) {
