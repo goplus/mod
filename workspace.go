@@ -171,9 +171,16 @@ func LoadGoMod(gomod string) (*Workspace, error) {
 //
 // The search honors GOWORK: GOWORK=off skips go.work, and GOWORK=<path> uses
 // that go.work and does no search (see Discover). If neither a go.work nor a
-// go.mod is found, LoadFromDir returns ErrNoModule.
+// go.mod is found, LoadFromDir returns the default workspace for dir (see
+// NewDefault), which resolves the standard library and recognizes the built-in
+// classfiles; it does not return ErrNoModule. Every other failure is still an
+// error: a broken go.work or go.mod, or a GOWORK that names a missing file, is
+// reported rather than degraded into a default workspace.
 func LoadFromDir(dir string) (*Workspace, error) {
 	gowork, gomod, err := Discover(dir)
+	if errors.Is(err, ErrNoModule) {
+		return NewDefault(dir)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -181,6 +188,38 @@ func LoadFromDir(dir string) (*Workspace, error) {
 		return LoadGoWork(gowork)
 	}
 	return LoadGoMod(gomod)
+}
+
+// NewDefault creates the default workspace for dir: one main module with an
+// empty module path and an empty go.mod, and no go.work. dir is made absolute
+// first; it is also the main module's directory.
+//
+// A default workspace resolves imports of the standard library only, and
+// recognizes the built-in classfiles (".gsh" and "_test.gox") and nothing else.
+// It is an ordinary go.mod-only workspace, so every Workspace method answers
+// correctly on it with no special case beyond the empty module path. It is what
+// LoadFromDir returns when neither a go.work nor a go.mod is found, and tools
+// that already know there is no module can create one directly.
+//
+// NewDefault reads nothing from disk. The only possible error is the one from
+// making dir absolute.
+func NewDefault(dir string) (*Workspace, error) {
+	abs, err := filepath.Abs(dir)
+	if err != nil {
+		return nil, err
+	}
+	w := &Workspace{dir: abs}
+	w.mainMods = []*mainMod{{dir: abs, path: "", file: new(modfile.File)}}
+	return w, nil
+}
+
+// IsDefault reports whether w is a default workspace, that is, one created by
+// NewDefault, or by LoadFromDir when it found neither go.work nor go.mod. A
+// real workspace can never satisfy it: a go.work workspace has file != nil, and
+// NewGoMod and loadMainMod require a "module" directive, so an empty module
+// path occurs only here.
+func (w *Workspace) IsDefault() bool {
+	return w.file == nil && len(w.mainMods) == 1 && w.mainMods[0].path == ""
 }
 
 // loadMainMod reads the go.mod in dir. Like the go command does for a main
