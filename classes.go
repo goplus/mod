@@ -19,10 +19,8 @@ package mod
 import (
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 
 	"github.com/goplus/mod/goxmod"
 )
@@ -36,14 +34,6 @@ type Classes = goxmod.Classes
 // [Workspace.Classes] when dir does not belong to any main module of the
 // workspace. Detect it with errors.Is(err, ErrDirNotInWorkspace).
 var ErrDirNotInWorkspace = errors.New("directory is not in the workspace")
-
-// clsEntry is one main module's cached classes, built lazily under its own
-// sync.Once so that different modules build independently.
-type clsEntry struct {
-	once    sync.Once
-	classes *Classes
-	err     error
-}
 
 // Classes returns the collection of classfiles for the main module that
 // contains dir, the directory of the package being compiled.
@@ -78,9 +68,11 @@ type clsEntry struct {
 // fixing the environment should create a new Workspace.
 //
 // A class module that is not yet in the module cache is fetched during the
-// first Classes call that reaches its module. Callers on latency-sensitive
-// paths (such as an editor keystroke handler) should call it once at startup
-// rather than per request.
+// first Classes call that reaches its module. Only the build result is cached;
+// the ownership resolution runs on every call and touches the filesystem (it
+// probes for a foreign go.mod on the way down to dir), so callers on
+// latency-sensitive paths (such as an editor keystroke handler) should resolve
+// dir to a *Classes once at startup and reuse it rather than call per request.
 //
 // In a workspace with several main modules (a go.work with several use
 // entries), Classes answers for the module that owns dir and for that module
@@ -95,16 +87,16 @@ func (w *Workspace) Classes(dir string) (*Classes, error) {
 	if err != nil {
 		return nil, err // not cached: it depends only on dir
 	}
-	e := &w.clsCache[i]
-	e.once.Do(func() {
-		e.classes, e.err = w.buildClasses(w.mainMods[i])
+	m := w.mainMods[i]
+	m.onceCls.Do(func() {
+		m.classes, m.clsErr = w.buildClasses(m)
 	})
-	return e.classes, e.err
+	return m.classes, m.clsErr
 }
 
 // mainModIndex returns the index into w.mainMods of the main module that owns
-// dir, or an error wrapping ErrDirNotInWorkspace if no main module does. See
-// Classes for the ownership rules it implements.
+// dir, or -1 and an error wrapping ErrDirNotInWorkspace if no main module does.
+// See Classes for the ownership rules it implements.
 func (w *Workspace) mainModIndex(dir string) (int, error) {
 	// A default workspace has no real module; like the old Classes(), it answers
 	// for any directory (with the built-ins only). There is exactly one entry.
@@ -114,7 +106,7 @@ func (w *Workspace) mainModIndex(dir string) (int, error) {
 
 	abs, err := filepath.Abs(dir)
 	if err != nil {
-		return 0, err
+		return -1, err
 	}
 
 	// Find the nearest containing main module (longest root wins).
@@ -127,7 +119,7 @@ func (w *Workspace) mainModIndex(dir string) (int, error) {
 		}
 	}
 	if best < 0 {
-		return 0, fmt.Errorf("%w: %s", ErrDirNotInWorkspace, abs)
+		return -1, fmt.Errorf("%w: %s", ErrDirNotInWorkspace, abs)
 	}
 
 	// Reject dir if a go.mod of a module not in the workspace sits strictly
@@ -136,8 +128,8 @@ func (w *Workspace) mainModIndex(dir string) (int, error) {
 	// needs no probe, matching how the go command assigns directories.
 	root := w.mainMods[best].dir
 	for d := abs; !samePath(d, root); {
-		if isFile(filepath.Join(d, gomodFile)) {
-			return 0, fmt.Errorf("%w: %s", ErrDirNotInWorkspace, abs)
+		if (Finder{}).isFile(filepath.Join(d, gomodFile)) {
+			return -1, fmt.Errorf("%w: %s", ErrDirNotInWorkspace, abs)
 		}
 		parent := filepath.Dir(d)
 		if parent == d { // defensive: should not happen, dir is below root
@@ -162,14 +154,9 @@ func dirContains(root, dir string) bool {
 	return rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
 }
 
-// isFile reports whether name exists and is not a directory.
-func isFile(name string) bool {
-	fi, err := os.Stat(name)
-	return err == nil && !fi.IsDir()
-}
-
-// buildClasses loads the gox.mod of mod (enriched with its go.mod) and imports
-// its classfiles, resolving class modules through LookupModule.
+// buildClasses loads the gox.mod (or, when absent, gop.mod) of mod, enriched
+// with its go.mod, and imports its classfiles, resolving class modules through
+// LookupModule.
 //
 // A default workspace has no module, so by design it has no gox.mod to read
 // (a gox.mod only exists in the directory of its go.mod): it returns the
