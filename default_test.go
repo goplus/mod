@@ -287,8 +287,8 @@ func TestDefaultValidateAndGoVersion(t *testing.T) {
 // classfiles (.gsh and _test.gox) and nothing else, and that repeated calls
 // return the same pointer.
 func TestDefaultClasses(t *testing.T) {
-	_, w := newDefault(t)
-	cls, err := w.Classes()
+	root, w := newDefault(t)
+	cls, err := w.Classes(root)
 	if err != nil {
 		t.Fatalf("Classes() = %v", err)
 	}
@@ -312,7 +312,7 @@ func TestDefaultClasses(t *testing.T) {
 	}
 
 	// A second call returns the same cached pointer.
-	cls2, err := w.Classes()
+	cls2, err := w.Classes(root)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -336,7 +336,7 @@ func TestDefaultClassesIgnoresGoxmod(t *testing.T) {
 	if !w.IsDefault() {
 		t.Fatal("want a default workspace")
 	}
-	cls, err := w.Classes()
+	cls, err := w.Classes(root)
 	if err != nil {
 		t.Fatalf("Classes() = %v", err)
 	}
@@ -351,7 +351,7 @@ func TestDefaultClassesIgnoresGoxmod(t *testing.T) {
 // TestDefaultClassesConcurrent runs Lookup and Classes in parallel on one
 // default workspace, to exercise the once-guarded caches under -race.
 func TestDefaultClassesConcurrent(t *testing.T) {
-	_, w := newDefault(t)
+	root, w := newDefault(t)
 	var wg sync.WaitGroup
 	for i := 0; i < 16; i++ {
 		wg.Add(1)
@@ -360,7 +360,7 @@ func TestDefaultClassesConcurrent(t *testing.T) {
 			if _, err := w.Lookup("fmt"); err != nil {
 				t.Errorf("Lookup(fmt) = %v", err)
 			}
-			if _, err := w.Classes(); err != nil {
+			if _, err := w.Classes(root); err != nil {
 				t.Errorf("Classes() = %v", err)
 			}
 		}()

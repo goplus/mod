@@ -69,11 +69,11 @@ type Workspace struct {
 	stdCache map[string]bool
 	goroot   string
 
-	// Lazily built, cached collection of classfiles for the main module (see
-	// Classes). Guarded by onceCls so that concurrent calls are safe.
-	onceCls sync.Once
-	classes *Classes
-	clsErr  error
+	// Lazily built, cached collection of classfiles, one entry per main module
+	// (see Classes). Each entry is guarded by its own sync.Once, so different
+	// modules build independently and concurrent calls are safe. Sized
+	// len(mainMods) when the workspace is loaded.
+	clsCache []clsEntry
 }
 
 // -----------------------------------------------------------------------------
@@ -112,6 +112,7 @@ func NewGoWork(dir string, f *modfile.WorkFile) (*Workspace, error) {
 	if len(w.mainMods) == 0 {
 		return nil, ErrNoModule
 	}
+	w.clsCache = make([]clsEntry, len(w.mainMods))
 	return w, nil
 }
 
@@ -134,6 +135,7 @@ func NewGoMod(dir string, f *modfile.File) (*Workspace, error) {
 	}
 	w := &Workspace{dir: abs}
 	w.mainMods = []*mainMod{{dir: abs, path: f.Module.Mod.Path, file: f}}
+	w.clsCache = make([]clsEntry, 1)
 	return w, nil
 }
 
@@ -213,6 +215,7 @@ func NewDefault(dir string) (*Workspace, error) {
 	}
 	w := &Workspace{dir: abs}
 	w.mainMods = []*mainMod{{dir: abs, path: "", file: new(modfile.File)}}
+	w.clsCache = make([]clsEntry, 1)
 	return w, nil
 }
 
