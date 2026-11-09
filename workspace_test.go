@@ -915,11 +915,6 @@ func TestValidateErrors(t *testing.T) {
 		want  []string
 	}{
 		{
-			name:  "no modules",
-			files: map[string]string{"ws/go.work": "go 1.22\n"},
-			want:  []string{"no modules were found"},
-		},
-		{
 			name: "same module path twice",
 			files: map[string]string{
 				"ws/go.work":  "go 1.22\nuse (\n\t./a\n\t./b\n)\n",

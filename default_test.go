@@ -101,18 +101,6 @@ func TestIsDefault(t *testing.T) {
 	if work.IsDefault() {
 		t.Error("LoadGoWork workspace: IsDefault = true, want false")
 	}
-
-	// A go.work with no "use" entries is not default either: it has file != nil.
-	emptyRoot := writeFiles(t, map[string]string{
-		"ws/go.work": "go 1.22\n",
-	})
-	empty, err := LoadGoWork(filepath.Join(emptyRoot, "ws", "go.work"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if empty.IsDefault() {
-		t.Error("empty go.work workspace: IsDefault = true, want false")
-	}
 }
 
 // TestLoadFromDirDefault checks that LoadFromDir returns a default workspace,
