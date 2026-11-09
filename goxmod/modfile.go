@@ -21,7 +21,6 @@ import (
 	"strings"
 
 	"github.com/goplus/mod/modfile"
-
 	gomodfile "golang.org/x/mod/modfile"
 )
 

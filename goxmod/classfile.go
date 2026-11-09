@@ -91,7 +91,7 @@ func (p *Classes) importMod(modPath string, lookupModVer LookupModVer) (err erro
 		// be fetched first. The download-cache .mod file alone is not enough,
 		// because the gox.mod we need lives in the extracted directory. A module
 		// without a version is a local directory and is read in place.
-		if dir, e := modcache.Path(modVer); e != nil || !isDir(dir) {
+		if dir, e := modcache.Path(modVer); e != nil || !exists(dir) {
 			if modVer, err = modfetch.Get(modVer.String()); err != nil {
 				return
 			}
@@ -100,10 +100,10 @@ func (p *Classes) importMod(modPath string, lookupModVer LookupModVer) (err erro
 	return p.importClassFrom(modVer)
 }
 
-// isDir reports whether name is an existing directory.
-func isDir(name string) bool {
-	fi, err := os.Stat(name)
-	return err == nil && fi.IsDir()
+// exists reports whether name is an existing directory.
+func exists(name string) bool {
+	_, err := os.Stat(name)
+	return err == nil
 }
 
 // importClassFrom loads the gox.mod (or gop.mod) of modVer from the module cache
