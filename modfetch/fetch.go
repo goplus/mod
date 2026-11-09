@@ -27,8 +27,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
 
-	xmod "github.com/goplus/mod"
 	"github.com/goplus/mod/modcache"
 	"golang.org/x/mod/module"
 	"golang.org/x/mod/semver"
@@ -45,6 +45,12 @@ const (
 var (
 	debugVerbose bool
 )
+
+// ErrNotFound is the sentinel reported when a module or package does not exist.
+// It is the same value as github.com/goplus/mod.ErrNotFound (both are
+// syscall.ENOENT), kept here so modfetch does not import the root mod package
+// and create an import cycle through packages that depend on both.
+const ErrNotFound = syscall.ENOENT
 
 // SetDebug sets debug flags.
 func SetDebug(flags dbgFlags) {
@@ -172,7 +178,7 @@ func Get(modPath string, noCache ...bool) (mod module.Version, err error) {
 	}
 	if noCache == nil || !noCache[0] {
 		mod, err = getFromCache(modPath)
-		if err != xmod.ErrNotFound {
+		if err != ErrNotFound {
 			return
 		}
 	}
@@ -194,7 +200,7 @@ func Get(modPath string, noCache ...bool) (mod module.Version, err error) {
 			reqPath = reqPath[:pos]
 		}
 		mod, err = getResult(stderr.String(), reqPath)
-		if err != xmod.ErrNotFound {
+		if err != ErrNotFound {
 			if debugVerbose {
 				log.Println("modfetch.Get ret:", err)
 			}
@@ -235,7 +241,7 @@ func getResult(data string, reqPath string) (mod module.Version, err error) {
 		}
 	}
 	if !found {
-		err = xmod.ErrNotFound
+		err = ErrNotFound
 		return
 	}
 	if mod.Path == "" {
@@ -256,7 +262,7 @@ func getMod(data string, next *string) (mod module.Version, err error) {
 			return
 		}
 	}
-	err = xmod.ErrNotFound
+	err = ErrNotFound
 	return
 }
 
@@ -281,7 +287,7 @@ func lookupFromCache(modPath string) (modRoot string, mod module.Version, err er
 	if pos > 0 { // has version
 		fi, e := os.Stat(modRoot)
 		if e != nil || !fi.IsDir() {
-			err = xmod.ErrNotFound
+			err = ErrNotFound
 		}
 		return
 	}
@@ -291,7 +297,7 @@ func lookupFromCache(modPath string) (modRoot string, mod module.Version, err er
 		err = errors.Unwrap(err)
 		return
 	}
-	err = xmod.ErrNotFound
+	err = ErrNotFound
 	for _, fi := range fis {
 		if fi.IsDir() {
 			if name := fi.Name(); strings.HasPrefix(name, fname) {
