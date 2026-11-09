@@ -252,12 +252,9 @@ func TestClassesNoMainModules(t *testing.T) {
 	root := writeFiles(t, map[string]string{
 		"ws/go.work": "go 1.22\n", // no use entries
 	})
-	w, err := LoadGoWork(filepath.Join(root, "ws", "go.work"))
-	if err != nil {
+	_, err := LoadGoWork(filepath.Join(root, "ws", "go.work"))
+	if err != ErrNoModule {
 		t.Fatal("LoadGoWork:", err)
-	}
-	if _, err := w.Classes(); err == nil {
-		t.Fatal("Classes: expected an error for a workspace with no main modules")
 	}
 }
 

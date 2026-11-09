@@ -109,6 +109,9 @@ func NewGoWork(dir string, f *modfile.WorkFile) (*Workspace, error) {
 		}
 		w.mainMods = append(w.mainMods, m)
 	}
+	if len(w.mainMods) == 0 {
+		return nil, ErrNoModule
+	}
 	return w, nil
 }
 
@@ -178,10 +181,10 @@ func LoadGoMod(gomod string) (*Workspace, error) {
 // reported rather than degraded into a default workspace.
 func LoadFromDir(dir string) (*Workspace, error) {
 	gowork, gomod, err := Discover(dir)
-	if errors.Is(err, ErrNoModule) {
-		return NewDefault(dir)
-	}
 	if err != nil {
+		if errors.Is(err, ErrNoModule) {
+			return NewDefault(dir)
+		}
 		return nil, err
 	}
 	if gowork != "" {
@@ -219,7 +222,7 @@ func NewDefault(dir string) (*Workspace, error) {
 // NewGoMod and loadMainMod require a "module" directive, so an empty module
 // path occurs only here.
 func (w *Workspace) IsDefault() bool {
-	return w.file == nil && len(w.mainMods) == 1 && w.mainMods[0].path == ""
+	return w.mainMods[0].path == ""
 }
 
 // loadMainMod reads the go.mod in dir. Like the go command does for a main
@@ -264,9 +267,6 @@ func loadMainMod(dir string) (*mainMod, error) {
 // All problems found are reported together (see errors.Join).
 func (w *Workspace) Validate() error {
 	var errs []error
-	if len(w.mainMods) == 0 {
-		errs = append(errs, errors.New("no modules were found in the current workspace; see 'go help work'"))
-	}
 
 	byDir := make(map[string]*mainMod)
 	byPath := make(map[string]*mainMod)

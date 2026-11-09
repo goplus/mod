@@ -17,7 +17,6 @@
 package mod
 
 import (
-	"errors"
 	"path/filepath"
 
 	"github.com/goplus/mod/goxmod"
@@ -72,9 +71,6 @@ func (w *Workspace) Classes() (*Classes, error) {
 func (w *Workspace) buildClasses() (_ *Classes, err error) {
 	if w.IsDefault() {
 		return goxmod.DefaultClasses(), nil
-	}
-	if len(w.mainMods) == 0 {
-		return nil, errors.New("no modules were found in the current workspace; see 'go help work'")
 	}
 	mainMod := w.mainMods[0]
 	gox, err := goxmod.LoadModfile(mainMod.file, filepath.Join(mainMod.dir, "gox.mod"))
