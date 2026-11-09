@@ -95,6 +95,57 @@ func TestImportClassesBuiltins(t *testing.T) {
 	}
 }
 
+// TestDefaultClasses checks that DefaultClasses recognizes exactly the two
+// built-in classfiles (_test.gox and .gsh) and returns a fresh collection on
+// each call.
+func TestDefaultClasses(t *testing.T) {
+	cls := DefaultClasses()
+	if !cls.IsClass("_test.gox") {
+		t.Fatal("IsClass _test.gox: not ok?")
+	}
+	if !cls.IsClass(".gsh") {
+		t.Fatal("IsClass .gsh: not ok?")
+	}
+	if cls.IsClass(".spx") {
+		t.Fatal("IsClass .spx: ok?")
+	}
+
+	// _test.gox shares its extension with its "Case" work class, so only
+	// main_test.gox is the project file; .gsh is the project file for any name.
+	if _, isProj, ok := cls.ClassInfo("main_test.gox"); !ok || !isProj {
+		t.Fatal("ClassInfo main_test.gox:", isProj, ok)
+	}
+	if _, isProj, ok := cls.ClassInfo("foo_test.gox"); !ok || isProj {
+		t.Fatal("ClassInfo foo_test.gox:", isProj, ok)
+	}
+	if _, isProj, ok := cls.ClassInfo("hello.gsh"); !ok || !isProj {
+		t.Fatal("ClassInfo hello.gsh:", isProj, ok)
+	}
+
+	// Each call returns a fresh, independent collection.
+	if other := DefaultClasses(); other == cls {
+		t.Fatal("DefaultClasses returned the same collection on a second call")
+	}
+}
+
+// TestImportClassesReplacesBuiltin checks that a module project with a built-in
+// extension still replaces the built-in: the built-ins are registered first.
+func TestImportClassesReplacesBuiltin(t *testing.T) {
+	gox := &modfile.File{
+		Projects: []*Project{
+			{Ext: ".gsh", Class: "Custom", PkgPaths: []string{"example.com/custom"}},
+		},
+	}
+	cls, err := ImportClasses(gox, nil)
+	if err != nil {
+		t.Fatal("ImportClasses:", err)
+	}
+	c, ok := cls.LookupClass(".gsh")
+	if !ok || c.Class != "Custom" {
+		t.Fatal("LookupClass .gsh:", c, ok)
+	}
+}
+
 // TestImportClassesOwnProject checks that a project declared by the module
 // itself, and its work-class extension, resolve through IsClass and LookupClass.
 func TestImportClassesOwnProject(t *testing.T) {

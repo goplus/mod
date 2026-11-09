@@ -179,6 +179,9 @@ func (w *Workspace) buildModules() ([]Module, error) {
 		byPath[m.Path] = i
 	}
 	for _, m := range w.mainMods {
+		if m.path == "" { // the default workspace has no module path to publish
+			continue
+		}
 		entry := Module{Path: m.path, Real: module.Version{Path: m.dir}}
 		if i, ok := byPath[m.path]; ok {
 			mods[i] = entry

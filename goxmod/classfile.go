@@ -63,9 +63,7 @@ type LookupModVer func(modPath string) (modVer module.Version, ok bool)
 // and TestProject are package-level values shared by every Classes, so callers
 // must treat them, and every *Project obtained from a Classes, as read-only.
 func ImportClasses(goxmod *modfile.File, lookupModVer LookupModVer) (p *Classes, err error) {
-	p = &Classes{projs: make(map[string]*Project)}
-	p.importClass(TestProject)
-	p.importClass(GshProject)
+	p = DefaultClasses()
 	for _, c := range goxmod.Projects {
 		p.importClass(c)
 	}
@@ -75,6 +73,21 @@ func ImportClasses(goxmod *modfile.File, lookupModVer LookupModVer) (p *Classes,
 		}
 	}
 	return
+}
+
+// DefaultClasses returns the classfiles that are known without any module: the
+// built-in projects TestProject ("_test.gox") and GshProject (".gsh"), in that
+// registration order. The result is a fresh collection, so it is safe to use
+// like any other *Classes.
+//
+// GshProject and TestProject are package-level values shared by every Classes,
+// so callers must treat them, and every *Project obtained from a Classes, as
+// read-only.
+func DefaultClasses() *Classes {
+	p := &Classes{projs: make(map[string]*Project)}
+	p.importClass(TestProject)
+	p.importClass(GshProject)
+	return p
 }
 
 // importMod registers the projects of the class module at modPath. A module that

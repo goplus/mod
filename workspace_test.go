@@ -315,8 +315,17 @@ func TestLoadDirGoModOnly(t *testing.T) {
 
 func TestLoadDirNoModule(t *testing.T) {
 	root := tempRoot(t)
-	if _, err := LoadFromDir(root); !errors.Is(err, ErrNoModule) {
-		t.Errorf("LoadDir outside any module = %v, want ErrNoModule", err)
+	// With no go.work or go.mod above it, LoadFromDir no longer fails: it returns
+	// the default workspace for the directory.
+	w, err := LoadFromDir(root)
+	if err != nil {
+		t.Fatalf("LoadFromDir outside any module = %v, want a default workspace", err)
+	}
+	if !w.IsDefault() {
+		t.Error("LoadFromDir outside any module should return a default workspace")
+	}
+	if w.dir != root {
+		t.Errorf("Dir = %q, want %q", w.dir, root)
 	}
 }
 

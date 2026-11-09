@@ -65,7 +65,14 @@ func (w *Workspace) Classes() (*Classes, error) {
 // buildClasses loads the gox.mod of the first main module (enriched with its
 // go.mod) and imports its classfiles, resolving class modules through
 // LookupModule.
+//
+// A default workspace has no module, so by design it has no gox.mod to read
+// (a gox.mod only exists in the directory of its go.mod): it returns the
+// built-in classfiles only, from goxmod.DefaultClasses.
 func (w *Workspace) buildClasses() (_ *Classes, err error) {
+	if w.IsDefault() {
+		return goxmod.DefaultClasses(), nil
+	}
 	if len(w.mainMods) == 0 {
 		return nil, errors.New("no modules were found in the current workspace; see 'go help work'")
 	}
