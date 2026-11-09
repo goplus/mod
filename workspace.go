@@ -31,10 +31,19 @@ import (
 // mainMod is one main module of the workspace: a local directory with a
 // parsed go.mod. It is unexported; callers see main modules only through
 // Modules and LookupModule, as entries of the unified module list.
+//
+// Each main module carries its own lazily built, cached collection of
+// classfiles (see Classes), guarded by onceCls so that different modules build
+// independently and concurrent calls are safe. mainMods holds *mainMod, so the
+// cache lives at a stable address and is never copied.
 type mainMod struct {
 	dir  string        // absolute directory of the module
 	path string        // module path, from the "module" directive
 	file *modfile.File // parsed go.mod (strictly, see loadMainMod), not nil
+
+	onceCls sync.Once
+	classes *Classes
+	clsErr  error
 }
 
 // goVersion returns the version of the "go" directive, or "" if there is none.
@@ -68,12 +77,6 @@ type Workspace struct {
 	stdMu    sync.RWMutex
 	stdCache map[string]bool
 	goroot   string
-
-	// Lazily built, cached collection of classfiles for the main module (see
-	// Classes). Guarded by onceCls so that concurrent calls are safe.
-	onceCls sync.Once
-	classes *Classes
-	clsErr  error
 }
 
 // -----------------------------------------------------------------------------
