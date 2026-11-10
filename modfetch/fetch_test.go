@@ -20,6 +20,10 @@ import (
 	"testing"
 )
 
+func init() {
+	SetDebug(DbgFlagAll)
+}
+
 func TestGetResult(t *testing.T) {
 	const parentFirst = "go: downloading github.com/llarhub/libcxx v0.1.1\n" +
 		"go: downloading github.com/llarhub/libcxx/c v0.1.1\n" +
