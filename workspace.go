@@ -42,7 +42,7 @@ type mainMod struct {
 	file *modfile.File // parsed go.mod (strictly, see loadMainMod), not nil
 
 	onceCls sync.Once
-	classes *Classes
+	classes Classes
 	clsErr  error
 }
 

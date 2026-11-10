@@ -82,10 +82,10 @@ var ErrDirNotInWorkspace = errors.New("directory is not in the workspace")
 // merged in.
 //
 // The returned *Classes is a lookup table and must be treated as read-only.
-func (w *Workspace) Classes(dir string) (*Classes, error) {
+func (w *Workspace) Classes(dir string) (_ Classes, err error) {
 	i, err := w.mainModIndex(dir)
 	if err != nil {
-		return nil, err // not cached: it depends only on dir
+		return // not cached: it depends only on dir
 	}
 	m := w.mainMods[i]
 	m.onceCls.Do(func() {
@@ -161,7 +161,7 @@ func dirContains(root, dir string) bool {
 // A default workspace has no module, so by design it has no gox.mod to read
 // (a gox.mod only exists in the directory of its go.mod): it returns the
 // built-in classfiles only, from goxmod.DefaultClasses.
-func (w *Workspace) buildClasses(mod *mainMod) (_ *Classes, err error) {
+func (w *Workspace) buildClasses(mod *mainMod) (_ Classes, err error) {
 	if mod.path == "" {
 		return goxmod.DefaultClasses(), nil
 	}

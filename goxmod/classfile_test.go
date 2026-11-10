@@ -96,8 +96,7 @@ func TestImportClassesBuiltins(t *testing.T) {
 }
 
 // TestDefaultClasses checks that DefaultClasses recognizes exactly the two
-// built-in classfiles (_test.gox and .gsh) and returns a fresh collection on
-// each call.
+// built-in classfiles (_test.gox and .gsh).
 func TestDefaultClasses(t *testing.T) {
 	cls := DefaultClasses()
 	if !cls.IsClass("_test.gox") {
@@ -120,11 +119,6 @@ func TestDefaultClasses(t *testing.T) {
 	}
 	if _, isProj, ok := cls.ClassInfo("hello.gsh"); !ok || !isProj {
 		t.Fatal("ClassInfo hello.gsh:", isProj, ok)
-	}
-
-	// Each call returns a fresh, independent collection.
-	if other := DefaultClasses(); other == cls {
-		t.Fatal("DefaultClasses returned the same collection on a second call")
 	}
 }
 
@@ -403,6 +397,18 @@ func TestClassInfo(t *testing.T) {
 	// An unknown file.
 	if autoLambdas, isProj, ok := cls.ClassInfo("foo.go"); ok || isProj || autoLambdas != nil {
 		t.Fatal("ClassInfo foo.go:", autoLambdas, isProj, ok)
+	}
+
+	if cls.UnsafePointer() == nil {
+		t.Fatal("UnsafePointer returned nil")
+	}
+
+	for range cls.XGo_Enum() {
+		break
+	}
+
+	for ext, proj := range cls.XGo_Enum() {
+		t.Logf("Class extension: %s, Project: %+v", ext, proj)
 	}
 }
 

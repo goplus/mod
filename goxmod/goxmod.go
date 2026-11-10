@@ -31,6 +31,10 @@
 package goxmod
 
 import (
+	"iter"
+	"reflect"
+	"unsafe"
+
 	"github.com/goplus/mod/modfile"
 	"github.com/qiniu/x/errors"
 )
@@ -85,7 +89,7 @@ type Classes struct {
 // file, and ok == true. For an unknown file it returns nil, false, false.
 //
 // See https://github.com/goplus/xgo/issues/2828 to learn about auto lambda.
-func (p *Classes) ClassInfo(fname string) (autoLambdas map[string]int, isProj, ok bool) {
+func (p Classes) ClassInfo(fname string) (autoLambdas map[string]int, isProj, ok bool) {
 	ext := modfile.ClassExt(fname)
 	if c, ok := p.projs[ext]; ok {
 		return c.AutoLambdas, c.IsProj(ext, fname), true
@@ -94,15 +98,31 @@ func (p *Classes) ClassInfo(fname string) (autoLambdas map[string]int, isProj, o
 }
 
 // IsClass reports whether ext is a known classfile extension.
-func (p *Classes) IsClass(ext string) (ok bool) {
+func (p Classes) IsClass(ext string) (ok bool) {
 	_, ok = p.projs[ext]
 	return
 }
 
 // LookupClass returns the project that owns ext, if any.
-func (p *Classes) LookupClass(ext string) (c *Project, ok bool) {
+func (p Classes) LookupClass(ext string) (c *Project, ok bool) {
 	c, ok = p.projs[ext]
 	return
+}
+
+// XGo_Enum enumerates all classfile extensions and their owning projects.
+func (p Classes) XGo_Enum() iter.Seq2[string, *Project] {
+	return func(yield func(string, *Project) bool) {
+		for ext, proj := range p.projs {
+			if !yield(ext, proj) {
+				return
+			}
+		}
+	}
+}
+
+// UnsafePointer returns an unsafe pointer to the underlying data.
+func (p Classes) UnsafePointer() unsafe.Pointer {
+	return reflect.ValueOf(p.projs).UnsafePointer()
 }
 
 // -----------------------------------------------------------------------------
