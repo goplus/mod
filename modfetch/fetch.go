@@ -75,6 +75,21 @@ func Get(modPath string, noCache ...bool) (mod module.Version, err error) {
 			return
 		}
 	}
+	mod, err = goGet(modPath)
+	if err != ErrNotFound {
+		if debugVerbose {
+			log.Println("modfetch.Get ret:", err)
+		}
+		return
+	}
+	return getFromCache(modPath)
+}
+
+// goGet runs `go get modPath` (adding @latest when no version is given) and
+// reports the downloaded module. It returns ErrNotFound when `go get` did not
+// report any downloaded module; the caller decides whether to fall back to the
+// module cache. Unlike Get, goGet does not consult the cache itself.
+func goGet(modPath string) (mod module.Version, err error) {
 	var stdout, stderr bytes.Buffer
 	var modPathVer = modPath
 	if strings.IndexByte(modPath, '@') < 0 {
@@ -92,15 +107,10 @@ func Get(modPath string, noCache ...bool) (mod module.Version, err error) {
 		if pos := strings.IndexByte(reqPath, '@'); pos > 0 {
 			reqPath = reqPath[:pos]
 		}
-		mod, err = getResult(stderr.String(), reqPath)
-		if err != ErrNotFound {
-			if debugVerbose {
-				log.Println("modfetch.Get ret:", err)
-			}
-			return
-		}
+		return getResult(stderr.String(), reqPath)
 	}
-	return getFromCache(modPath)
+	err = ErrNotFound
+	return
 }
 
 func getResult(data string, reqPath string) (mod module.Version, err error) {
