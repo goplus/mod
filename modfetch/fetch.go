@@ -18,11 +18,9 @@ package modfetch
 
 import (
 	"bytes"
-	"context"
 	"errors"
 	"fmt"
 	"log"
-	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -55,110 +53,6 @@ const ErrNotFound = syscall.ENOENT
 // SetDebug sets debug flags.
 func SetDebug(flags dbgFlags) {
 	debugVerbose = (flags & DbgFlagVerbose) != 0
-}
-
-// -----------------------------------------------------------------------------
-
-// GetPkg downloads the module that contains pkgPath to GOMODCACHE.
-func GetPkg(pkgPathVer, modBase string) (modVer module.Version, relPath string, err error) {
-	var ver string
-	var pkgPath string = pkgPathVer
-	if pos := strings.IndexByte(pkgPath, '@'); pos > 0 {
-		pkgPath, ver = pkgPath[:pos], pkgPath[pos+1:]
-	}
-	if debugVerbose {
-		log.Println("modfetch.GetPkg", pkgPathVer, modBase)
-	}
-	semIsValid := semver.IsValid(ver)
-	if semIsValid {
-		modVer, relPath, err = lookupListFromCache(pkgPath, "@"+ver)
-		if err == nil {
-			return
-		}
-	}
-	var stdout, stderr bytes.Buffer
-	cmd := exec.Command("go", "install", "-x", pkgPathVer)
-	if debugVerbose {
-		log.Println("==>", cmd)
-	}
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	cmd.Run()
-	proxy, pkg, found := foundBestRepo(stderr.String(), pkgPath)
-	var foundVer string
-	if semIsValid {
-		foundVer = "@" + ver
-	}
-	if found {
-		if !semIsValid {
-			if rev, err := foundRevInfo(proxy, pkg, ver); err == nil {
-				foundVer = "@" + rev.Version
-			}
-		}
-		if strings.HasPrefix(pkgPath, pkg+"/") {
-			relPath = pkgPath[len(pkg)+1:]
-		}
-		_, modVer, err = lookupFromCache(pkg + foundVer)
-	} else {
-		modVer, relPath, err = lookupListFromCache(pkgPath, foundVer)
-	}
-	if debugVerbose {
-		log.Println("==>", modVer, relPath, err)
-	}
-	return
-}
-
-func lookupListFromCache(pkgPath string, ver string) (modVer module.Version, relPath string, err error) {
-	list := strings.Split(pkgPath, "/")
-	for i := len(list); i > 0; i-- {
-		modPath := strings.Join(list[:i], "/") + ver
-		_, modVer, err = lookupFromCache(modPath)
-		if err == nil {
-			encPath, _ := module.EscapePath(modVer.Path)
-			modRoot := filepath.Join(modcache.GOMODCACHE, encPath+"@"+modVer.Version, filepath.Join(list[i:]...))
-			if _, e := os.Stat(modRoot); e != nil {
-				err = fmt.Errorf("xgo: module %v found, but does not contain package %v", modVer.Path, pkgPath)
-				return
-			}
-			relPath = strings.Join(list[i:], "/")
-			return
-		}
-	}
-	return
-}
-
-// Split splits a pkgPath into modPath and its relPath to module root.
-func Split(pkgPath, modBase string) (modPath, relPath string) {
-	if modBase != "" && strings.HasPrefix(pkgPath, modBase) {
-		n := len(modBase)
-		if len(pkgPath) == n {
-			return modBase, ""
-		}
-		if pkgPath[n] == '/' {
-			return modBase, pkgPath[n+1:]
-		}
-	}
-	parts := strings.SplitN(pkgPath, "/", 4)
-	if !strings.Contains(parts[0], ".") { // standard package
-		return "", pkgPath
-	}
-	switch parts[0] {
-	case ".", "..": // local package
-		return modBase, pkgPath
-	case "github.com", "golang.org":
-		if len(parts) > 3 {
-			relPath = parts[3]
-			if pos := strings.IndexByte(relPath, '@'); pos > 0 {
-				parts[2] += relPath[pos:]
-				relPath = relPath[:pos]
-			}
-			modPath = strings.Join(parts[:3], "/")
-		} else {
-			modPath = pkgPath
-		}
-		return
-	}
-	panic("TODO: modfetch.Split - unexpected pkgPath: " + pkgPath)
 }
 
 // -----------------------------------------------------------------------------
@@ -309,48 +203,6 @@ func lookupFromCache(modPath string) (modRoot string, mod module.Version, err er
 		}
 	}
 	return
-}
-
-// check rev info or list
-// # get https://goproxy.cn/github.com/goplus/goxls/@v/main.info: 200 OK
-// # get https://goproxy.cn/github.com/goplus/goxls/@v/list: 200 OK
-// check pkglist match
-// # get https://goproxy.cn/github.com/go-playground/validator/@v/list: 200 OK (0.530s)
-// # get https://goproxy.cn/github.com/go-playground/validator/v10/@v/list: 200 OK (0.383s)
-func foundBestRepo(data string, pkgPath string) (proxy string, best string, found bool) {
-	for _, line := range strings.Split(data, "\n") {
-		if strings.HasPrefix(line, "# get ") {
-			if !strings.Contains(line, ": 200 OK") {
-				continue
-			}
-			if n := strings.Index(line, "/@v/"); n > 0 {
-				base, err := url.Parse(line[6:n])
-				if err != nil {
-					continue
-				}
-				pkg := base.Path[1:]
-				if strings.HasPrefix(pkgPath, pkg) {
-					proxy = base.Scheme + "://" + base.Host
-					found = true
-					if len(best) < len(pkg) {
-						best = pkg
-					}
-				}
-			}
-		}
-	}
-	return
-}
-
-func foundRevInfo(proxy string, pkg string, rev string) (*RevInfo, error) {
-	repo, err := newProxyRepo(proxy, pkg)
-	if err != nil {
-		return nil, err
-	}
-	if rev == "latest" {
-		return repo.Latest(context.Background())
-	}
-	return repo.Stat(context.Background(), rev)
 }
 
 // -----------------------------------------------------------------------------
