@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io/fs"
 	"log"
 	"os"
 	"os/exec"
@@ -75,6 +76,21 @@ func Get(modPath string, noCache ...bool) (mod module.Version, err error) {
 			return
 		}
 	}
+	mod, err = goGet(modPath)
+	if err != ErrNotFound {
+		if debugVerbose {
+			log.Println("modfetch.Get ret:", err)
+		}
+		return
+	}
+	return getFromCache(modPath)
+}
+
+// goGet runs `go get modPath` (adding @latest when no version is given) and
+// reports the downloaded module. It returns ErrNotFound when `go get` did not
+// report any downloaded module; the caller decides whether to fall back to the
+// module cache. Unlike Get, goGet does not consult the cache itself.
+func goGet(modPath string) (mod module.Version, err error) {
 	var stdout, stderr bytes.Buffer
 	var modPathVer = modPath
 	if strings.IndexByte(modPath, '@') < 0 {
@@ -92,15 +108,10 @@ func Get(modPath string, noCache ...bool) (mod module.Version, err error) {
 		if pos := strings.IndexByte(reqPath, '@'); pos > 0 {
 			reqPath = reqPath[:pos]
 		}
-		mod, err = getResult(stderr.String(), reqPath)
-		if err != ErrNotFound {
-			if debugVerbose {
-				log.Println("modfetch.Get ret:", err)
-			}
-			return
-		}
+		return getResult(stderr.String(), reqPath)
 	}
-	return getFromCache(modPath)
+	err = ErrNotFound
+	return
 }
 
 func getResult(data string, reqPath string) (mod module.Version, err error) {
@@ -187,7 +198,16 @@ func lookupFromCache(modPath string) (modRoot string, mod module.Version, err er
 	dir, fname := filepath.Split(modRoot)
 	fis, err := os.ReadDir(dir)
 	if err != nil {
-		err = errors.Unwrap(err)
+		// A missing cache directory simply means the module is not cached yet.
+		// Normalize it to ErrNotFound so callers treat it as a cache miss; this
+		// must be errors.Is(fs.ErrNotExist) rather than comparing the unwrapped
+		// errno, because Windows reports a missing parent path as
+		// ERROR_PATH_NOT_FOUND, which is not syscall.ENOENT (== ErrNotFound).
+		if errors.Is(err, fs.ErrNotExist) {
+			err = ErrNotFound
+		} else {
+			err = errors.Unwrap(err)
+		}
 		return
 	}
 	err = ErrNotFound
