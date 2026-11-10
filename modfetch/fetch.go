@@ -36,8 +36,7 @@ type dbgFlags int
 
 const (
 	DbgFlagVerbose dbgFlags = 1 << iota
-	DbgFlagShowError
-	DbgFlagAll = DbgFlagShowError | DbgFlagVerbose
+	DbgFlagAll              = DbgFlagVerbose
 )
 
 var (
