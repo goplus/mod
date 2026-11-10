@@ -17,11 +17,99 @@
 package modfetch
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
+
+	"github.com/goplus/mod/modcache"
 )
 
 func init() {
 	SetDebug(DbgFlagAll)
+}
+
+// withModCache points modcache.GOMODCACHE at dir for the duration of the test,
+// restoring the previous value afterwards. It lets the cache-backed paths of Get
+// run against a controlled fake cache without any network access.
+func withModCache(t *testing.T, dir string) {
+	t.Helper()
+	old := modcache.GOMODCACHE
+	modcache.GOMODCACHE = dir
+	t.Cleanup(func() { modcache.GOMODCACHE = old })
+}
+
+// mustMkModDir creates an extracted-module directory "<path>@<version>" inside
+// the fake cache, mimicking what `go mod download` leaves in GOMODCACHE.
+func mustMkModDir(t *testing.T, cache, path, version string) {
+	t.Helper()
+	dir := filepath.Join(cache, path+"@"+version)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestGetEmptyPath(t *testing.T) {
+	if _, err := Get(""); err != errEmptyModPath {
+		t.Fatalf("Get(\"\"): err = %v, want errEmptyModPath", err)
+	}
+}
+
+func TestGetFromCacheVersioned(t *testing.T) {
+	cache := t.TempDir()
+	withModCache(t, cache)
+	mustMkModDir(t, cache, "example.com/foo", "v1.2.3")
+
+	// A versioned path resolves straight from the cache, no network needed.
+	mod, err := Get("example.com/foo@v1.2.3")
+	if err != nil {
+		t.Fatal("Get:", err)
+	}
+	if mod.Path != "example.com/foo" || mod.Version != "v1.2.3" {
+		t.Fatalf("Get: got %v %v, want example.com/foo v1.2.3", mod.Path, mod.Version)
+	}
+}
+
+func TestGetFromCacheLatest(t *testing.T) {
+	cache := t.TempDir()
+	withModCache(t, cache)
+	// Several cached versions of the same module; an unversioned request must
+	// resolve to the highest semver, not the first or last read from disk.
+	mustMkModDir(t, cache, "example.com/foo", "v1.2.0")
+	mustMkModDir(t, cache, "example.com/foo", "v1.10.0")
+	mustMkModDir(t, cache, "example.com/foo", "v1.3.0")
+
+	mod, err := Get("example.com/foo")
+	if err != nil {
+		t.Fatal("Get:", err)
+	}
+	if mod.Path != "example.com/foo" || mod.Version != "v1.10.0" {
+		t.Fatalf("Get: got %v %v, want example.com/foo v1.10.0", mod.Path, mod.Version)
+	}
+}
+
+func TestGetVersionedCacheMiss(t *testing.T) {
+	cache := t.TempDir()
+	withModCache(t, cache)
+	// The module path is cached but not at the requested version. A versioned
+	// request is an exact-match lookup, so this is a cache miss. getFromCache
+	// (the final fallback of Get) must report ErrNotFound rather than silently
+	// returning a different version.
+	mustMkModDir(t, cache, "example.com/foo", "v1.0.0")
+
+	if _, err := getFromCache("example.com/foo@v2.0.0"); err != ErrNotFound {
+		t.Fatalf("getFromCache: err = %v, want ErrNotFound", err)
+	}
+}
+
+func TestGetUnversionedCacheMiss(t *testing.T) {
+	cache := t.TempDir()
+	withModCache(t, cache)
+	// Nothing cached for this module: an unversioned lookup over a missing cache
+	// directory must normalize to ErrNotFound (a cache miss), the signal Get uses
+	// to decide whether to fall back to the network.
+	if _, err := getFromCache("example.com/absent"); err != ErrNotFound {
+		t.Fatalf("getFromCache: err = %v, want ErrNotFound", err)
+	}
 }
 
 func TestGetResult(t *testing.T) {

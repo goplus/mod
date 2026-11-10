@@ -61,7 +61,29 @@ var (
 	errEmptyModPath = errors.New("empty module path")
 )
 
-// Get downloads a modPath to GOMODCACHE.
+// Get resolves modPath to a specific module version, downloading it into
+// GOMODCACHE when necessary, and reports the resolved module.
+//
+// modPath may be versioned ("example.com/foo@v1.2.3") or unversioned
+// ("example.com/foo"). An unversioned path is resolved to the latest version:
+// Get first looks for the highest version already in GOMODCACHE and, on a cache
+// miss, runs `go get <modPath>@latest` to download it.
+//
+// By default Get consults GOMODCACHE first and only reaches the network on a
+// cache miss. Passing noCache as true bypasses the cache lookup and always runs
+// `go get`, which contacts the proxy/VCS to pick up a newer version; only the
+// first noCache value is used and the rest are ignored.
+//
+// The returned mod carries the resolved path and version. err is:
+//
+//   - errEmptyModPath when modPath is empty;
+//   - nil when the module was found in the cache or downloaded successfully;
+//   - ErrNotFound (== syscall.ENOENT) when the module exists in neither the
+//     cache nor upstream, so callers can use it as a sentinel to tell a genuine
+//     "no such module" apart from a transient failure.
+//
+// Because `go get` writes to the caller's go.mod, prefer GetPkg (which downloads
+// into a throwaway module) when that side effect is undesirable.
 func Get(modPath string, noCache ...bool) (mod module.Version, err error) {
 	if debugVerbose {
 		log.Println("modfetch.Get", modPath)
