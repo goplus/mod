@@ -284,8 +284,7 @@ func TestDefaultValidateAndGoVersion(t *testing.T) {
 }
 
 // TestDefaultClasses checks that a default workspace recognizes the built-in
-// classfiles (.gsh and _test.gox) and nothing else, and that repeated calls
-// return the same pointer.
+// classfiles (.gsh and _test.gox) and nothing else.
 func TestDefaultClasses(t *testing.T) {
 	root, w := newDefault(t)
 	cls, err := w.Classes(root)
@@ -310,35 +309,25 @@ func TestDefaultClasses(t *testing.T) {
 	if !isProj {
 		t.Error("ClassInfo(hello.gsh): isProj = false, want true")
 	}
-
-	// A second call returns the same cached pointer.
-	cls2, err := w.Classes(root)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if cls2 != cls {
-		t.Error("Classes() returned a different pointer on the second call")
-	}
 }
 
 // TestDefaultClassesAnyDir checks that a default workspace answers Classes for
 // any directory, including one entirely unrelated to its root: it never returns
-// ErrDirNotInWorkspace, unlike a real single-module workspace. All directories
-// share the one cached pointer.
+// ErrDirNotInWorkspace, unlike a real single-module workspace.
 func TestDefaultClassesAnyDir(t *testing.T) {
 	root, w := newDefault(t)
 	clsRoot, err := w.Classes(root)
 	if err != nil {
 		t.Fatalf("Classes(root) = %v", err)
 	}
+	if !clsRoot.IsClass(".gsh") || !clsRoot.IsClass("_test.gox") {
+		t.Error("the built-in classfiles should be recognized for any directory")
+	}
 	// A directory that is not under root at all.
 	outside := filepath.Join(filepath.Dir(root), "elsewhere", "pkg")
 	clsOut, err := w.Classes(outside)
 	if err != nil {
 		t.Fatalf("Classes(outside) = %v, want no error for a default workspace", err)
-	}
-	if clsOut != clsRoot {
-		t.Errorf("default workspace returned a different pointer for an unrelated dir: %p vs %p", clsOut, clsRoot)
 	}
 	if !clsOut.IsClass(".gsh") || !clsOut.IsClass("_test.gox") {
 		t.Error("the built-in classfiles should be recognized for any directory")

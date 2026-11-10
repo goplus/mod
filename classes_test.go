@@ -232,9 +232,9 @@ func TestClassesClassModNoProjects(t *testing.T) {
 		t.Fatalf("Classes = %v, %v; want ErrNotClassFileMod", c1, e1)
 	}
 	// The error is cached: a later call returns the identical error.
-	c2, e2 := w.Classes(appDir)
-	if c1 != c2 || e1 != e2 {
-		t.Fatalf("Classes not cached: %p/%v vs %p/%v", c1, e1, c2, e2)
+	_, e2 := w.Classes(appDir)
+	if e1 != e2 {
+		t.Fatalf("Classes not cached: %v vs %v", e1, e2)
 	}
 }
 
@@ -250,13 +250,13 @@ func TestClassesMalformedGoxMod(t *testing.T) {
 		t.Fatal("LoadGoMod:", err)
 	}
 	appDir := filepath.Join(root, "app")
-	c1, e1 := w.Classes(appDir)
+	_, e1 := w.Classes(appDir)
 	if e1 == nil {
 		t.Fatal("Classes: expected an error for a malformed gox.mod")
 	}
-	c2, e2 := w.Classes(appDir)
-	if c1 != c2 || e1 != e2 {
-		t.Fatalf("Classes not cached: %p/%v vs %p/%v", c1, e1, c2, e2)
+	_, e2 := w.Classes(appDir)
+	if e1 != e2 {
+		t.Fatalf("Classes not cached: %v vs %v", e1, e2)
 	}
 }
 
@@ -286,8 +286,8 @@ func TestClassesCachedPointer(t *testing.T) {
 	appDir := filepath.Join(root, "app")
 	c1, e1 := w.Classes(appDir)
 	c2, e2 := w.Classes(appDir)
-	if c1 != c2 || e1 != e2 {
-		t.Fatalf("Classes not cached: %p/%v vs %p/%v", c1, e1, c2, e2)
+	if c1.UnsafePointer() != c2.UnsafePointer() || e1 != e2 {
+		t.Fatalf("Classes not cached: %p/%v vs %p/%v", c1.UnsafePointer(), e1, c2.UnsafePointer(), e2)
 	}
 }
 
@@ -306,7 +306,7 @@ func TestClassesConcurrent(t *testing.T) {
 
 	const n = 16
 	var wg sync.WaitGroup
-	results := make([]*Classes, n)
+	results := make([]Classes, n)
 	errs := make([]error, n)
 	wg.Add(n)
 	for i := 0; i < n; i++ {
@@ -318,8 +318,8 @@ func TestClassesConcurrent(t *testing.T) {
 	wg.Wait()
 
 	for i := 1; i < n; i++ {
-		if results[i] != results[0] || errs[i] != errs[0] {
-			t.Fatalf("Classes[%d] = %p/%v, want %p/%v", i, results[i], errs[i], results[0], errs[0])
+		if results[i].UnsafePointer() != results[0].UnsafePointer() || errs[i] != errs[0] {
+			t.Fatalf("Classes[%d] = %p/%v, want %p/%v", i, results[i].UnsafePointer, errs[i], results[0].UnsafePointer, errs[0])
 		}
 	}
 }
@@ -343,8 +343,8 @@ func TestClassesSamePointerForModuleDirs(t *testing.T) {
 	if err != nil {
 		t.Fatal("Classes(sub/pkg):", err)
 	}
-	if cRoot != cSub {
-		t.Fatalf("different pointers for two directories of the same module: %p vs %p", cRoot, cSub)
+	if cRoot.UnsafePointer() != cSub.UnsafePointer() {
+		t.Fatalf("different pointers for two directories of the same module: %p vs %p", cRoot.UnsafePointer(), cSub.UnsafePointer())
 	}
 }
 
@@ -361,8 +361,8 @@ func TestClassesDirOutsideWorkspace(t *testing.T) {
 	}
 	outside := filepath.Join(root, "elsewhere")
 	cls, err := w.Classes(outside)
-	if cls != nil {
-		t.Fatalf("Classes = %p, want nil", cls)
+	if cls.UnsafePointer() != nil {
+		t.Fatalf("Classes = %p, want nil", cls.UnsafePointer())
 	}
 	if !errors.Is(err, ErrDirNotInWorkspace) {
 		t.Fatalf("Classes error = %v, want ErrDirNotInWorkspace", err)
@@ -500,7 +500,7 @@ func TestClassesRelativeAndNonExistentDir(t *testing.T) {
 	if err != nil {
 		t.Fatal("Classes(non-existent):", err)
 	}
-	if clsNew != cls {
+	if clsNew.UnsafePointer() != cls.UnsafePointer() {
 		t.Fatal("non-existent subdir did not share the module's cached classes")
 	}
 }
@@ -531,13 +531,13 @@ func TestClassesPerModuleErrorIsolation(t *testing.T) {
 		t.Fatal("Classes(b): expected an error for a malformed gox.mod")
 	}
 	b2, eb2 := w.Classes(filepath.Join(root, "ws", "b", "sub"))
-	if b1 != b2 || eb1 != eb2 {
-		t.Fatalf("Classes(b) not cached per module: %p/%v vs %p/%v", b1, eb1, b2, eb2)
+	if b1.UnsafePointer() != b2.UnsafePointer() || eb1 != eb2 {
+		t.Fatalf("Classes(b) not cached per module: %p/%v vs %p/%v", b1.UnsafePointer(), eb1, b2.UnsafePointer(), eb2)
 	}
 	// a is still fine after b failed.
 	clsA2, errA2 := w.Classes(filepath.Join(root, "ws", "a"))
-	if errA2 != nil || clsA2 != clsA {
-		t.Fatalf("Classes(a) changed after b failed: %p/%v, want %p/nil", clsA2, errA2, clsA)
+	if errA2 != nil || clsA2.UnsafePointer() != clsA.UnsafePointer() {
+		t.Fatalf("Classes(a) changed after b failed: %p/%v, want %p/nil", clsA2.UnsafePointer(), errA2, clsA.UnsafePointer())
 	}
 }
 

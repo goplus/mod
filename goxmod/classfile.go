@@ -62,7 +62,7 @@ type LookupModVer func(modPath string) (modVer module.Version, ok bool)
 // lookupModVer must not be nil when goxmod.ClassMods is not empty. GshProject
 // and TestProject are package-level values shared by every Classes, so callers
 // must treat them, and every *Project obtained from a Classes, as read-only.
-func ImportClasses(goxmod *modfile.File, lookupModVer LookupModVer) (p *Classes, err error) {
+func ImportClasses(goxmod *modfile.File, lookupModVer LookupModVer) (p Classes, err error) {
 	p = DefaultClasses()
 	for _, c := range goxmod.Projects {
 		p.importClass(c)
@@ -83,8 +83,8 @@ func ImportClasses(goxmod *modfile.File, lookupModVer LookupModVer) (p *Classes,
 // GshProject and TestProject are package-level values shared by every Classes,
 // so callers must treat them, and every *Project obtained from a Classes, as
 // read-only.
-func DefaultClasses() *Classes {
-	p := &Classes{projs: make(map[string]*Project)}
+func DefaultClasses() Classes {
+	p := Classes{projs: make(map[string]*Project)}
 	p.importClass(TestProject)
 	p.importClass(GshProject)
 	return p
@@ -94,7 +94,7 @@ func DefaultClasses() *Classes {
 // lookupModVer cannot resolve is skipped. A versioned module whose extracted
 // directory is not yet in the module cache is fetched first; a module without a
 // version is a local directory and is never fetched.
-func (p *Classes) importMod(modPath string, lookupModVer LookupModVer) (err error) {
+func (p Classes) importMod(modPath string, lookupModVer LookupModVer) (err error) {
 	modVer, ok := lookupModVer(modPath)
 	if !ok {
 		return nil // unresolvable class modules are skipped
@@ -122,7 +122,7 @@ func exists(name string) bool {
 // importClassFrom loads the gox.mod (or gop.mod) of modVer from the module cache
 // and registers its projects. A module that declares no projects yields
 // ErrNotClassFileMod.
-func (p *Classes) importClassFrom(modVer module.Version) (err error) {
+func (p Classes) importClassFrom(modVer module.Version) (err error) {
 	dir, err := modcache.Path(modVer)
 	if err != nil {
 		return
@@ -143,7 +143,7 @@ func (p *Classes) importClassFrom(modVer module.Version) (err error) {
 
 // importClass indexes c by its own extension and by every extension in its Works
 // list.
-func (p *Classes) importClass(c *Project) {
+func (p Classes) importClass(c *Project) {
 	p.projs[c.Ext] = c
 	for _, w := range c.Works {
 		p.projs[w.Ext] = c
