@@ -7,4 +7,8 @@ require (
 	golang.org/x/mod v0.40.0
 )
 
-retract v0.13.11
+retract (
+	v0.13.11
+	v0.23.1
+	v0.24.0
+)
