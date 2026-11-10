@@ -40,8 +40,8 @@ func newDefault(t *testing.T) (root string, w *Workspace) {
 // absolute directory.
 func TestNewDefault(t *testing.T) {
 	root, w := newDefault(t)
-	if w.file != nil {
-		t.Errorf("file = %v, want nil", w.file)
+	if w.File != nil {
+		t.Errorf("file = %v, want nil", w.File)
 	}
 	if len(w.mainMods) != 1 {
 		t.Fatalf("mainMods = %d, want 1", len(w.mainMods))
@@ -53,8 +53,8 @@ func TestNewDefault(t *testing.T) {
 	if m.file == nil {
 		t.Error("mainMods[0].file is nil, want a non-nil empty go.mod")
 	}
-	if m.dir != root || w.dir != root {
-		t.Errorf("dir = %q / %q, want %q", m.dir, w.dir, root)
+	if m.dir != root || w.Dir != root {
+		t.Errorf("dir = %q / %q, want %q", m.dir, w.Dir, root)
 	}
 }
 
@@ -71,8 +71,8 @@ func TestNewDefaultMakesAbsolute(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if w.dir != root {
-		t.Errorf("dir = %q, want %q", w.dir, root)
+	if w.Dir != root {
+		t.Errorf("dir = %q, want %q", w.Dir, root)
 	}
 }
 
@@ -114,8 +114,8 @@ func TestLoadFromDirDefault(t *testing.T) {
 	if !w.IsDefault() {
 		t.Error("LoadFromDir outside any module: IsDefault = false, want true")
 	}
-	if w.dir != root {
-		t.Errorf("dir = %q, want %q", w.dir, root)
+	if w.Dir != root {
+		t.Errorf("dir = %q, want %q", w.Dir, root)
 	}
 }
 

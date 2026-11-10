@@ -61,8 +61,8 @@ func (m *mainMod) goVersion() string {
 //
 // If go.work, a go.mod, or the module cache changes, load the workspace again.
 type Workspace struct {
-	dir  string            // directory containing go.work, or the module's directory
-	file *modfile.WorkFile // parsed go.work, nil for a go.mod-only workspace
+	Dir  string            // directory containing go.work, or the module's directory
+	File *modfile.WorkFile // parsed go.work, nil for a go.mod-only workspace
 
 	mainMods []*mainMod // main modules, in the order of the "use" directives
 
@@ -100,7 +100,7 @@ func NewGoWork(dir string, f *modfile.WorkFile) (*Workspace, error) {
 	if err != nil {
 		return nil, err
 	}
-	w := &Workspace{dir: abs, file: f}
+	w := &Workspace{Dir: abs, File: f}
 	for _, u := range f.Use {
 		moddir := filepath.FromSlash(u.Path)
 		if !filepath.IsAbs(moddir) {
@@ -135,7 +135,7 @@ func NewGoMod(dir string, f *modfile.File) (*Workspace, error) {
 	if f.Module == nil {
 		return nil, fmt.Errorf("%s: no module declaration", filepath.Join(abs, gomodFile))
 	}
-	w := &Workspace{dir: abs}
+	w := &Workspace{Dir: abs}
 	w.mainMods = []*mainMod{{dir: abs, path: f.Module.Mod.Path, file: f}}
 	return w, nil
 }
@@ -214,7 +214,7 @@ func NewDefault(dir string) (*Workspace, error) {
 	if err != nil {
 		return nil, err
 	}
-	w := &Workspace{dir: abs}
+	w := &Workspace{Dir: abs}
 	w.mainMods = []*mainMod{{dir: abs, path: "", file: new(modfile.File)}}
 	return w, nil
 }
@@ -304,8 +304,8 @@ func (w *Workspace) Validate() error {
 // workGoVersion returns the "go" version of go.work, or "" for a go.mod-only
 // workspace (where there is no go.work version to check a module against).
 func (w *Workspace) workGoVersion() string {
-	if w.file != nil && w.file.Go != nil {
-		return w.file.Go.Version
+	if w.File != nil && w.File.Go != nil {
+		return w.File.Go.Version
 	}
 	return ""
 }
@@ -338,10 +338,10 @@ func (e *ReplaceConflictError) Error() string {
 func (w *Workspace) replacements() (map[module.Version]module.Version, error) {
 	repl := make(map[module.Version]module.Version)
 	byWork := make(map[string]bool)
-	if w.file != nil {
-		for _, r := range w.file.Replace {
+	if w.File != nil {
+		for _, r := range w.File.Replace {
 			byWork[r.Old.Path] = true
-			repl[r.Old] = absReplace(w.dir, r.New)
+			repl[r.Old] = absReplace(w.Dir, r.New)
 		}
 	}
 	for _, m := range w.mainMods {
@@ -375,9 +375,9 @@ func absReplace(dir string, v module.Version) module.Version {
 // there is none. For a go.mod-only workspace it returns the version of the
 // main module's "go" directive.
 func (w *Workspace) GoVersion() string {
-	if w.file != nil {
-		if w.file.Go != nil {
-			return w.file.Go.Version
+	if w.File != nil {
+		if w.File.Go != nil {
+			return w.File.Go.Version
 		}
 	} else {
 		return w.mainMods[0].goVersion()
