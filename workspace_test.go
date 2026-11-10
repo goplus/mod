@@ -70,14 +70,14 @@ var standard = map[string]string{
 
 func TestLoadGoWork(t *testing.T) {
 	w := &Workspace{
-		file: new(modfile.WorkFile),
+		File: new(modfile.WorkFile),
 	}
 	if w.GoVersion() != "" {
 		t.Errorf("GoVersion of empty workspace = %q, want empty string", w.GoVersion())
 	}
 	root, w := loadWS(t, standard)
-	if w.dir != filepath.Join(root, "ws") {
-		t.Errorf("Dir = %q", w.dir)
+	if w.Dir != filepath.Join(root, "ws") {
+		t.Errorf("Dir = %q", w.Dir)
 	}
 	if got := w.GoVersion(); got != "1.22" {
 		t.Errorf("GoVersion = %q", got)
@@ -215,11 +215,11 @@ func TestLoadGoModIsStrict(t *testing.T) {
 		t.Fatal(err)
 	}
 	// A go.mod-only workspace has no go.work.
-	if w.file != nil {
-		t.Errorf("File = %v; want nil", w.file)
+	if w.File != nil {
+		t.Errorf("File = %v; want nil", w.File)
 	}
-	if w.dir != filepath.Join(root, "ok") {
-		t.Errorf("Dir = %q, want the module directory", w.dir)
+	if w.Dir != filepath.Join(root, "ok") {
+		t.Errorf("Dir = %q, want the module directory", w.Dir)
 	}
 	if got := w.GoVersion(); got != "1.21" {
 		t.Errorf("GoVersion = %q, want 1.21", got)
@@ -283,7 +283,7 @@ func TestLoadDir(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if w.file == nil {
+	if w.File == nil {
 		t.Error("LoadDir should prefer the go.work in the parent")
 	}
 }
@@ -298,11 +298,11 @@ func TestLoadDirGoModOnly(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if w.file != nil {
-		t.Errorf("expected a go.mod-only workspace, got File=%v", w.file)
+	if w.File != nil {
+		t.Errorf("expected a go.mod-only workspace, got File=%v", w.File)
 	}
-	if w.dir != filepath.Join(root, "proj") {
-		t.Errorf("Dir = %q, want the module directory", w.dir)
+	if w.Dir != filepath.Join(root, "proj") {
+		t.Errorf("Dir = %q, want the module directory", w.Dir)
 	}
 	pkg, err := w.Lookup("example.com/proj/sub")
 	if err != nil {
@@ -324,8 +324,8 @@ func TestLoadDirNoModule(t *testing.T) {
 	if !w.IsDefault() {
 		t.Error("LoadFromDir outside any module should return a default workspace")
 	}
-	if w.dir != root {
-		t.Errorf("Dir = %q, want %q", w.dir, root)
+	if w.Dir != root {
+		t.Errorf("Dir = %q, want %q", w.Dir, root)
 	}
 }
 
@@ -350,7 +350,7 @@ func TestLoadDirHonorsGOWORK(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if w.file != nil {
+		if w.File != nil {
 			t.Error("GOWORK=off should skip go.work")
 		}
 	})
@@ -369,8 +369,8 @@ func TestLoadDirRelative(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if w.dir != root {
-		t.Errorf("Dir = %q, want %q", w.dir, root)
+	if w.Dir != root {
+		t.Errorf("Dir = %q, want %q", w.Dir, root)
 	}
 }
 
