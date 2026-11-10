@@ -231,6 +231,13 @@ func tempModule() (dir string, cleanup func(), err error) {
 // Authentication prompts (for example "could not read Username") are left as
 // real errors on purpose: a private module that genuinely exists must not be
 // mistaken for "not a module", which would silently pick a shorter prefix.
+//
+// Version-resolution failures ("unknown revision", "no matching versions",
+// "invalid pseudo-version") are deliberately NOT treated as not-found: they are
+// emitted for a module that DOES exist but whose requested version cannot be
+// resolved. GetPkg always probes "<candidate>@latest", so such an error means a
+// real module with no resolvable latest version; surfacing it is safer than
+// silently skipping the module and picking a shorter, wrong prefix.
 func isNotFoundOutput(errText string) bool {
 	for _, sig := range notFoundSignals {
 		if strings.Contains(errText, sig) {
@@ -239,31 +246,39 @@ func isNotFoundOutput(errText string) bool {
 	}
 	// `go get` rejects a bare host or host/user prefix as a module root with
 	// "invalid <host> import path ...". The host varies, so match the two
-	// bracketing phrases instead of a fixed substring.
-	if strings.Contains(errText, "invalid ") && strings.Contains(errText, " import path") {
-		return true
+	// bracketing phrases instead of a fixed substring. Match within a single
+	// line so unrelated fragments ("invalid version" on one line, " import
+	// path" on another) cannot combine into a false positive.
+	for _, line := range strings.Split(errText, "\n") {
+		if strings.Contains(line, "invalid ") && strings.Contains(line, " import path") {
+			return true
+		}
+		// git: `fatal: repository 'https://host/owner/repo' not found`. Pair the
+		// bracketing phrases on one line so the generic "' not found" fragment
+		// (e.g. "pathspec '...' not found") does not match on its own.
+		if strings.Contains(line, "repository '") && strings.Contains(line, "' not found") {
+			return true
+		}
 	}
 	return false
 }
 
 // notFoundSignals are substrings `go get` prints when a module or its repository
-// does not exist, across the proxy (404/410, "not found: module") and the VCS
-// fallback ("Repository not found", "repository ... not found", bad import path,
-// no tagged versions). A path the toolchain rejects as an invalid module import
-// path (for example a bare host or host/user prefix) also cannot be a module and
-// is treated as "not found" so GetPkg skips it and keeps probing.
+// does not exist: the proxy answer ("404 Not Found", "410 Gone",
+// "not found: module") and the VCS fallback ("Repository not found" /
+// "repository not found", "unrecognized import path"). "malformed import path"
+// marks a syntactically invalid path the toolchain rejects, which also cannot be
+// a module. git's "repository '...' not found" is matched per line by
+// isNotFoundOutput, and version-resolution failures are intentionally absent
+// here (see isNotFoundOutput).
 var notFoundSignals = []string{
 	"404 Not Found",
 	"410 Gone",
 	"not found: module",
 	"Repository not found", // GitHub VCS, credentials available
 	"repository not found", // lowercase variants from other hosts
-	"' not found",          // git "fatal: repository '...' not found"
-	"no matching versions",
 	"unrecognized import path",
-	"unknown revision",
 	"malformed import path", // syntactically invalid path
-	"invalid pseudo-version",
 }
 
 // pkgInModule reports whether the module rooted at modRoot provides the package

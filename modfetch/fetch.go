@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io/fs"
 	"log"
 	"os"
 	"os/exec"
@@ -197,7 +198,16 @@ func lookupFromCache(modPath string) (modRoot string, mod module.Version, err er
 	dir, fname := filepath.Split(modRoot)
 	fis, err := os.ReadDir(dir)
 	if err != nil {
-		err = errors.Unwrap(err)
+		// A missing cache directory simply means the module is not cached yet.
+		// Normalize it to ErrNotFound so callers treat it as a cache miss; this
+		// must be errors.Is(fs.ErrNotExist) rather than comparing the unwrapped
+		// errno, because Windows reports a missing parent path as
+		// ERROR_PATH_NOT_FOUND, which is not syscall.ENOENT (== ErrNotFound).
+		if errors.Is(err, fs.ErrNotExist) {
+			err = ErrNotFound
+		} else {
+			err = errors.Unwrap(err)
+		}
 		return
 	}
 	err = ErrNotFound

@@ -99,9 +99,7 @@ func TestIsNotFoundOutput(t *testing.T) {
 		"remote: Repository not found.\nfatal: repository 'https://github.com/foo/bar' not found",
 		`invalid github.com import path "github.com/foo"`,
 		`malformed import path "foo//bar": double slash`,
-		`no matching versions for query "latest"`,
 		`unrecognized import path "foo"`,
-		`unknown revision v9.9.9`,
 	}
 	for _, s := range notFound {
 		if !isNotFoundOutput(s) {
@@ -116,6 +114,17 @@ func TestIsNotFoundOutput(t *testing.T) {
 		`fatal: could not read Username for 'https://github.com': terminal prompts disabled`,
 		`verifying module: checksum mismatch`,
 		`Get "https://proxy": net/http: TLS handshake timeout`,
+		// Version-resolution failures: the module EXISTS but its requested
+		// version cannot be resolved. Must stay a real error so GetPkg surfaces
+		// it instead of skipping a real module (GetPkg always probes @latest).
+		`github.com/foo/bar@latest: no matching versions for query "latest"`,
+		`github.com/foo/bar@latest: invalid version: unknown revision v9.9.9`,
+		`invalid pseudo-version "v0.0.0-00010101000000-000000000000"`,
+		// Cross-line fragments must not combine into a false positive: "invalid "
+		// on one line and " import path" on another are unrelated here.
+		"go: invalid version: foo\nsome other import path note",
+		// Generic "' not found" without the "repository '" pairing must not match.
+		`error: pathspec 'main' not found`,
 	}
 	for _, s := range real {
 		if isNotFoundOutput(s) {
