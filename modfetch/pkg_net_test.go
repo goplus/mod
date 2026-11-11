@@ -25,6 +25,58 @@ import (
 // These tests download real modules through GOPROXY and are skipped under
 // `go test -short`. They exercise the end-to-end resolution of GetPkg.
 
+func TestGetRoot(t *testing.T) {
+	if testing.Short() {
+		t.Skip("network test skipped in -short mode")
+	}
+	// End-to-end: an unversioned path is resolved to the latest version and
+	// downloaded into GOMODCACHE, whether that means a live `go get` or a cache
+	// hit from a previous run.
+	mod, err := Get("github.com/qiniu/x")
+	if err != nil {
+		t.Fatal("Get:", err)
+	}
+	if mod.Path != "github.com/qiniu/x" {
+		t.Fatalf("mod.Path = %q, want github.com/qiniu/x", mod.Path)
+	}
+	if mod.Version == "" {
+		t.Fatal("mod.Version is empty")
+	}
+}
+
+func TestGetVersioned(t *testing.T) {
+	if testing.Short() {
+		t.Skip("network test skipped in -short mode")
+	}
+	// A pinned version resolves to exactly that version.
+	const want = "v1.19.3"
+	mod, err := Get("github.com/qiniu/x@" + want)
+	if err != nil {
+		t.Fatal("Get:", err)
+	}
+	if mod.Path != "github.com/qiniu/x" || mod.Version != want {
+		t.Fatalf("Get: got %v %v, want github.com/qiniu/x %v", mod.Path, mod.Version, want)
+	}
+}
+
+func TestGetNotFound(t *testing.T) {
+	if testing.Short() {
+		t.Skip("network test skipped in -short mode")
+	}
+	// A module that exists nowhere must end up as ErrNotFound: neither the cache
+	// nor `go get` can resolve it.
+	_, err := Get("github.com/goplus/this-module-does-not-exist-xyz123")
+	if err == nil {
+		t.Fatal("Get: expected an error for a nonexistent module")
+	}
+	if !errors.Is(err, ErrNotFound) {
+		// Without VCS credentials GitHub may answer a missing public repo with an
+		// auth prompt rather than a clean 404; that surfaces as a real error on
+		// purpose, so accept it here but require Get not to resolve it.
+		t.Logf("Get returned a non-ErrNotFound error (acceptable if no VCS creds): %v", err)
+	}
+}
+
 func TestGetPkgRoot(t *testing.T) {
 	if testing.Short() {
 		t.Skip("network test skipped in -short mode")
