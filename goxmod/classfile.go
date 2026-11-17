@@ -84,9 +84,15 @@ func ImportClasses(goxmod *modfile.File, lookupModVer LookupModVer) (p Classes, 
 // so callers must treat them, and every *Project obtained from a Classes, as
 // read-only.
 func DefaultClasses() Classes {
+	return LoadClasses(TestProject, GshProject)
+}
+
+// LoadClasses returns a Classes containing the given projects.
+func LoadClasses(projs ...*Project) Classes {
 	p := Classes{projs: make(map[string]*Project)}
-	p.importClass(TestProject)
-	p.importClass(GshProject)
+	for _, c := range projs {
+		p.importClass(c)
+	}
 	return p
 }
 
