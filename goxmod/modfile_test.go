@@ -182,7 +182,7 @@ go 1.18
 require (
 	github.com/goplus/yap v0.5.0 //xgo:class
 	github.com/qiniu/a v0.1.0
-	github.com/qiniu/x v1.13.2 // gop:class
+	github.com/qiniu/x v1.13.2 //gop:class
 )
 `
 	gomod := parseGoMod(t, gomodText)

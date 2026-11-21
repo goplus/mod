@@ -20,6 +20,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/goplus/mod/gomod"
 	"github.com/goplus/mod/modfile"
 	gomodfile "golang.org/x/mod/modfile"
 )
@@ -31,14 +32,14 @@ const defaultXgoVer = "1.5"
 // LoadModfile reads and parses the gox.mod module description at goxmod,
 // enriched with information that only exists in go.mod. It is [LoadModfileEx]
 // with os.ReadFile; see that function for the full contract.
-func LoadModfile(gomod *gomodfile.File, goxmod string) (*modfile.File, error) {
-	return LoadModfileEx(gomod, goxmod, os.ReadFile)
+func LoadModfile(gomodf *gomodfile.File, goxmod string) (*modfile.File, error) {
+	return LoadModfileEx(gomodf, goxmod, os.ReadFile)
 }
 
 // LoadModfileEx reads and parses the gox.mod module description at goxmod,
 // enriched with information that only exists in go.mod. The readFile hook lets
 // editors and tests supply file contents from memory; LoadModfile passes
-// os.ReadFile. gomod is the parsed go.mod of the same module and may be nil.
+// os.ReadFile. gomodf is the parsed go.mod of the same module and may be nil.
 //
 // It performs these steps, in order:
 //
@@ -50,7 +51,7 @@ func LoadModfile(gomod *gomodfile.File, goxmod string) (*modfile.File, error) {
 //     the default XGo version, and no error is returned. A module without
 //     gox.mod is a normal case, not a failure. Any read error leads here, not
 //     only "file not found".
-//  4. If gomod is not nil, two things from go.mod are folded into the result:
+//  4. If gomodf is not nil, two things from go.mod are folded into the result:
 //     every require whose trailing comment starts with "xgo:class" (or the
 //     legacy "gop:class") is appended to ClassMods, and a trailing comment on
 //     the go directive that starts with "llgo " or "tinygo " (for example
@@ -59,7 +60,7 @@ func LoadModfile(gomod *gomodfile.File, goxmod string) (*modfile.File, error) {
 //
 // The result is therefore the union of what gox.mod declares and what go.mod
 // adds, so callers never have to merge the two themselves.
-func LoadModfileEx(gomod *gomodfile.File, goxmod string, readFile func(string) ([]byte, error)) (*modfile.File, error) {
+func LoadModfileEx(gomodf *gomodfile.File, goxmod string, readFile func(string) ([]byte, error)) (*modfile.File, error) {
 	var opt *modfile.File
 	if goxmod != "" {
 		data, err := readFile(goxmod)
@@ -80,9 +81,9 @@ func LoadModfileEx(gomod *gomodfile.File, goxmod string, readFile func(string) (
 	if opt == nil {
 		opt = modfile.New(goxmod, defaultXgoVer)
 	}
-	if gomod != nil {
-		importClassfileFromGoMod(opt, gomod)
-		if cl := getGoCompiler(gomod); cl != nil {
+	if gomodf != nil {
+		importClassfileFromGoMod(opt, gomodf)
+		if cl := gomod.Compiler(gomodf); cl != nil {
 			opt.Compiler = cl
 		}
 	}
@@ -94,56 +95,10 @@ func LoadModfileEx(gomod *gomodfile.File, goxmod string, readFile func(string) (
 // //gop:class).
 func importClassfileFromGoMod(opt *modfile.File, f *gomodfile.File) {
 	for _, r := range f.Require {
-		if isClass(r) {
+		if gomod.IsClass(r) {
 			opt.ClassMods = append(opt.ClassMods, r.Mod.Path)
 		}
 	}
-}
-
-// isClass reports whether a require is marked as a class module by a trailing
-// //xgo:class (or the legacy //gop:class) comment. The marker is matched after
-// leading whitespace is trimmed, as a prefix.
-func isClass(r *gomodfile.Require) bool {
-	if line := r.Syntax; line != nil {
-		for _, c := range line.Suffix {
-			text := strings.TrimLeft(c.Token[2:], " \t")
-			if strings.HasPrefix(text, "xgo:class") || strings.HasPrefix(text, "gop:class") {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-/*
-getGoCompiler reads a trailing comment on the go directive that names a custom
-compiler, for example:
-
-	go 1.18 // llgo 0.9
-	go 1.18 // tinygo 0.32
-
-The first matching comment wins. It returns nil if there is none.
-*/
-func getGoCompiler(f *gomodfile.File) *modfile.Compiler {
-	if gostmt := f.Go; gostmt != nil {
-		if line := gostmt.Syntax; line != nil {
-			for _, c := range line.Suffix {
-				text := strings.TrimLeft(c.Token[2:], " \t")
-				if strings.HasPrefix(text, "llgo ") {
-					return &modfile.Compiler{
-						Name:    "llgo",
-						Version: strings.TrimSpace(text[5:]),
-					}
-				} else if strings.HasPrefix(text, "tinygo ") {
-					return &modfile.Compiler{
-						Name:    "tinygo",
-						Version: strings.TrimSpace(text[7:]),
-					}
-				}
-			}
-		}
-	}
-	return nil
 }
 
 // -----------------------------------------------------------------------------
