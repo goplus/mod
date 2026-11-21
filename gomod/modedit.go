@@ -28,12 +28,17 @@ const (
 
 // -----------------------------------------------------------------------------
 
-// File wraps a modfile.File and provides higher-level operations for editing go.mod.
+// File wraps a modfile.File and provides higher-level operations for editing
+// go.mod. File is a small value type; copies share the same underlying
+// modfile.File, so edits made through any copy are visible to all of them.
 type File struct {
 	*modfile.File
 }
 
-// Create creates a new module with the given module path.
+// Create creates a new, in-memory go.mod for module modPath with a go directive
+// of goVer. gomod is the file name used later by [File.Save]; nothing is
+// written to disk until then. It fails if goVer is not a valid Go version;
+// modPath is not validated.
 func Create(gomod, modPath, goVer string) (_ File, err error) {
 	f := new(modfile.File)
 	if err = f.AddModuleStmt(modPath); err != nil {
@@ -46,7 +51,8 @@ func Create(gomod, modPath, goVer string) (_ File, err error) {
 	return File{f}, nil
 }
 
-// Load reads and parses the go.mod at the given path.
+// Load reads and parses the go.mod at the given path. The path is remembered
+// so that [File.Save] writes back to the same file.
 func Load(gomod string) (_ File, err error) {
 	data, err := os.ReadFile(gomod)
 	if err != nil {
@@ -57,7 +63,10 @@ func Load(gomod string) (_ File, err error) {
 }
 
 // AddCompiler records a compiler directive (llgo/tinygo) as a comment on the
-// go directive in go.mod, the way the XGo toolchain reads it.
+// go directive in go.mod, the way the XGo toolchain reads it (see [Compiler]).
+// For example, AddCompiler("llgo", "0.9") produces "go 1.18 // llgo 0.9".
+// If there is no go directive, one with the default Go version is added first.
+// Any existing trailing comment on the go directive is replaced.
 func (f File) AddCompiler(compiler, ver string) {
 	if f.Go == nil {
 		f.AddGoStmt(defaultGoVer)
@@ -70,8 +79,11 @@ func (f File) AddCompiler(compiler, ver string) {
 	}
 }
 
-// AddRequire adds a require line, marking it as a classfile require (//xgo:class)
-// when hasProj is set.
+// AddRequire adds a require line for path at version vers, or updates the
+// version if path is already required. When hasProj is set (the dependency
+// declares classfile projects), the require is also marked as a class module
+// with a trailing //xgo:class comment, unless it is already marked (see
+// [IsClass]). An existing marker is kept even when hasProj is false.
 func (f File) AddRequire(path, vers string, hasProj bool) error {
 	if err := f.File.AddRequire(path, vers); err != nil {
 		return err
@@ -92,8 +104,10 @@ func (f File) AddRequire(path, vers string, hasProj bool) error {
 	return nil
 }
 
-// Save writes go.mod to disk. The compiler directive (llgo/tinygo) lives in the
-// go.mod `go` line suffix.
+// Save cleans up and formats go.mod, then writes it to the path given to
+// [Create] or [Load]. The compiler directive (llgo/tinygo) lives in the go.mod
+// `go` line suffix, and class module markers in require line suffixes, so both
+// survive formatting.
 func (f File) Save() error {
 	f.Cleanup()
 	data, err := f.Format()
