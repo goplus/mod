@@ -17,21 +17,21 @@
 // Package gomod reads and edits the XGo-specific parts of a go.mod file.
 //
 // XGo stores two kinds of extra information in go.mod, both as trailing
-// comments so that the file stays valid for the go command:
+// comments so that the file stays valid for the go command.
 //
-//   - A class module marker on a require line, for example
+// A class module marker on a require line tells XGo to load the classfile
+// projects declared by that dependency, for example:
 //
-//     require github.com/goplus/yap v0.8.0 //xgo:class
+//	require github.com/goplus/yap v0.8.0 //xgo:class
 //
-//     It tells XGo to load the classfile projects declared by that dependency.
-//     The legacy //gop:class marker is also recognized. See [IsClass] and
-//     [File.AddRequire].
+// The legacy //gop:class marker is also recognized. See [IsClass] and
+// [File.AddRequire].
 //
-//   - A custom compiler on the go directive, for example
+// A custom compiler is recorded on the go directive, for example:
 //
-//     go 1.18 // llgo 0.9
+//	go 1.18 // llgo 0.9
 //
-//     See [Compiler] and [File.AddCompiler].
+// See [Compiler] and [File.AddCompiler].
 //
 // [File] wraps a [golang.org/x/mod/modfile.File] to create, load, edit and save
 // a go.mod with these markers.
